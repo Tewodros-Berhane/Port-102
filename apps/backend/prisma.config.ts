@@ -7,6 +7,8 @@ import { defineConfig } from 'prisma/config';
 const envFilePaths = [
   join(process.cwd(), '.env'),
   join(process.cwd(), '../../.env'),
+  join(process.cwd(), '.env.example'),
+  join(process.cwd(), '../../.env.example'),
 ];
 
 for (const path of envFilePaths) {
@@ -19,7 +21,7 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
-    seed: 'ts-node prisma/seed.ts',
+    seed: 'tsx prisma/seed.ts',
   },
   datasource: {
     url: process.env.DATABASE_URL ?? '',
