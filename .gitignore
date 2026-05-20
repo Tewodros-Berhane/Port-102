@@ -12,6 +12,15 @@ pnpm-debug.log*
 *.tsbuildinfo
 .DS_Store
 .turbo/
+AGENTS.md
+Agents.md
+tree.md
+apps/backend/AGENTS.md
+apps/backend/Agents.md
+apps/frontend/AGENTS.md
+apps/frontend/Agents.md
+apps/mobile/AGENTS.md
+apps/mobile/Agents.md
 apps/backend/src/generated/
 apps/backend/prisma.config.d.ts
 apps/backend/prisma.config.js
