@@ -1,8 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+import { configureApplication } from '../src/app.setup';
 
 describe('HealthController (e2e)', () => {
   let app: INestApplication;
@@ -16,14 +17,7 @@ describe('HealthController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    configureApplication(app);
     await app.init();
   });
 
@@ -37,8 +31,14 @@ describe('HealthController (e2e)', () => {
       .expect(200);
 
     expect(response.body).toMatchObject({
-      status: 'ok',
-      service: 'port-102-backend',
+      success: true,
+      statusCode: 200,
+      message: 'Request successful',
+      data: {
+        status: 'ok',
+        service: 'port-102-backend',
+      },
+      path: '/api/health',
     });
   });
 });
