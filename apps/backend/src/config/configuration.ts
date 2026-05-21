@@ -18,6 +18,10 @@ export default () => ({
     ),
     accessExpiresIn: optionalEnv('JWT_ACCESS_EXPIRES_IN', '15m'),
     refreshExpiresIn: optionalEnv('JWT_REFRESH_EXPIRES_IN', '30d'),
+    hotelSelectionExpiresIn: optionalEnv(
+      'JWT_HOTEL_SELECTION_EXPIRES_IN',
+      '10m',
+    ),
   },
   security: {
     bcryptSaltRounds: Number.parseInt(
