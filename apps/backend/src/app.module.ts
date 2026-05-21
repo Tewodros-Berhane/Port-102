@@ -3,7 +3,10 @@ import { ConfigModule } from '@nestjs/config';
 import { join } from 'node:path';
 
 import configuration from './config/configuration';
+import { ApprovalRequestsModule } from './modules/approval-requests/approval-requests.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { EmployeesModule } from './modules/employees/employees.module';
+import { GuestsModule } from './modules/guests/guests.module';
 import { HealthModule } from './modules/health/health.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { RolesModule } from './modules/roles/roles.module';
@@ -26,6 +29,9 @@ import { PrismaModule } from './prisma/prisma.module';
     HealthModule,
     AuthModule,
     UsersModule,
+    EmployeesModule,
+    GuestsModule,
+    ApprovalRequestsModule,
     RolesModule,
     PermissionsModule,
   ],
