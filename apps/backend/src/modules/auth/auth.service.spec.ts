@@ -11,6 +11,9 @@ describe('AuthService', () => {
   let service: AuthService;
   let usersRepository: {
     findByEmailForLogin: jest.Mock;
+    findByIdForHotelSelection: jest.Mock;
+    findActiveMembershipProfile: jest.Mock;
+    findActiveMembershipsForUser: jest.Mock;
   };
   let authTokensRepository: {
     createRefreshToken: jest.Mock;
@@ -22,6 +25,7 @@ describe('AuthService', () => {
   };
   let jwtService: {
     signAsync: jest.Mock;
+    verifyAsync: jest.Mock;
   };
   let configService: {
     getOrThrow: jest.Mock;
@@ -68,6 +72,9 @@ describe('AuthService', () => {
     passwordHash = await hash('CorrectPassword123!', 4);
     usersRepository = {
       findByEmailForLogin: jest.fn(),
+      findByIdForHotelSelection: jest.fn(),
+      findActiveMembershipProfile: jest.fn(),
+      findActiveMembershipsForUser: jest.fn(),
     };
     authTokensRepository = {
       createRefreshToken: jest.fn(),
@@ -79,12 +86,14 @@ describe('AuthService', () => {
     };
     jwtService = {
       signAsync: jest.fn().mockResolvedValue('access-token'),
+      verifyAsync: jest.fn(),
     };
     configService = {
       getOrThrow: jest.fn((key: string) => {
         const values: Record<string, string> = {
           'jwt.accessExpiresIn': '15m',
           'jwt.refreshExpiresIn': '30d',
+          'jwt.hotelSelectionExpiresIn': '10m',
         };
 
         return values[key] ?? 'secret';
@@ -248,9 +257,215 @@ describe('AuthService', () => {
       requiresHotelSelection: true,
       activeHotel: null,
       membership: null,
+      hotelSelectionToken: 'access-token',
       tokens: null,
     });
     expect(response.hotelChoices).toHaveLength(2);
+    expect(jwtService.signAsync).toHaveBeenCalledWith(
+      {
+        sub: 1,
+        email: 'admin@demo-hotel.com',
+        tokenVersion: 0,
+        purpose: 'hotel-selection',
+      },
+      { expiresIn: '10m' },
+    );
+  });
+
+  it('returns the current user hotel context and permissions', async () => {
+    usersRepository.findActiveMembershipProfile.mockResolvedValue({
+      ...activeMembership,
+      userId: 1,
+      hotelId: 1,
+      user: {
+        id: 1,
+        email: 'admin@demo-hotel.com',
+        fullName: 'Hotel Admin',
+      },
+      role: {
+        ...activeMembership.role,
+        permissions: [
+          {
+            permission: {
+              key: 'users.read',
+            },
+          },
+          {
+            permission: {
+              key: 'reports.occupancy.read',
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(
+      service.getMe({
+        sub: 1,
+        email: 'admin@demo-hotel.com',
+        hotelId: 1,
+        membershipId: 10,
+        roleKey: 'HOTEL_ADMIN',
+        tokenVersion: 0,
+      }),
+    ).resolves.toEqual({
+      id: 1,
+      name: 'Hotel Admin',
+      email: 'admin@demo-hotel.com',
+      activeHotel: {
+        id: 1,
+        name: 'Demo Hotel',
+        code: 'DEMO',
+      },
+      membership: {
+        id: 10,
+        role: {
+          id: 2,
+          key: 'HOTEL_ADMIN',
+          name: 'Hotel Admin',
+        },
+        department: {
+          id: 3,
+          key: 'ADMINISTRATION',
+          name: 'Administration',
+        },
+      },
+      permissions: ['users.read', 'reports.occupancy.read'],
+    });
+    expect(usersRepository.findActiveMembershipProfile).toHaveBeenCalledWith(
+      1,
+      10,
+    );
+  });
+
+  it('lists active hotels available to the current user', async () => {
+    usersRepository.findActiveMembershipsForUser.mockResolvedValue([
+      activeMembership,
+      {
+        ...activeMembership,
+        id: 11,
+        hotel: {
+          id: 2,
+          name: 'Second Hotel',
+          code: 'SECOND',
+          status: 'ACTIVE',
+        },
+      },
+    ]);
+
+    await expect(
+      service.getMyHotels({
+        sub: 1,
+        email: 'admin@demo-hotel.com',
+        hotelId: 1,
+        membershipId: 10,
+        roleKey: 'HOTEL_ADMIN',
+        tokenVersion: 0,
+      }),
+    ).resolves.toEqual([
+      {
+        id: 10,
+        hotel: {
+          id: 1,
+          name: 'Demo Hotel',
+          code: 'DEMO',
+        },
+        role: {
+          id: 2,
+          key: 'HOTEL_ADMIN',
+          name: 'Hotel Admin',
+        },
+        department: {
+          id: 3,
+          key: 'ADMINISTRATION',
+          name: 'Administration',
+        },
+      },
+      {
+        id: 11,
+        hotel: {
+          id: 2,
+          name: 'Second Hotel',
+          code: 'SECOND',
+        },
+        role: {
+          id: 2,
+          key: 'HOTEL_ADMIN',
+          name: 'Hotel Admin',
+        },
+        department: {
+          id: 3,
+          key: 'ADMINISTRATION',
+          name: 'Administration',
+        },
+      },
+    ]);
+  });
+
+  it('selects an active hotel and issues tokens', async () => {
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 1,
+      email: 'admin@demo-hotel.com',
+      tokenVersion: 0,
+      purpose: 'hotel-selection',
+    });
+    usersRepository.findByIdForHotelSelection.mockResolvedValue(
+      createUser({
+        hotelUsers: [
+          activeMembership,
+          {
+            ...activeMembership,
+            id: 11,
+            hotel: {
+              id: 2,
+              name: 'Second Hotel',
+              code: 'SECOND',
+              status: 'ACTIVE',
+            },
+          },
+        ],
+      }),
+    );
+
+    const response = await service.selectHotel('selection-token', 2);
+
+    expect(response).toMatchObject({
+      requiresHotelSelection: false,
+      activeHotel: {
+        id: 2,
+        name: 'Second Hotel',
+        code: 'SECOND',
+      },
+      membership: {
+        id: 11,
+      },
+      hotelSelectionToken: null,
+      tokens: {
+        accessToken: 'access-token',
+        tokenType: 'Bearer',
+        expiresIn: '15m',
+      },
+    });
+    expect(jwtService.verifyAsync).toHaveBeenCalledWith('selection-token');
+    expect(jwtService.signAsync).toHaveBeenLastCalledWith(
+      {
+        sub: 1,
+        email: 'admin@demo-hotel.com',
+        hotelId: 2,
+        membershipId: 11,
+        roleKey: 'HOTEL_ADMIN',
+        tokenVersion: 0,
+      },
+      { expiresIn: '15m' },
+    );
+  });
+
+  it('rejects invalid hotel selection tokens', async () => {
+    jwtService.verifyAsync.mockRejectedValue(new Error('expired'));
+
+    await expect(service.selectHotel('expired-token', 1)).rejects.toThrow(
+      'Invalid hotel selection token.',
+    );
   });
 
   it('rotates refresh tokens', async () => {
