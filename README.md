@@ -15,41 +15,17 @@ packages/sdk      Future API SDK
 
 ## Backend
 
-The backend lives in `apps/backend` and is built with NestJS, TypeScript, PostgreSQL, Prisma ORM, Swagger/OpenAPI, and Jest.
+The backend lives in `apps/backend`. It was generated with the Nest CLI and is built with NestJS, TypeScript, PostgreSQL, Prisma ORM, Swagger/OpenAPI, Jest, and Supertest.
 
-### Install
+### Backend Setup
+
+Install dependencies from the monorepo root:
 
 ```bash
 npm install
 ```
 
-### Configure environment
-
-```bash
-cp .env.example .env
-```
-
-The backend reads `DATABASE_URL` from `.env`. The default value matches the PostgreSQL service in `docker-compose.yml`.
-
-### Start PostgreSQL
-
-```bash
-docker compose up -d postgres
-```
-
-### Generate Prisma client
-
-```bash
-npm run backend:prisma:generate
-```
-
-### Run database migrations
-
-```bash
-npm run backend:prisma:migrate
-```
-
-### Start the backend
+Start the backend in development mode:
 
 ```bash
 npm run backend:dev
@@ -57,7 +33,67 @@ npm run backend:dev
 
 The API starts on `http://localhost:3000` by default.
 
-Swagger documentation is available at `http://localhost:3000/api/docs`.
+### Environment Setup
+
+Create a local environment file:
+
+```bash
+cp .env.example .env
+```
+
+Required backend environment values:
+
+```text
+NODE_ENV=development
+PORT=3000
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/port_102?schema=public"
+```
+
+The backend uses `ConfigModule` globally and reads these values from the root `.env` file.
+
+### Database Setup
+
+Start PostgreSQL with Docker Compose:
+
+```bash
+docker compose up -d postgres
+```
+
+The default database settings in `.env.example` match the `postgres` service in `docker-compose.yml`.
+
+### Prisma Commands
+
+Generate the Prisma client:
+
+```bash
+npm run backend:prisma:generate
+```
+
+Create and run a development migration:
+
+```bash
+npm run backend:prisma:migrate
+```
+
+Deploy existing migrations:
+
+```bash
+npm run backend:prisma:deploy
+```
+
+Open Prisma Studio:
+
+```bash
+npm run backend:prisma:studio
+```
+
+Run the seed script:
+
+```bash
+npm run backend:prisma:seed
+```
+
+### Health, Swagger, and Response Format
 
 Health check endpoint:
 
@@ -65,10 +101,55 @@ Health check endpoint:
 GET /api/health
 ```
 
-### Test and build
+Swagger documentation is available at:
+
+```text
+http://localhost:3000/api/docs
+```
+
+Successful API responses are wrapped globally:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Request successful",
+  "data": {},
+  "timestamp": "2026-05-19T00:00:00.000Z",
+  "path": "/api/health"
+}
+```
+
+HTTP exceptions are formatted globally:
+
+```json
+{
+  "success": false,
+  "statusCode": 404,
+  "error": "Not Found",
+  "message": "Cannot GET /api/example",
+  "timestamp": "2026-05-19T00:00:00.000Z",
+  "path": "/api/example"
+}
+```
+
+### Tests and Build
+
+Run unit tests:
 
 ```bash
 npm run backend:test
+```
+
+Run e2e tests:
+
+```bash
+npm run test:e2e -w @port-102/backend
+```
+
+Build the backend:
+
+```bash
 npm run backend:build
 ```
 
