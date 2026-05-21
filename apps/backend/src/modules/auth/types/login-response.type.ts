@@ -12,5 +12,6 @@ export type LoginResponse = {
   activeHotel: LocalAuthenticatedMembership['hotel'] | null;
   membership: LocalAuthenticatedMembership | null;
   hotelChoices: LocalAuthenticatedMembership[];
+  hotelSelectionToken: string | null;
   tokens: TokenPair | null;
 };
