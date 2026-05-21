@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
+import { HotelAccessGuard } from '../../common/guards/hotel-access.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
@@ -25,7 +26,13 @@ import { LocalStrategy } from './strategies/local.strategy';
     UsersModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthTokensRepository, JwtStrategy, LocalStrategy],
+  providers: [
+    AuthService,
+    AuthTokensRepository,
+    HotelAccessGuard,
+    JwtStrategy,
+    LocalStrategy,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}
