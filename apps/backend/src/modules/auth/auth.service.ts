@@ -1,6 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { compare } from 'bcryptjs';
@@ -8,13 +12,38 @@ import type { SignOptions } from 'jsonwebtoken';
 
 import { UsersRepository } from '../users/repositories/users.repository';
 import { AuthTokensRepository } from './repositories/auth-tokens.repository';
+import type { AuthMeResponse } from './types/auth-me-response.type';
 import type { CurrentUserPayload } from './types/current-user-payload.type';
+import type { HotelSelectionPayload } from './types/hotel-selection-payload.type';
 import {
   LocalAuthenticatedMembership,
   LocalAuthenticatedUser,
 } from './types/local-authenticated-user.type';
 import { LoginResponse } from './types/login-response.type';
 import type { TokenPair } from './types/token-pair.type';
+
+type AuthMembershipSource = {
+  id: number;
+  status?: string;
+  hotel: {
+    id: number;
+    name: string;
+    code: string;
+    status?: string;
+  };
+  role: {
+    id: number;
+    key: string;
+    systemKey: string | null;
+    name: string;
+    isActive?: boolean;
+  };
+  department: {
+    id: number;
+    key: string;
+    name: string;
+  } | null;
+};
 
 @Injectable()
 export class AuthService {
@@ -47,33 +76,7 @@ export class AuthService {
       throw new UnauthorizedException('User account is not active.');
     }
 
-    const activeMemberships = user.hotelUsers
-      .filter(
-        (membership) =>
-          membership.status === 'ACTIVE' &&
-          membership.hotel.status === 'ACTIVE' &&
-          membership.role.isActive,
-      )
-      .map<LocalAuthenticatedMembership>((membership) => ({
-        id: membership.id,
-        hotel: {
-          id: membership.hotel.id,
-          name: membership.hotel.name,
-          code: membership.hotel.code,
-        },
-        role: {
-          id: membership.role.id,
-          key: membership.role.systemKey ?? membership.role.key,
-          name: membership.role.name,
-        },
-        department: membership.department
-          ? {
-              id: membership.department.id,
-              key: membership.department.key,
-              name: membership.department.name,
-            }
-          : null,
-      }));
+    const activeMemberships = this.mapActiveMemberships(user.hotelUsers);
 
     if (activeMemberships.length === 0) {
       throw new UnauthorizedException('User has no active hotel membership.');
@@ -96,6 +99,10 @@ export class AuthService {
     const tokens = singleMembership
       ? await this.createTokenPair(user, singleMembership)
       : null;
+    const hotelSelectionToken =
+      user.memberships.length > 1
+        ? await this.createHotelSelectionToken(user)
+        : null;
 
     return {
       status: 'authenticated',
@@ -108,6 +115,108 @@ export class AuthService {
       activeHotel: singleMembership?.hotel ?? null,
       membership: singleMembership,
       hotelChoices: user.memberships,
+      hotelSelectionToken,
+      tokens,
+    };
+  }
+
+  async getMe(payload: CurrentUserPayload): Promise<AuthMeResponse> {
+    const membership = await this.usersRepository.findActiveMembershipProfile(
+      payload.sub,
+      payload.membershipId,
+    );
+
+    if (!membership || membership.hotelId !== payload.hotelId) {
+      throw new UnauthorizedException('Invalid access token.');
+    }
+
+    return {
+      id: membership.user.id,
+      name: membership.user.fullName,
+      email: membership.user.email,
+      activeHotel: {
+        id: membership.hotel.id,
+        name: membership.hotel.name,
+        code: membership.hotel.code,
+      },
+      membership: {
+        id: membership.id,
+        role: {
+          id: membership.role.id,
+          key: membership.role.systemKey ?? membership.role.key,
+          name: membership.role.name,
+        },
+        department: membership.department
+          ? {
+              id: membership.department.id,
+              key: membership.department.key,
+              name: membership.department.name,
+            }
+          : null,
+      },
+      permissions: membership.role.permissions.map(
+        ({ permission }) => permission.key,
+      ),
+    };
+  }
+
+  async getMyHotels(
+    payload: CurrentUserPayload,
+  ): Promise<LocalAuthenticatedMembership[]> {
+    const memberships = await this.usersRepository.findActiveMembershipsForUser(
+      payload.sub,
+    );
+
+    return memberships.map((membership) => this.mapMembership(membership));
+  }
+
+  async selectHotel(
+    hotelSelectionToken: string,
+    hotelId: number,
+  ): Promise<LoginResponse> {
+    const selectionPayload =
+      await this.verifyHotelSelectionToken(hotelSelectionToken);
+    const user = await this.usersRepository.findByIdForHotelSelection(
+      selectionPayload.sub,
+    );
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Invalid hotel selection token.');
+    }
+
+    if (user.tokenVersion !== selectionPayload.tokenVersion) {
+      throw new UnauthorizedException('Invalid hotel selection token.');
+    }
+
+    const localUser: LocalAuthenticatedUser = {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      tokenVersion: user.tokenVersion,
+      memberships: this.mapActiveMemberships(user.hotelUsers),
+    };
+    const selectedMembership = localUser.memberships.find(
+      (membership) => membership.hotel.id === hotelId,
+    );
+
+    if (!selectedMembership) {
+      throw new ForbiddenException('Hotel access is not allowed.');
+    }
+
+    const tokens = await this.createTokenPair(localUser, selectedMembership);
+
+    return {
+      status: 'authenticated',
+      user: {
+        id: localUser.id,
+        email: localUser.email,
+        fullName: localUser.fullName,
+      },
+      requiresHotelSelection: false,
+      activeHotel: selectedMembership.hotel,
+      membership: selectedMembership,
+      hotelChoices: localUser.memberships,
+      hotelSelectionToken: null,
       tokens,
     };
   }
@@ -226,25 +335,9 @@ export class AuthService {
     };
   }
 
-  private mapMembership(membership: {
-    id: number;
-    hotel: {
-      id: number;
-      name: string;
-      code: string;
-    };
-    role: {
-      id: number;
-      key: string;
-      systemKey: string | null;
-      name: string;
-    };
-    department: {
-      id: number;
-      key: string;
-      name: string;
-    } | null;
-  }): LocalAuthenticatedMembership {
+  private mapMembership(
+    membership: AuthMembershipSource,
+  ): LocalAuthenticatedMembership {
     return {
       id: membership.id,
       hotel: {
@@ -267,6 +360,17 @@ export class AuthService {
     };
   }
 
+  private mapActiveMemberships(memberships: AuthMembershipSource[]) {
+    return memberships
+      .filter(
+        (membership) =>
+          membership.status === 'ACTIVE' &&
+          membership.hotel.status === 'ACTIVE' &&
+          membership.role.isActive,
+      )
+      .map((membership) => this.mapMembership(membership));
+  }
+
   private generateRefreshToken() {
     return randomBytes(64).toString('base64url');
   }
@@ -285,6 +389,44 @@ export class AuthService {
     return this.configService.getOrThrow<string>(
       'jwt.accessExpiresIn',
     ) as SignOptions['expiresIn'];
+  }
+
+  private hotelSelectionTokenExpiresIn(): SignOptions['expiresIn'] {
+    return this.configService.getOrThrow<string>(
+      'jwt.hotelSelectionExpiresIn',
+    ) as SignOptions['expiresIn'];
+  }
+
+  private createHotelSelectionToken(user: LocalAuthenticatedUser) {
+    const payload: HotelSelectionPayload = {
+      sub: user.id,
+      email: user.email,
+      tokenVersion: user.tokenVersion,
+      purpose: 'hotel-selection',
+    };
+
+    return this.jwtService.signAsync(payload, {
+      expiresIn: this.hotelSelectionTokenExpiresIn(),
+    });
+  }
+
+  private async verifyHotelSelectionToken(token: string) {
+    try {
+      const payload =
+        await this.jwtService.verifyAsync<HotelSelectionPayload>(token);
+
+      if (payload.purpose !== 'hotel-selection') {
+        throw new UnauthorizedException('Invalid hotel selection token.');
+      }
+
+      return payload;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new UnauthorizedException('Invalid hotel selection token.');
+    }
   }
 
   private parseDurationToMs(duration: string) {
