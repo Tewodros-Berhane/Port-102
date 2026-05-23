@@ -203,7 +203,7 @@ async function seedRolePermissions(prisma: PrismaClient) {
   }
 }
 
-async function seedInitialHotel(prisma: PrismaClient) {
+async function seedHotelProfile(prisma: PrismaClient) {
   const hotelName = optionalEnv('INITIAL_HOTEL_NAME', 'Demo Hotel');
   const hotelCode = optionalEnv('INITIAL_HOTEL_CODE', 'DEMO');
 
@@ -211,46 +211,39 @@ async function seedInitialHotel(prisma: PrismaClient) {
     where: { code: hotelCode },
     update: {
       name: hotelName,
-      status: 'ACTIVE',
+      timezone: optionalEnv('INITIAL_HOTEL_TIMEZONE', 'Africa/Nairobi'),
+      defaultCurrency: optionalEnv('INITIAL_HOTEL_CURRENCY', 'ETB'),
     },
     create: {
       name: hotelName,
       code: hotelCode,
+      timezone: optionalEnv('INITIAL_HOTEL_TIMEZONE', 'Africa/Nairobi'),
+      defaultCurrency: optionalEnv('INITIAL_HOTEL_CURRENCY', 'ETB'),
     },
   });
 }
 
-async function seedDefaultDepartments(prisma: PrismaClient, hotelId: number) {
-  const departments = [];
-
+async function seedDefaultDepartments(prisma: PrismaClient) {
   for (const department of DEFAULT_DEPARTMENTS) {
-    departments.push(
-      await prisma.department.upsert({
-        where: {
-          hotelId_key: {
-            hotelId,
-            key: department.key,
-          },
-        },
-        update: {
-          name: department.name,
-          description: department.description,
-          isActive: true,
-        },
-        create: {
-          hotelId,
-          key: department.key,
-          name: department.name,
-          description: department.description,
-        },
-      }),
-    );
+    await prisma.department.upsert({
+      where: {
+        key: department.key,
+      },
+      update: {
+        name: department.name,
+        description: department.description,
+        isActive: true,
+      },
+      create: {
+        key: department.key,
+        name: department.name,
+        description: department.description,
+      },
+    });
   }
-
-  return departments;
 }
 
-async function seedInitialAdmin(prisma: PrismaClient, hotelId: number) {
+async function seedInitialAdmin(prisma: PrismaClient) {
   const adminName = optionalEnv('INITIAL_ADMIN_NAME', 'Hotel Admin');
   const adminEmail = normalizeEmail(
     optionalEnv('INITIAL_ADMIN_EMAIL', 'admin@demo-hotel.com'),
@@ -268,10 +261,7 @@ async function seedInitialAdmin(prisma: PrismaClient, hotelId: number) {
 
   const administrationDepartment = await prisma.department.findUnique({
     where: {
-      hotelId_key: {
-        hotelId,
-        key: 'ADMINISTRATION',
-      },
+      key: 'ADMINISTRATION',
     },
   });
 
@@ -283,41 +273,24 @@ async function seedInitialAdmin(prisma: PrismaClient, hotelId: number) {
     where: { email: adminEmail },
   });
 
-  const admin =
-    existingAdmin ??
-    (await prisma.user.create({
-      data: {
-        email: adminEmail,
-        fullName: adminName,
-        passwordHash: await hash(adminPassword, bcryptSaltRounds),
-      },
-    }));
-
   if (existingAdmin) {
     await prisma.user.update({
       where: { id: existingAdmin.id },
       data: {
         fullName: adminName,
         status: 'ACTIVE',
+        roleId: hotelAdminRole.id,
+        departmentId: administrationDepartment.id,
       },
     });
+    return;
   }
 
-  await prisma.hotelUser.upsert({
-    where: {
-      userId_hotelId: {
-        userId: admin.id,
-        hotelId,
-      },
-    },
-    update: {
-      roleId: hotelAdminRole.id,
-      departmentId: administrationDepartment.id,
-      status: 'ACTIVE',
-    },
-    create: {
-      userId: admin.id,
-      hotelId,
+  await prisma.user.create({
+    data: {
+      email: adminEmail,
+      fullName: adminName,
+      passwordHash: await hash(adminPassword, bcryptSaltRounds),
       roleId: hotelAdminRole.id,
       departmentId: administrationDepartment.id,
     },
@@ -336,15 +309,14 @@ async function main() {
     await seedPermissions(prisma);
     await seedRoles(prisma);
     await seedRolePermissions(prisma);
-
-    const hotel = await seedInitialHotel(prisma);
-    await seedDefaultDepartments(prisma, hotel.id);
-    await seedInitialAdmin(prisma, hotel.id);
+    await seedHotelProfile(prisma);
+    await seedDefaultDepartments(prisma);
+    await seedInitialAdmin(prisma);
 
     const [permissionCount, roleCount, departmentCount] = await Promise.all([
       prisma.permission.count(),
       prisma.role.count({ where: { isSystem: true } }),
-      prisma.department.count({ where: { hotelId: hotel.id } }),
+      prisma.department.count(),
     ]);
 
     console.log(
