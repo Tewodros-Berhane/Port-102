@@ -43,20 +43,13 @@ export class EmployeesService {
   constructor(private readonly employeesRepository: EmployeesRepository) {}
 
   async create(
-    currentUser: CurrentUserPayload,
+    _currentUser: CurrentUserPayload,
     createEmployeeDto: CreateEmployeeDto,
   ) {
-    await this.ensureAssignableDepartment(
-      currentUser.hotelId,
-      createEmployeeDto.departmentId,
-    );
-    await this.ensureEmployeeNumberAvailable(
-      currentUser.hotelId,
-      createEmployeeDto.employeeNumber,
-    );
+    await this.ensureAssignableDepartment(createEmployeeDto.departmentId);
+    await this.ensureEmployeeNumberAvailable(createEmployeeDto.employeeNumber);
 
     const employee = await this.employeesRepository.createEmployee({
-      hotelId: currentUser.hotelId,
       departmentId: createEmployeeDto.departmentId ?? null,
       employeeNumber: this.normalizeOptionalString(
         createEmployeeDto.employeeNumber,
@@ -72,12 +65,11 @@ export class EmployeesService {
     return this.serializeEmployee(employee);
   }
 
-  async list(currentUser: CurrentUserPayload, query: ListEmployeesQueryDto) {
+  async list(_currentUser: CurrentUserPayload, query: ListEmployeesQueryDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
     const search = this.normalizeOptionalString(query.search);
     const [total, employees] = await this.employeesRepository.listEmployees({
-      hotelId: currentUser.hotelId,
       skip: (page - 1) * pageSize,
       take: pageSize,
       search: search ?? undefined,
@@ -95,11 +87,8 @@ export class EmployeesService {
     };
   }
 
-  async getById(currentUser: CurrentUserPayload, employeeId: number) {
-    const employee = await this.findRequiredEmployee(
-      currentUser.hotelId,
-      employeeId,
-    );
+  async getById(_currentUser: CurrentUserPayload, employeeId: number) {
+    const employee = await this.findRequiredEmployee(employeeId);
 
     return this.serializeEmployee(employee);
   }
@@ -109,17 +98,10 @@ export class EmployeesService {
     employeeId: number,
     updateEmployeeDto: UpdateEmployeeDto,
   ) {
-    const employee = await this.findRequiredEmployee(
-      currentUser.hotelId,
-      employeeId,
-    );
+    const employee = await this.findRequiredEmployee(employeeId);
 
-    await this.ensureAssignableDepartment(
-      currentUser.hotelId,
-      updateEmployeeDto.departmentId,
-    );
+    await this.ensureAssignableDepartment(updateEmployeeDto.departmentId);
     await this.ensureEmployeeNumberAvailable(
-      currentUser.hotelId,
       updateEmployeeDto.employeeNumber,
       employee.id,
     );
@@ -170,15 +152,15 @@ export class EmployeesService {
     }
 
     if (Object.keys(data).length > 0) {
-      await this.updateEmployeeOrThrow(currentUser.hotelId, employee.id, data);
+      await this.updateEmployeeOrThrow(employee.id, data);
     }
 
     return this.getById(currentUser, employee.id);
   }
 
   async deactivate(currentUser: CurrentUserPayload, employeeId: number) {
-    await this.findRequiredEmployee(currentUser.hotelId, employeeId);
-    await this.updateEmployeeOrThrow(currentUser.hotelId, employeeId, {
+    await this.findRequiredEmployee(employeeId);
+    await this.updateEmployeeOrThrow(employeeId, {
       status: 'INACTIVE',
     });
 
@@ -190,29 +172,22 @@ export class EmployeesService {
     employeeId: number,
     linkEmployeeUserDto: LinkEmployeeUserDto,
   ) {
-    const employee = await this.findRequiredEmployee(
-      currentUser.hotelId,
-      employeeId,
-    );
+    const employee = await this.findRequiredEmployee(employeeId);
 
     if (employee.user && employee.user.id !== linkEmployeeUserDto.userId) {
       throw new ConflictException('Employee is already linked to a user.');
     }
 
-    const hotelUser = await this.employeesRepository.findHotelUser(
-      currentUser.hotelId,
+    const user = await this.employeesRepository.findActiveUser(
       linkEmployeeUserDto.userId,
     );
 
-    if (!hotelUser) {
-      throw new ForbiddenException(
-        'User does not belong to the current hotel.',
-      );
+    if (!user) {
+      throw new ForbiddenException('User is not active or does not exist.');
     }
 
     const linkedEmployee =
       await this.employeesRepository.findEmployeeLinkedToUser(
-        currentUser.hotelId,
         linkEmployeeUserDto.userId,
       );
 
@@ -222,50 +197,40 @@ export class EmployeesService {
       );
     }
 
-    await this.updateEmployeeOrThrow(currentUser.hotelId, employee.id, {
-      userId: hotelUser.userId,
+    await this.updateEmployeeOrThrow(employee.id, {
+      userId: user.id,
     });
 
     return this.getById(currentUser, employee.id);
   }
 
-  private async findRequiredEmployee(hotelId: number, employeeId: number) {
-    const employee = await this.employeesRepository.findEmployeeProfile(
-      hotelId,
-      employeeId,
-    );
+  private async findRequiredEmployee(employeeId: number) {
+    const employee =
+      await this.employeesRepository.findEmployeeProfile(employeeId);
 
     if (!employee) {
-      throw new NotFoundException('Employee was not found in this hotel.');
+      throw new NotFoundException('Employee was not found.');
     }
 
     return employee;
   }
 
-  private async ensureAssignableDepartment(
-    hotelId: number,
-    departmentId?: number | null,
-  ) {
+  private async ensureAssignableDepartment(departmentId?: number | null) {
     if (departmentId === undefined || departmentId === null) {
       return null;
     }
 
-    const department = await this.employeesRepository.findActiveDepartment(
-      hotelId,
-      departmentId,
-    );
+    const department =
+      await this.employeesRepository.findActiveDepartment(departmentId);
 
     if (!department) {
-      throw new ForbiddenException(
-        'Department is not assignable to this hotel.',
-      );
+      throw new ForbiddenException('Department is not assignable.');
     }
 
     return department;
   }
 
   private async ensureEmployeeNumberAvailable(
-    hotelId: number,
     employeeNumber?: string | null,
     currentEmployeeId?: number,
   ) {
@@ -278,21 +243,17 @@ export class EmployeesService {
 
     const existingEmployee =
       await this.employeesRepository.findEmployeeByNumber(
-        hotelId,
         normalizedEmployeeNumber,
       );
 
     if (existingEmployee && existingEmployee.id !== currentEmployeeId) {
-      throw new ConflictException(
-        'Employee number already exists in this hotel.',
-      );
+      throw new ConflictException('Employee number already exists.');
     }
 
     return existingEmployee;
   }
 
   private async updateEmployeeOrThrow(
-    hotelId: number,
     employeeId: number,
     data: {
       departmentId?: number | null;
@@ -308,13 +269,12 @@ export class EmployeesService {
     },
   ) {
     const result = await this.employeesRepository.updateEmployee(
-      hotelId,
       employeeId,
       data,
     );
 
     if (result.count === 0) {
-      throw new NotFoundException('Employee was not found in this hotel.');
+      throw new NotFoundException('Employee was not found.');
     }
   }
 
