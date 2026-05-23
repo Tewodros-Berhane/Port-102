@@ -10,6 +10,7 @@ import {
   ApprovalStatus,
   Prisma,
 } from '../../generated/prisma/client';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { CreateApprovalRequestDto } from './dto/create-approval-request.dto';
 import { DecideApprovalRequestDto } from './dto/decide-approval-request.dto';
@@ -41,26 +42,10 @@ type ApprovalRequestRecord = {
     email: string;
     fullName: string;
   };
-  requestedByHotelUser: {
-    id: number;
-    role: {
-      id: number;
-      key: string;
-      name: string;
-    };
-  } | null;
   decidedByUser: {
     id: number;
     email: string;
     fullName: string;
-  } | null;
-  decidedByHotelUser: {
-    id: number;
-    role: {
-      id: number;
-      key: string;
-      name: string;
-    };
   } | null;
 };
 
@@ -68,6 +53,7 @@ type ApprovalRequestRecord = {
 export class ApprovalRequestsService {
   constructor(
     private readonly approvalRequestsRepository: ApprovalRequestsRepository,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async create(
@@ -79,9 +65,7 @@ export class ApprovalRequestsService {
     );
     const approvalRequest =
       await this.approvalRequestsRepository.createApprovalRequest({
-        hotelId: currentUser.hotelId,
         requestedByUserId: currentUser.sub,
-        requestedByHotelUserId: currentUser.membershipId,
         type,
         title: this.normalizeRequiredString(
           createApprovalRequestDto.title,
@@ -91,11 +75,23 @@ export class ApprovalRequestsService {
         payload: this.toInputJson(createApprovalRequestDto.payload),
       });
 
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'approval_request.created',
+      entityType: 'ApprovalRequest',
+      entityId: String(approvalRequest.id),
+      metadata: {
+        approvalRequestId: approvalRequest.id,
+        type: approvalRequest.type,
+        status: approvalRequest.status,
+      },
+    });
+
     return this.serializeApprovalRequest(approvalRequest);
   }
 
   async list(
-    currentUser: CurrentUserPayload,
+    _currentUser: CurrentUserPayload,
     query: ListApprovalRequestsQueryDto,
   ) {
     const page = query.page ?? 1;
@@ -105,7 +101,6 @@ export class ApprovalRequestsService {
       : undefined;
     const [total, approvalRequests] =
       await this.approvalRequestsRepository.listApprovalRequests({
-        hotelId: currentUser.hotelId,
         skip: (page - 1) * pageSize,
         take: pageSize,
         status: query.status,
@@ -125,11 +120,9 @@ export class ApprovalRequestsService {
     };
   }
 
-  async getById(currentUser: CurrentUserPayload, approvalRequestId: number) {
-    const approvalRequest = await this.findRequiredApprovalRequest(
-      currentUser.hotelId,
-      approvalRequestId,
-    );
+  async getById(_currentUser: CurrentUserPayload, approvalRequestId: number) {
+    const approvalRequest =
+      await this.findRequiredApprovalRequest(approvalRequestId);
 
     return this.serializeApprovalRequest(approvalRequest);
   }
@@ -169,10 +162,8 @@ export class ApprovalRequestsService {
     status: typeof ApprovalStatus.APPROVED | typeof ApprovalStatus.REJECTED,
     auditAction: string,
   ) {
-    const approvalRequest = await this.findRequiredApprovalRequest(
-      currentUser.hotelId,
-      approvalRequestId,
-    );
+    const approvalRequest =
+      await this.findRequiredApprovalRequest(approvalRequestId);
     const type = this.ensureSupportedApprovalType(approvalRequest.type);
 
     if (approvalRequest.status !== ApprovalStatus.PENDING) {
@@ -183,16 +174,12 @@ export class ApprovalRequestsService {
 
     const decidedApprovalRequest =
       await this.approvalRequestsRepository.decideApprovalRequest({
-        hotelId: currentUser.hotelId,
         approvalRequestId,
-        requestType: type,
         status,
         decidedByUserId: currentUser.sub,
-        decidedByHotelUserId: currentUser.membershipId,
         decisionNote: this.normalizeOptionalString(
           decideApprovalRequestDto.decisionNote,
         ),
-        auditAction,
       });
 
     if (!decidedApprovalRequest) {
@@ -201,23 +188,29 @@ export class ApprovalRequestsService {
       );
     }
 
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: auditAction,
+      entityType: 'ApprovalRequest',
+      entityId: String(approvalRequestId),
+      metadata: {
+        approvalRequestId,
+        type,
+        status,
+      },
+    });
+
     return this.serializeApprovalRequest(decidedApprovalRequest);
   }
 
-  private async findRequiredApprovalRequest(
-    hotelId: number,
-    approvalRequestId: number,
-  ) {
+  private async findRequiredApprovalRequest(approvalRequestId: number) {
     const approvalRequest =
       await this.approvalRequestsRepository.findApprovalRequest(
-        hotelId,
         approvalRequestId,
       );
 
     if (!approvalRequest) {
-      throw new NotFoundException(
-        'Approval request was not found in this hotel.',
-      );
+      throw new NotFoundException('Approval request was not found.');
     }
 
     return approvalRequest;
@@ -245,12 +238,10 @@ export class ApprovalRequestsService {
       updatedAt: approvalRequest.updatedAt,
       requestedBy: {
         user: approvalRequest.requestedByUser,
-        hotelUser: approvalRequest.requestedByHotelUser,
       },
       decidedBy: approvalRequest.decidedByUser
         ? {
             user: approvalRequest.decidedByUser,
-            hotelUser: approvalRequest.decidedByHotelUser,
           }
         : null,
     };
