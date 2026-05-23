@@ -1,4 +1,7 @@
-import type { LocalAuthenticatedMembership } from './local-authenticated-user.type';
+import type {
+  LocalAuthenticatedDepartment,
+  LocalAuthenticatedRole,
+} from './local-authenticated-user.type';
 import type { TokenPair } from './token-pair.type';
 
 export type LoginResponse = {
@@ -7,11 +10,10 @@ export type LoginResponse = {
     id: number;
     email: string;
     fullName: string;
+    status: string;
   };
-  requiresHotelSelection: boolean;
-  activeHotel: LocalAuthenticatedMembership['hotel'] | null;
-  membership: LocalAuthenticatedMembership | null;
-  hotelChoices: LocalAuthenticatedMembership[];
-  hotelSelectionToken: string | null;
-  tokens: TokenPair | null;
+  role: LocalAuthenticatedRole;
+  department: LocalAuthenticatedDepartment;
+  permissions: string[];
+  tokens: TokenPair;
 };
