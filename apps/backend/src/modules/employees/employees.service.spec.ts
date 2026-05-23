@@ -12,55 +12,50 @@ describe('EmployeesService', () => {
     listEmployees: jest.Mock;
     findEmployeeProfile: jest.Mock;
     updateEmployee: jest.Mock;
-    findHotelUser: jest.Mock;
+    findActiveUser: jest.Mock;
     findEmployeeLinkedToUser: jest.Mock;
   };
 
+  const now = new Date('2026-05-23T00:00:00.000Z');
   const currentUser = {
     sub: 1,
     email: 'admin@demo-hotel.com',
-    hotelId: 10,
-    membershipId: 20,
     roleKey: 'HOTEL_ADMIN',
+    roleId: 2,
+    departmentId: 3,
     tokenVersion: 0,
   };
-  const now = new Date('2026-05-22T00:00:00.000Z');
-  const employeeProfile = {
+  const department = {
+    id: 3,
+    key: 'HOUSEKEEPING',
+    name: 'Housekeeping',
+  };
+  const employee = {
     id: 5,
-    hotelId: 10,
     employeeNumber: 'EMP-001',
     firstName: 'Demo',
     lastName: 'Employee',
     email: 'employee@demo-hotel.com',
-    phone: '+251911111111',
+    phone: null,
     jobTitle: 'Supervisor',
     status: 'ACTIVE',
-    hireDate: now,
+    hireDate: null,
     createdAt: now,
     updatedAt: now,
-    department: {
-      id: 3,
-      key: 'HOUSEKEEPING',
-      name: 'Housekeeping',
-    },
+    department,
     user: null,
   };
 
   beforeEach(async () => {
     employeesRepository = {
-      findActiveDepartment: jest.fn().mockResolvedValue({ id: 3 }),
-      findEmployeeByNumber: jest.fn(),
-      createEmployee: jest.fn().mockResolvedValue(employeeProfile),
-      listEmployees: jest.fn().mockResolvedValue([1, [employeeProfile]]),
-      findEmployeeProfile: jest.fn().mockResolvedValue(employeeProfile),
+      findActiveDepartment: jest.fn().mockResolvedValue(department),
+      findEmployeeByNumber: jest.fn().mockResolvedValue(null),
+      createEmployee: jest.fn().mockResolvedValue(employee),
+      listEmployees: jest.fn().mockResolvedValue([1, [employee]]),
+      findEmployeeProfile: jest.fn().mockResolvedValue(employee),
       updateEmployee: jest.fn().mockResolvedValue({ count: 1 }),
-      findHotelUser: jest.fn().mockResolvedValue({
-        userId: 9,
-        user: {
-          id: 9,
-        },
-      }),
-      findEmployeeLinkedToUser: jest.fn(),
+      findActiveUser: jest.fn().mockResolvedValue({ id: 9 }),
+      findEmployeeLinkedToUser: jest.fn().mockResolvedValue(null),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -76,62 +71,46 @@ describe('EmployeesService', () => {
     service = module.get<EmployeesService>(EmployeesService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('creates an employee without a linked login user', async () => {
-    const result = await service.create(currentUser, {
-      employeeNumber: ' EMP-001 ',
+  it('creates an employee profile without hotel ownership fields', async () => {
+    await service.create(currentUser, {
       firstName: ' Demo ',
       lastName: ' Employee ',
-      email: ' EMPLOYEE@DEMO-HOTEL.COM ',
-      phone: ' +251911111111 ',
-      jobTitle: ' Supervisor ',
       departmentId: 3,
-      hireDate: '2026-05-22',
+      employeeNumber: ' EMP-001 ',
+      email: ' EMPLOYEE@DEMO-HOTEL.COM ',
+      jobTitle: ' Supervisor ',
     });
 
-    expect(employeesRepository.findActiveDepartment).toHaveBeenCalledWith(
-      10,
-      3,
-    );
+    expect(employeesRepository.findActiveDepartment).toHaveBeenCalledWith(3);
     expect(employeesRepository.findEmployeeByNumber).toHaveBeenCalledWith(
-      10,
       'EMP-001',
     );
     expect(employeesRepository.createEmployee).toHaveBeenCalledWith({
-      hotelId: 10,
       departmentId: 3,
       employeeNumber: 'EMP-001',
       firstName: 'Demo',
       lastName: 'Employee',
       email: 'employee@demo-hotel.com',
-      phone: '+251911111111',
+      phone: null,
       jobTitle: 'Supervisor',
-      hireDate: new Date('2026-05-22'),
-    });
-    expect(result).toMatchObject({
-      id: 5,
-      employeeNumber: 'EMP-001',
-      user: null,
+      hireDate: null,
     });
   });
 
-  it('rejects duplicate employee numbers inside the same hotel', async () => {
-    employeesRepository.findEmployeeByNumber.mockResolvedValue(employeeProfile);
+  it('rejects duplicate employee numbers globally', async () => {
+    employeesRepository.findEmployeeByNumber.mockResolvedValue(employee);
 
     await expect(
       service.create(currentUser, {
-        employeeNumber: 'EMP-001',
         firstName: 'Demo',
         lastName: 'Employee',
+        employeeNumber: 'EMP-001',
       }),
-    ).rejects.toThrow('Employee number already exists in this hotel.');
+    ).rejects.toThrow('Employee number already exists.');
   });
 
-  it('lists employees with pagination metadata', async () => {
-    const result = await service.list(currentUser, {
+  it('lists employees without hotel filters', async () => {
+    await service.list(currentUser, {
       page: 2,
       pageSize: 10,
       search: ' demo ',
@@ -139,37 +118,30 @@ describe('EmployeesService', () => {
     });
 
     expect(employeesRepository.listEmployees).toHaveBeenCalledWith({
-      hotelId: 10,
       skip: 10,
       take: 10,
       search: 'demo',
       status: 'ACTIVE',
     });
-    expect(result.pagination).toEqual({
-      page: 2,
-      pageSize: 10,
-      total: 1,
-      totalPages: 1,
-    });
   });
 
-  it('rejects employee lookups outside the current hotel', async () => {
+  it('throws when an employee is missing', async () => {
     employeesRepository.findEmployeeProfile.mockResolvedValue(null);
 
-    await expect(service.getById(currentUser, 5)).rejects.toThrow(
-      'Employee was not found in this hotel.',
+    await expect(service.getById(currentUser, 404)).rejects.toThrow(
+      'Employee was not found.',
     );
   });
 
-  it('updates an employee profile in the current hotel', async () => {
+  it('updates an employee profile directly', async () => {
     await service.update(currentUser, 5, {
       employeeNumber: 'EMP-002',
-      firstName: 'Updated',
+      firstName: ' Updated ',
       departmentId: 3,
       hireDate: null,
     });
 
-    expect(employeesRepository.updateEmployee).toHaveBeenCalledWith(10, 5, {
+    expect(employeesRepository.updateEmployee).toHaveBeenCalledWith(5, {
       employeeNumber: 'EMP-002',
       firstName: 'Updated',
       departmentId: 3,
@@ -177,38 +149,38 @@ describe('EmployeesService', () => {
     });
   });
 
-  it('deactivates an employee profile in the current hotel', async () => {
+  it('deactivates an employee profile directly', async () => {
     await service.deactivate(currentUser, 5);
 
-    expect(employeesRepository.updateEmployee).toHaveBeenCalledWith(10, 5, {
+    expect(employeesRepository.updateEmployee).toHaveBeenCalledWith(5, {
       status: 'INACTIVE',
     });
   });
 
-  it('links an employee to an active current-hotel user', async () => {
+  it('links an employee to an active user', async () => {
     await service.linkUser(currentUser, 5, { userId: 9 });
 
-    expect(employeesRepository.findHotelUser).toHaveBeenCalledWith(10, 9);
+    expect(employeesRepository.findActiveUser).toHaveBeenCalledWith(9);
     expect(employeesRepository.findEmployeeLinkedToUser).toHaveBeenCalledWith(
-      10,
       9,
     );
-    expect(employeesRepository.updateEmployee).toHaveBeenCalledWith(10, 5, {
+    expect(employeesRepository.updateEmployee).toHaveBeenCalledWith(5, {
       userId: 9,
     });
   });
 
-  it('rejects linking a user from outside the current hotel', async () => {
-    employeesRepository.findHotelUser.mockResolvedValue(null);
+  it('rejects linking an inactive or missing user', async () => {
+    employeesRepository.findActiveUser.mockResolvedValue(null);
 
     await expect(
       service.linkUser(currentUser, 5, { userId: 9 }),
-    ).rejects.toThrow('User does not belong to the current hotel.');
+    ).rejects.toThrow('User is not active or does not exist.');
   });
 
   it('rejects linking a user already linked to another employee', async () => {
     employeesRepository.findEmployeeLinkedToUser.mockResolvedValue({
-      id: 99,
+      id: 6,
+      userId: 9,
     });
 
     await expect(
