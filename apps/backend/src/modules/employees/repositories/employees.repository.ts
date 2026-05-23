@@ -19,27 +19,24 @@ const employeeInclude = {
 export class EmployeesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findActiveDepartment(hotelId: number, departmentId: number) {
+  findActiveDepartment(departmentId: number) {
     return this.prisma.department.findFirst({
       where: {
         id: departmentId,
-        hotelId,
         isActive: true,
       },
     });
   }
 
-  findEmployeeByNumber(hotelId: number, employeeNumber: string) {
+  findEmployeeByNumber(employeeNumber: string) {
     return this.prisma.employee.findFirst({
       where: {
-        hotelId,
         employeeNumber,
       },
     });
   }
 
   createEmployee(data: {
-    hotelId: number;
     departmentId?: number | null;
     employeeNumber?: string | null;
     firstName: string;
@@ -56,20 +53,17 @@ export class EmployeesRepository {
   }
 
   listEmployees({
-    hotelId,
     skip,
     take,
     search,
     status,
   }: {
-    hotelId: number;
     skip: number;
     take: number;
     search?: string;
     status?: 'ACTIVE' | 'INACTIVE';
   }) {
     const where = {
-      hotelId,
       ...(status ? { status } : {}),
       ...(search
         ? {
@@ -125,18 +119,16 @@ export class EmployeesRepository {
     ]);
   }
 
-  findEmployeeProfile(hotelId: number, employeeId: number) {
-    return this.prisma.employee.findFirst({
+  findEmployeeProfile(employeeId: number) {
+    return this.prisma.employee.findUnique({
       where: {
         id: employeeId,
-        hotelId,
       },
       include: employeeInclude,
     });
   }
 
   updateEmployee(
-    hotelId: number,
     employeeId: number,
     data: {
       departmentId?: number | null;
@@ -154,32 +146,26 @@ export class EmployeesRepository {
     return this.prisma.employee.updateMany({
       where: {
         id: employeeId,
-        hotelId,
       },
       data,
     });
   }
 
-  findHotelUser(hotelId: number, userId: number) {
-    return this.prisma.hotelUser.findFirst({
+  findActiveUser(userId: number) {
+    return this.prisma.user.findFirst({
       where: {
-        hotelId,
-        userId,
+        id: userId,
         status: 'ACTIVE',
-        user: {
-          status: 'ACTIVE',
-        },
       },
-      include: {
-        user: true,
+      select: {
+        id: true,
       },
     });
   }
 
-  findEmployeeLinkedToUser(hotelId: number, userId: number) {
-    return this.prisma.employee.findFirst({
+  findEmployeeLinkedToUser(userId: number) {
+    return this.prisma.employee.findUnique({
       where: {
-        hotelId,
         userId,
       },
     });
