@@ -6,9 +6,9 @@ import { getCurrentUser } from './current-user.decorator';
 const currentUser: CurrentUserPayload = {
   sub: 1,
   email: 'admin@port102.test',
-  hotelId: 10,
-  membershipId: 20,
   roleKey: 'HOTEL_ADMIN',
+  roleId: 2,
+  departmentId: 3,
   tokenVersion: 0,
 };
 
