@@ -1,8 +1,8 @@
 export type CurrentUserPayload = {
   sub: number;
   email: string;
-  hotelId: number;
-  membershipId: number;
   roleKey: string;
+  roleId: number;
+  departmentId?: number | null;
   tokenVersion: number;
 };
