@@ -1,30 +1,26 @@
 import type { Request } from 'express';
 
-export type LocalAuthenticatedMembership = {
+export type LocalAuthenticatedRole = {
   id: number;
-  hotel: {
-    id: number;
-    name: string;
-    code: string;
-  };
-  role: {
-    id: number;
-    key: string;
-    name: string;
-  };
-  department: {
-    id: number;
-    key: string;
-    name: string;
-  } | null;
+  key: string;
+  name: string;
 };
+
+export type LocalAuthenticatedDepartment = {
+  id: number;
+  key: string;
+  name: string;
+} | null;
 
 export type LocalAuthenticatedUser = {
   id: number;
   email: string;
   fullName: string;
+  status: string;
   tokenVersion: number;
-  memberships: LocalAuthenticatedMembership[];
+  role: LocalAuthenticatedRole;
+  department: LocalAuthenticatedDepartment;
+  permissions: string[];
 };
 
 export type LocalAuthRequest = Request & {
