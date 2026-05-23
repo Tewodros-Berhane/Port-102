@@ -18,9 +18,9 @@ describe('EmployeesController', () => {
   const currentUser = {
     sub: 1,
     email: 'admin@demo-hotel.com',
-    hotelId: 10,
-    membershipId: 20,
     roleKey: 'HOTEL_ADMIN',
+    roleId: 2,
+    departmentId: 3,
     tokenVersion: 0,
   };
 
@@ -44,9 +44,6 @@ describe('EmployeesController', () => {
         {
           provide: PrismaService,
           useValue: {
-            hotelUser: {
-              findFirst: jest.fn(),
-            },
             role: {
               findFirst: jest.fn(),
             },
