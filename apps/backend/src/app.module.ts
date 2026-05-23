@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import configuration from './config/configuration';
 import { ApprovalRequestsModule } from './modules/approval-requests/approval-requests.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { GuestsModule } from './modules/guests/guests.module';
@@ -32,6 +33,7 @@ import { PrismaModule } from './prisma/prisma.module';
     EmployeesModule,
     GuestsModule,
     ApprovalRequestsModule,
+    AuditLogsModule,
     RolesModule,
     PermissionsModule,
   ],
