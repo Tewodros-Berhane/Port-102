@@ -5,106 +5,57 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import type { CurrentUserPayload } from '../../modules/auth/types/current-user-payload.type';
 import { PrismaService } from '../../prisma/prisma.service';
-import { PermissionsGuard, type PermissionsRequest } from './permissions.guard';
+import { PermissionsGuard } from './permissions.guard';
 
-const currentUser: CurrentUserPayload = {
+const currentUser = {
   sub: 1,
-  email: 'admin@port102.test',
-  hotelId: 10,
-  membershipId: 20,
+  email: 'admin@demo-hotel.com',
   roleKey: 'HOTEL_ADMIN',
+  roleId: 2,
+  departmentId: 3,
   tokenVersion: 0,
 };
 
-const rolePermissions = {
-  permissions: [
-    {
-      permission: {
-        key: 'users.read',
-      },
-    },
-    {
-      permission: {
-        key: 'users.create',
-      },
-    },
-  ],
-};
-
-const hotelContext = {
-  membership: {
-    id: 20,
-    userId: 1,
-    hotelId: 10,
-    roleId: 30,
-    departmentId: null,
-    status: 'ACTIVE',
-  },
-  hotel: {
-    id: 10,
-    name: 'Port 102 Demo Hotel',
-    code: 'DEMO',
-    status: 'ACTIVE',
-    timezone: 'Africa/Nairobi',
-    defaultCurrency: 'ETB',
-  },
-  role: {
-    id: 30,
-    key: 'HOTEL_ADMIN',
-    name: 'Hotel Admin',
-    isSystem: true,
-    isActive: true,
-  },
-  department: null,
-};
-
-type PrismaMock = {
-  role: {
-    findFirst: jest.Mock;
-  };
-  hotelUser: {
-    findFirst: jest.Mock;
-  };
-};
-
-function createContext(request: Partial<PermissionsRequest> = {}) {
+function createContext(request: Record<string, unknown> = {}) {
   return {
+    getHandler: jest.fn(),
+    getClass: jest.fn(),
     switchToHttp: () => ({
       getRequest: () => request,
     }),
-    getHandler: () => createContext,
-    getClass: () => PermissionsGuard,
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 }
 
 function createGuard({
-  requiredPermissions = ['users.read'],
   isPublic = false,
-  role = rolePermissions,
-  membership = { role: rolePermissions },
+  requiredPermissions = ['users.read'],
+  rolePermissions = ['users.read', 'roles.read'],
 }: {
-  requiredPermissions?: string[];
   isPublic?: boolean;
-  role?: typeof rolePermissions | null;
-  membership?: { role: typeof rolePermissions } | null;
+  requiredPermissions?: string[];
+  rolePermissions?: string[] | null;
 } = {}) {
-  const prisma: PrismaMock = {
+  const prisma = {
     role: {
-      findFirst: jest.fn().mockResolvedValue(role),
+      findFirst: jest.fn().mockResolvedValue(
+        rolePermissions
+          ? {
+              permissions: rolePermissions.map((key) => ({
+                permission: { key },
+              })),
+            }
+          : null,
+      ),
     },
-    hotelUser: {
-      findFirst: jest.fn().mockResolvedValue(membership),
-    },
-  };
+  } as unknown as PrismaService;
   const reflector = {
     getAllAndOverride: jest.fn().mockReturnValue(isPublic),
     getAllAndMerge: jest.fn().mockReturnValue(requiredPermissions),
   } as unknown as Reflector;
 
   return {
-    guard: new PermissionsGuard(prisma as unknown as PrismaService, reflector),
+    guard: new PermissionsGuard(prisma, reflector),
     prisma,
     reflector,
   };
@@ -117,7 +68,6 @@ describe('PermissionsGuard', () => {
     await expect(guard.canActivate(createContext())).resolves.toBe(true);
 
     expect(prisma.role.findFirst).not.toHaveBeenCalled();
-    expect(prisma.hotelUser.findFirst).not.toHaveBeenCalled();
   });
 
   it('allows routes without required permissions', async () => {
@@ -126,10 +76,9 @@ describe('PermissionsGuard', () => {
     await expect(guard.canActivate(createContext())).resolves.toBe(true);
 
     expect(prisma.role.findFirst).not.toHaveBeenCalled();
-    expect(prisma.hotelUser.findFirst).not.toHaveBeenCalled();
   });
 
-  it('rejects permission checks without an authenticated user payload', async () => {
+  it('rejects protected routes without an authenticated user', async () => {
     const { guard } = createGuard();
 
     await expect(guard.canActivate(createContext())).rejects.toThrow(
@@ -137,20 +86,18 @@ describe('PermissionsGuard', () => {
     );
   });
 
-  it('allows users whose membership role has every required permission', async () => {
+  it('allows users whose direct role has every required permission', async () => {
     const { guard, prisma } = createGuard({
-      requiredPermissions: ['users.read', 'users.create'],
+      requiredPermissions: ['users.read', 'roles.read'],
+      rolePermissions: ['roles.read', 'users.read', 'users.create'],
     });
-    const request: Partial<PermissionsRequest> = {
-      user: currentUser,
-      hotelContext,
-    };
+    const request = { user: currentUser };
 
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
 
     expect(prisma.role.findFirst).toHaveBeenCalledWith({
       where: {
-        id: hotelContext.membership.roleId,
+        id: currentUser.roleId,
         isActive: true,
       },
       include: {
@@ -170,75 +117,27 @@ describe('PermissionsGuard', () => {
         },
       },
     });
-    expect(prisma.hotelUser.findFirst).not.toHaveBeenCalled();
-    expect(request.permissionKeys).toEqual(['users.read', 'users.create']);
-  });
-
-  it('falls back to reading permissions through the active membership', async () => {
-    const { guard, prisma } = createGuard({
-      requiredPermissions: ['users.read'],
+    expect(request).toMatchObject({
+      permissionKeys: ['roles.read', 'users.read', 'users.create'],
     });
-    const request: Partial<PermissionsRequest> = {
-      user: currentUser,
-    };
-
-    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
-
-    expect(prisma.hotelUser.findFirst).toHaveBeenCalledWith({
-      where: {
-        id: currentUser.membershipId,
-        userId: currentUser.sub,
-        hotelId: currentUser.hotelId,
-        status: 'ACTIVE',
-        hotel: {
-          status: 'ACTIVE',
-        },
-        role: {
-          isActive: true,
-        },
-      },
-      include: {
-        role: {
-          include: {
-            permissions: {
-              where: {
-                permission: {
-                  isActive: true,
-                },
-              },
-              include: {
-                permission: {
-                  select: {
-                    key: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-    expect(prisma.role.findFirst).not.toHaveBeenCalled();
-    expect(request.permissionKeys).toEqual(['users.read', 'users.create']);
   });
 
   it('rejects users missing a required permission', async () => {
     const { guard } = createGuard({
       requiredPermissions: ['users.delete'],
+      rolePermissions: ['users.read'],
     });
 
     await expect(
-      guard.canActivate(createContext({ user: currentUser, hotelContext })),
+      guard.canActivate(createContext({ user: currentUser })),
     ).rejects.toThrow(ForbiddenException);
   });
 
-  it('rejects users without an active membership role', async () => {
-    const { guard } = createGuard({
-      role: null,
-    });
+  it('rejects users without an active role permission set', async () => {
+    const { guard } = createGuard({ rolePermissions: null });
 
     await expect(
-      guard.canActivate(createContext({ user: currentUser, hotelContext })),
-    ).rejects.toThrow('Hotel access is not allowed.');
+      guard.canActivate(createContext({ user: currentUser })),
+    ).rejects.toThrow('Role access is not allowed.');
   });
 });
