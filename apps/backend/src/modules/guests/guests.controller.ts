@@ -13,7 +13,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import { HotelAccessGuard } from '../../common/guards/hotel-access.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
@@ -24,14 +23,14 @@ import { GuestsService } from './guests.service';
 
 @ApiTags('Guests')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, HotelAccessGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('guests')
 export class GuestsController {
   constructor(private readonly guestsService: GuestsService) {}
 
   @Post()
   @Permissions('guests.create')
-  @ApiOperation({ summary: 'Create a hotel-scoped guest profile' })
+  @ApiOperation({ summary: 'Create a guest profile' })
   create(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Body() createGuestDto: CreateGuestDto,
@@ -41,7 +40,7 @@ export class GuestsController {
 
   @Get()
   @Permissions('guests.read')
-  @ApiOperation({ summary: 'List hotel-scoped guest profiles' })
+  @ApiOperation({ summary: 'List guest profiles' })
   list(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Query() query: ListGuestsQueryDto,
@@ -51,7 +50,7 @@ export class GuestsController {
 
   @Get(':id')
   @Permissions('guests.read')
-  @ApiOperation({ summary: 'Get one hotel-scoped guest profile' })
+  @ApiOperation({ summary: 'Get one guest profile' })
   getById(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) guestId: number,
@@ -61,7 +60,7 @@ export class GuestsController {
 
   @Patch(':id')
   @Permissions('guests.update', 'guests.preferences.update')
-  @ApiOperation({ summary: 'Update one hotel-scoped guest profile' })
+  @ApiOperation({ summary: 'Update one guest profile' })
   update(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) guestId: number,
