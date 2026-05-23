@@ -14,19 +14,8 @@ const roleInclude = {
 export class RolesRepository {
   constructor(protected readonly prisma: PrismaService) {}
 
-  listVisibleRoles(hotelId: number) {
+  listRoles() {
     return this.prisma.role.findMany({
-      where: {
-        OR: [
-          {
-            isSystem: true,
-            hotelId: null,
-          },
-          {
-            hotelId,
-          },
-        ],
-      },
       include: roleInclude,
       orderBy: [
         {
@@ -39,28 +28,18 @@ export class RolesRepository {
     });
   }
 
-  findVisibleRole(hotelId: number, roleId: number) {
-    return this.prisma.role.findFirst({
+  findRole(roleId: number) {
+    return this.prisma.role.findUnique({
       where: {
         id: roleId,
-        OR: [
-          {
-            isSystem: true,
-            hotelId: null,
-          },
-          {
-            hotelId,
-          },
-        ],
       },
       include: roleInclude,
     });
   }
 
-  findHotelRoleByKey(hotelId: number, key: string) {
-    return this.prisma.role.findFirst({
+  findRoleByKey(key: string) {
+    return this.prisma.role.findUnique({
       where: {
-        hotelId,
         key,
       },
     });
@@ -81,7 +60,6 @@ export class RolesRepository {
   }
 
   createCustomRole(data: {
-    hotelId: number;
     key: string;
     name: string;
     description?: string | null;
@@ -90,7 +68,6 @@ export class RolesRepository {
     return this.prisma.$transaction(async (transaction) => {
       const role = await transaction.role.create({
         data: {
-          hotelId: data.hotelId,
           key: data.key,
           name: data.name,
           description: data.description ?? null,
