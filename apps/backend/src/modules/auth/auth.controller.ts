@@ -11,12 +11,13 @@ import {
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { HotelAccessGuard } from '../../common/guards/hotel-access.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { SelectHotelDto } from './dto/select-hotel.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import type { CurrentUserPayload } from './types/current-user-payload.type';
@@ -56,33 +57,13 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard, HotelAccessGuard)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Get the current user, hotel, role, and permissions',
+    summary: 'Get the current user, role, department, and permissions',
   })
   me(@CurrentUser() currentUser: CurrentUserPayload) {
     return this.authService.getMe(currentUser);
-  }
-
-  @Get('my-hotels')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'List hotels available to the current user' })
-  myHotels(@CurrentUser() currentUser: CurrentUserPayload) {
-    return this.authService.getMyHotels(currentUser);
-  }
-
-  @Post('select-hotel')
-  @HttpCode(HttpStatus.OK)
-  @Public()
-  @ApiOperation({ summary: 'Select an active hotel after multi-hotel login' })
-  @ApiBody({ type: SelectHotelDto })
-  selectHotel(@Body() selectHotelDto: SelectHotelDto) {
-    return this.authService.selectHotel(
-      selectHotelDto.hotelSelectionToken,
-      selectHotelDto.hotelId,
-    );
   }
 
   @Post('logout-all')
@@ -92,5 +73,33 @@ export class AuthController {
   @ApiOperation({ summary: 'Revoke all refresh tokens for the current user' })
   logoutAll(@CurrentUser() currentUser: CurrentUserPayload) {
     return this.authService.logoutAll(currentUser);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change the current user password' })
+  changePassword(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(currentUser, changePasswordDto);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Public()
+  @ApiOperation({ summary: 'Request a password reset token' })
+  forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Public()
+  @ApiOperation({ summary: 'Reset a password using a reset token' })
+  resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(resetPasswordDto);
   }
 }
