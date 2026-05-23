@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -15,71 +16,84 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersRepository } from './repositories/users.repository';
 
+type UserProfile = {
+  id: number;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  role: {
+    id: number;
+    key: string;
+    systemKey: string | null;
+    name: string;
+  };
+  department: {
+    id: number;
+    key: string;
+    name: string;
+  } | null;
+};
+
 @Injectable()
 export class UsersService {
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly configService: ConfigService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async create(currentUser: CurrentUserPayload, createUserDto: CreateUserDto) {
     const email = this.normalizeEmail(createUserDto.email);
 
-    await this.ensureAssignableRole(currentUser.hotelId, createUserDto.roleId);
-    await this.ensureAssignableDepartment(
-      currentUser.hotelId,
-      createUserDto.departmentId,
-    );
+    await this.ensureAssignableRole(createUserDto.roleId);
+    await this.ensureAssignableDepartment(createUserDto.departmentId);
 
     const existingUser =
       await this.usersRepository.findByEmailForManagement(email);
 
-    if (
-      existingUser?.hotelUsers.some(
-        (membership) => membership.hotelId === currentUser.hotelId,
-      )
-    ) {
-      throw new ConflictException('User already belongs to this hotel.');
+    if (existingUser) {
+      throw new ConflictException('Email is already in use.');
     }
 
-    if (existingUser && existingUser.status !== 'ACTIVE') {
-      throw new ForbiddenException('User account is not active.');
-    }
-
-    const user =
-      existingUser ??
-      (await this.usersRepository.createUser({
-        email,
-        passwordHash: await this.hashPassword(createUserDto.password),
-        fullName: createUserDto.fullName.trim(),
-        phone: this.normalizeOptionalString(createUserDto.phone),
-      }));
-
-    await this.usersRepository.createHotelMembership({
-      userId: user.id,
-      hotelId: currentUser.hotelId,
+    const user = await this.usersRepository.createUser({
+      email,
+      passwordHash: await this.hashPassword(createUserDto.password),
+      fullName: createUserDto.fullName.trim(),
+      phone: this.normalizeOptionalString(createUserDto.phone),
       roleId: createUserDto.roleId,
       departmentId: createUserDto.departmentId ?? null,
+    });
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'users.created',
+      entityType: 'User',
+      entityId: String(user.id),
+      metadata: {
+        targetUserId: user.id,
+        roleId: createUserDto.roleId,
+        departmentId: createUserDto.departmentId ?? null,
+      },
     });
 
     return this.getById(currentUser, user.id);
   }
 
-  async list(currentUser: CurrentUserPayload, query: ListUsersQueryDto) {
+  async list(_currentUser: CurrentUserPayload, query: ListUsersQueryDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
     const search = this.normalizeOptionalString(query.search);
-    const [total, memberships] = await this.usersRepository.listHotelUsers({
-      hotelId: currentUser.hotelId,
+    const [total, users] = await this.usersRepository.listUsers({
       skip: (page - 1) * pageSize,
       take: pageSize,
       search: search ?? undefined,
     });
 
     return {
-      items: memberships.map((membership) =>
-        this.serializeHotelUser(membership),
-      ),
+      items: users.map((user) => this.serializeUser(user)),
       pagination: {
         page,
         pageSize,
@@ -89,13 +103,10 @@ export class UsersService {
     };
   }
 
-  async getById(currentUser: CurrentUserPayload, userId: number) {
-    const membership = await this.findRequiredHotelUser(
-      currentUser.hotelId,
-      userId,
-    );
+  async getById(_currentUser: CurrentUserPayload, userId: number) {
+    const user = await this.findRequiredUser(userId);
 
-    return this.serializeHotelUser(membership);
+    return this.serializeUser(user);
   }
 
   async update(
@@ -103,16 +114,14 @@ export class UsersService {
     userId: number,
     updateUserDto: UpdateUserDto,
   ) {
-    await this.findRequiredHotelUser(currentUser.hotelId, userId);
-    await this.ensureAssignableDepartment(
-      currentUser.hotelId,
-      updateUserDto.departmentId,
-    );
+    await this.findRequiredUser(userId);
+    await this.ensureAssignableDepartment(updateUserDto.departmentId);
 
     const userData: {
       email?: string;
       fullName?: string;
       phone?: string | null;
+      departmentId?: number | null;
     } = {};
 
     if (updateUserDto.email !== undefined) {
@@ -135,32 +144,48 @@ export class UsersService {
       userData.phone = this.normalizeOptionalString(updateUserDto.phone);
     }
 
-    if (Object.keys(userData).length > 0) {
-      await this.usersRepository.updateUserProfile(userId, userData);
+    if (updateUserDto.departmentId !== undefined) {
+      userData.departmentId = updateUserDto.departmentId ?? null;
     }
 
-    if (updateUserDto.departmentId !== undefined) {
-      await this.updateMembershipOrThrow(currentUser.hotelId, userId, {
-        departmentId: updateUserDto.departmentId ?? null,
-      });
+    if (Object.keys(userData).length > 0) {
+      await this.usersRepository.updateUserProfile(userId, userData);
     }
 
     return this.getById(currentUser, userId);
   }
 
   async deactivate(currentUser: CurrentUserPayload, userId: number) {
-    await this.findRequiredHotelUser(currentUser.hotelId, userId);
-    await this.updateMembershipOrThrow(currentUser.hotelId, userId, {
+    await this.findRequiredUser(userId);
+    await this.usersRepository.updateUserProfile(userId, {
       status: 'INACTIVE',
+    });
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'users.deactivated',
+      entityType: 'User',
+      entityId: String(userId),
+      metadata: {
+        targetUserId: userId,
+      },
     });
 
     return this.getById(currentUser, userId);
   }
 
   async activate(currentUser: CurrentUserPayload, userId: number) {
-    await this.findRequiredHotelUser(currentUser.hotelId, userId);
-    await this.updateMembershipOrThrow(currentUser.hotelId, userId, {
+    await this.findRequiredUser(userId);
+    await this.usersRepository.updateUserProfile(userId, {
       status: 'ACTIVE',
+    });
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'users.activated',
+      entityType: 'User',
+      entityId: String(userId),
+      metadata: {
+        targetUserId: userId,
+      },
     });
 
     return this.getById(currentUser, userId);
@@ -171,12 +196,22 @@ export class UsersService {
     userId: number,
     resetPasswordDto: ResetPasswordDto,
   ) {
-    await this.findRequiredHotelUser(currentUser.hotelId, userId);
+    await this.findRequiredUser(userId);
     await this.usersRepository.updatePassword(
       userId,
       await this.hashPassword(resetPasswordDto.newPassword),
     );
     await this.usersRepository.revokeActiveRefreshTokensForUser(userId);
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'auth.password_reset',
+      entityType: 'User',
+      entityId: String(userId),
+      metadata: {
+        targetUserId: userId,
+        scope: 'admin_reset',
+      },
+    });
 
     return { passwordReset: true };
   }
@@ -186,139 +221,84 @@ export class UsersService {
     userId: number,
     assignRoleDto: AssignRoleDto,
   ) {
-    await this.findRequiredHotelUser(currentUser.hotelId, userId);
-    await this.ensureAssignableRole(currentUser.hotelId, assignRoleDto.roleId);
-    await this.ensureAssignableDepartment(
-      currentUser.hotelId,
-      assignRoleDto.departmentId,
-    );
-    await this.updateMembershipOrThrow(currentUser.hotelId, userId, {
+    await this.findRequiredUser(userId);
+    await this.ensureAssignableRole(assignRoleDto.roleId);
+    await this.ensureAssignableDepartment(assignRoleDto.departmentId);
+    await this.usersRepository.updateUserProfile(userId, {
       roleId: assignRoleDto.roleId,
       departmentId: assignRoleDto.departmentId ?? null,
+    });
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'users.role_assigned',
+      entityType: 'User',
+      entityId: String(userId),
+      metadata: {
+        targetUserId: userId,
+        roleId: assignRoleDto.roleId,
+        departmentId: assignRoleDto.departmentId ?? null,
+      },
     });
 
     return this.getById(currentUser, userId);
   }
 
-  private async findRequiredHotelUser(hotelId: number, userId: number) {
-    const membership = await this.usersRepository.findHotelUserProfile(
-      hotelId,
-      userId,
-    );
+  private async findRequiredUser(userId: number) {
+    const user = await this.usersRepository.findUserProfile(userId);
 
-    if (!membership) {
-      throw new NotFoundException('User was not found in this hotel.');
+    if (!user) {
+      throw new NotFoundException('User was not found.');
     }
 
-    return membership;
+    return user;
   }
 
-  private async ensureAssignableRole(hotelId: number, roleId: number) {
-    const role = await this.usersRepository.findAssignableRole(hotelId, roleId);
+  private async ensureAssignableRole(roleId: number) {
+    const role = await this.usersRepository.findAssignableRole(roleId);
 
     if (!role) {
-      throw new ForbiddenException('Role is not assignable to this hotel.');
+      throw new ForbiddenException('Role is not assignable.');
     }
 
     return role;
   }
 
-  private async ensureAssignableDepartment(
-    hotelId: number,
-    departmentId?: number | null,
-  ) {
+  private async ensureAssignableDepartment(departmentId?: number | null) {
     if (departmentId === undefined || departmentId === null) {
       return null;
     }
 
-    const department = await this.usersRepository.findActiveDepartment(
-      hotelId,
-      departmentId,
-    );
+    const department =
+      await this.usersRepository.findActiveDepartment(departmentId);
 
     if (!department) {
-      throw new ForbiddenException(
-        'Department is not assignable to this hotel.',
-      );
+      throw new ForbiddenException('Department is not assignable.');
     }
 
     return department;
   }
 
-  private async updateMembershipOrThrow(
-    hotelId: number,
-    userId: number,
-    data: {
-      roleId?: number;
-      departmentId?: number | null;
-      status?: 'ACTIVE' | 'INACTIVE';
-    },
-  ) {
-    const result = await this.usersRepository.updateHotelMembership(
-      hotelId,
-      userId,
-      data,
-    );
-
-    if (result.count === 0) {
-      throw new NotFoundException('User was not found in this hotel.');
-    }
-  }
-
-  private serializeHotelUser(membership: {
-    id: number;
-    status: string;
-    joinedAt: Date;
-    createdAt: Date;
-    updatedAt: Date;
-    user: {
-      id: number;
-      email: string;
-      fullName: string;
-      phone: string | null;
-      status: string;
-      createdAt: Date;
-      updatedAt: Date;
-    };
-    role: {
-      id: number;
-      key: string;
-      systemKey: string | null;
-      name: string;
-    };
-    department: {
-      id: number;
-      key: string;
-      name: string;
-    } | null;
-  }) {
+  private serializeUser(user: UserProfile) {
     return {
-      id: membership.user.id,
-      email: membership.user.email,
-      fullName: membership.user.fullName,
-      phone: membership.user.phone,
-      status: membership.user.status,
-      createdAt: membership.user.createdAt,
-      updatedAt: membership.user.updatedAt,
-      membership: {
-        id: membership.id,
-        status: membership.status,
-        joinedAt: membership.joinedAt,
-        createdAt: membership.createdAt,
-        updatedAt: membership.updatedAt,
-        role: {
-          id: membership.role.id,
-          key: membership.role.systemKey ?? membership.role.key,
-          name: membership.role.name,
-        },
-        department: membership.department
-          ? {
-              id: membership.department.id,
-              key: membership.department.key,
-              name: membership.department.name,
-            }
-          : null,
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      phone: user.phone,
+      status: user.status,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      role: {
+        id: user.role.id,
+        key: user.role.systemKey ?? user.role.key,
+        name: user.role.name,
       },
+      department: user.department
+        ? {
+            id: user.department.id,
+            key: user.department.key,
+            name: user.department.name,
+          }
+        : null,
     };
   }
 
