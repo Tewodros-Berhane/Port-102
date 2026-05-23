@@ -33,17 +33,6 @@ enum UserStatus {
   PASSWORD_RESET_REQUIRED
 }
 
-enum HotelStatus {
-  ACTIVE
-  INACTIVE
-}
-
-enum HotelUserStatus {
-  ACTIVE
-  INACTIVE
-  INVITED
-}
-
 enum RefreshTokenStatus {
   ACTIVE
   REVOKED
@@ -84,9 +73,12 @@ model User {
   status                    UserStatus        @default(ACTIVE)
   tokenVersion              Int               @default(0)
   lastLoginAt               DateTime?
+  roleId                    Int
+  departmentId              Int?
   createdAt                 DateTime          @default(now())
   updatedAt                 DateTime          @updatedAt
-  hotelUsers                HotelUser[]
+  role                      Role              @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  department                Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   refreshTokens             RefreshToken[]
   employees                 Employee[]
   guests                    Guest[]
@@ -94,59 +86,31 @@ model User {
   requestedApprovalRequests ApprovalRequest[] @relation("ApprovalRequester")
   approvedApprovalRequests  ApprovalRequest[] @relation("ApprovalApprover")
 
+  @@index([roleId])
+  @@index([departmentId])
   @@map("users")
 }
 
+/// Singleton hotel profile/settings record. This is not used for tenancy or access control.
 model Hotel {
-  id               Int               @id @default(autoincrement())
-  name             String
-  code             String            @unique
-  status           HotelStatus       @default(ACTIVE)
-  timezone         String            @default("Africa/Nairobi")
-  defaultCurrency  String            @default("ETB")
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  memberships      HotelUser[]
-  roles            Role[]
-  departments      Department[]
-  employees        Employee[]
-  guests           Guest[]
-  auditLogs        AuditLog[]
-  approvalRequests ApprovalRequest[]
+  id              Int      @id @default(autoincrement())
+  name            String
+  code            String   @unique
+  timezone        String   @default("Africa/Nairobi")
+  defaultCurrency String   @default("ETB")
+  address         String?
+  phone           String?
+  email           String?
+  logoUrl         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@map("hotels")
 }
 
-model HotelUser {
-  id                        Int               @id @default(autoincrement())
-  userId                    Int
-  hotelId                   Int
-  roleId                    Int
-  departmentId              Int?
-  status                    HotelUserStatus   @default(ACTIVE)
-  joinedAt                  DateTime          @default(now())
-  createdAt                 DateTime          @default(now())
-  updatedAt                 DateTime          @updatedAt
-  user                      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  hotel                     Hotel             @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  role                      Role              @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  department                Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  refreshTokens             RefreshToken[]
-  auditLogs                 AuditLog[]        @relation("AuditActorMembership")
-  requestedApprovalRequests ApprovalRequest[] @relation("ApprovalRequesterMembership")
-  approvedApprovalRequests  ApprovalRequest[] @relation("ApprovalApproverMembership")
-
-  @@unique([userId, hotelId])
-  @@index([hotelId, status])
-  @@index([roleId])
-  @@index([departmentId])
-  @@map("hotel_users")
-}
-
 model Role {
   id          Int              @id @default(autoincrement())
-  hotelId     Int?
-  key         String
+  key         String           @unique
   systemKey   RoleKey?         @unique
   name        String
   description String?
@@ -154,12 +118,10 @@ model Role {
   isActive    Boolean          @default(true)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-  hotel       Hotel?           @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  memberships HotelUser[]
+  users       User[]
   permissions RolePermission[]
 
-  @@unique([hotelId, key])
-  @@index([hotelId, isActive])
+  @@index([isActive])
   @@map("roles")
 }
 
@@ -192,7 +154,6 @@ model RolePermission {
 model RefreshToken {
   id          Int                @id @default(autoincrement())
   userId      Int
-  hotelUserId Int?
   tokenHash   String             @unique
   status      RefreshTokenStatus @default(ACTIVE)
   expiresAt   DateTime
@@ -203,38 +164,32 @@ model RefreshToken {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  hotelUser   HotelUser?         @relation(fields: [hotelUserId], references: [id], onDelete: SetNull)
 
   @@index([userId, status])
-  @@index([hotelUserId])
   @@index([expiresAt])
   @@map("refresh_tokens")
 }
 
 model Department {
-  id          Int         @id @default(autoincrement())
-  hotelId     Int
-  key         String
+  id          Int        @id @default(autoincrement())
+  key         String     @unique
   name        String
   description String?
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  hotel       Hotel       @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  memberships HotelUser[]
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  users       User[]
   employees   Employee[]
 
-  @@unique([hotelId, key])
-  @@index([hotelId, isActive])
+  @@index([isActive])
   @@map("departments")
 }
 
 model Employee {
   id             Int            @id @default(autoincrement())
-  hotelId        Int
   departmentId   Int?
-  userId         Int?
-  employeeNumber String?
+  userId         Int?           @unique
+  employeeNumber String?        @unique
   firstName      String
   lastName       String
   email          String?
@@ -244,21 +199,17 @@ model Employee {
   hireDate       DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  hotel          Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   department     Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@unique([hotelId, employeeNumber])
-  @@unique([hotelId, userId])
-  @@index([hotelId, status])
+  @@index([status])
   @@index([departmentId])
   @@map("employees")
 }
 
 model Guest {
   id             Int         @id @default(autoincrement())
-  hotelId        Int
-  userId         Int?
+  userId         Int?        @unique
   firstName      String
   lastName       String
   email          String?
@@ -269,61 +220,48 @@ model Guest {
   preferences    Json?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
-  hotel          Hotel       @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@unique([hotelId, email])
-  @@unique([hotelId, userId])
-  @@index([hotelId, status])
-  @@index([hotelId, lastName])
+  @@index([status])
+  @@index([lastName])
   @@map("guests")
 }
 
 model AuditLog {
-  id               Int        @id @default(autoincrement())
-  hotelId          Int?
-  actorUserId      Int?
-  actorHotelUserId Int?
-  action           String
-  entityType       String?
-  entityId         String?
-  ipAddress        String?
-  userAgent        String?
-  metadata         Json?
-  createdAt        DateTime   @default(now())
-  hotel            Hotel?     @relation(fields: [hotelId], references: [id], onDelete: SetNull)
-  actorUser        User?      @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
-  actorHotelUser   HotelUser? @relation("AuditActorMembership", fields: [actorHotelUserId], references: [id], onDelete: SetNull)
+  id          Int      @id @default(autoincrement())
+  actorUserId Int?
+  action      String
+  entityType  String?
+  entityId    String?
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actorUser   User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
-  @@index([hotelId, createdAt])
   @@index([actorUserId])
   @@index([action])
+  @@index([createdAt])
   @@map("audit_logs")
 }
 
 model ApprovalRequest {
-  id                     Int                 @id @default(autoincrement())
-  hotelId                Int
-  requestedByUserId      Int
-  requestedByHotelUserId Int?
-  decidedByUserId        Int?
-  decidedByHotelUserId   Int?
-  type                   ApprovalRequestType
-  status                 ApprovalStatus      @default(PENDING)
-  title                  String
-  reason                 String?
-  payload                Json?
-  decisionNote           String?
-  decidedAt              DateTime?
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
-  hotel                  Hotel               @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  requestedByUser        User                @relation("ApprovalRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
-  requestedByHotelUser   HotelUser?          @relation("ApprovalRequesterMembership", fields: [requestedByHotelUserId], references: [id], onDelete: SetNull)
-  decidedByUser          User?               @relation("ApprovalApprover", fields: [decidedByUserId], references: [id], onDelete: SetNull)
-  decidedByHotelUser     HotelUser?          @relation("ApprovalApproverMembership", fields: [decidedByHotelUserId], references: [id], onDelete: SetNull)
+  id                Int                 @id @default(autoincrement())
+  requestedByUserId Int
+  decidedByUserId   Int?
+  type              ApprovalRequestType
+  status            ApprovalStatus      @default(PENDING)
+  title             String
+  reason            String?
+  payload           Json?
+  decisionNote      String?
+  decidedAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  requestedByUser   User                @relation("ApprovalRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  decidedByUser     User?               @relation("ApprovalApprover", fields: [decidedByUserId], references: [id], onDelete: SetNull)
 
-  @@index([hotelId, status])
+  @@index([status])
   @@index([requestedByUserId])
   @@index([decidedByUserId])
   @@index([type])
