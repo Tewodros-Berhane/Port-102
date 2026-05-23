@@ -1,14 +1,14 @@
-import type { LocalAuthenticatedMembership } from './local-authenticated-user.type';
+import type {
+  LocalAuthenticatedDepartment,
+  LocalAuthenticatedRole,
+} from './local-authenticated-user.type';
 
 export type AuthMeResponse = {
   id: number;
-  name: string;
+  fullName: string;
   email: string;
-  activeHotel: LocalAuthenticatedMembership['hotel'];
-  membership: {
-    id: number;
-    role: LocalAuthenticatedMembership['role'];
-    department: LocalAuthenticatedMembership['department'];
-  };
+  status: string;
+  role: LocalAuthenticatedRole;
+  department: LocalAuthenticatedDepartment;
   permissions: string[];
 };
