@@ -2,6 +2,33 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../prisma/prisma.service';
 
+const userProfileInclude = {
+  role: true,
+  department: true,
+} as const;
+
+const authUserInclude = {
+  role: {
+    include: {
+      permissions: {
+        where: {
+          permission: {
+            isActive: true,
+          },
+        },
+        include: {
+          permission: {
+            select: {
+              key: true,
+            },
+          },
+        },
+      },
+    },
+  },
+  department: true,
+} as const;
+
 @Injectable()
 export class UsersRepository {
   constructor(protected readonly prisma: PrismaService) {}
@@ -9,124 +36,36 @@ export class UsersRepository {
   findByEmailForLogin(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
-      include: {
-        hotelUsers: {
-          include: {
-            hotel: true,
-            role: true,
-            department: true,
-          },
-        },
-      },
+      include: authUserInclude,
     });
   }
 
-  findByIdForHotelSelection(userId: number) {
-    return this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        hotelUsers: {
-          include: {
-            hotel: true,
-            role: true,
-            department: true,
-          },
-        },
-      },
-    });
-  }
-
-  findActiveMembershipProfile(userId: number, membershipId: number) {
-    return this.prisma.hotelUser.findFirst({
+  findActiveUserProfile(userId: number) {
+    return this.prisma.user.findFirst({
       where: {
-        id: membershipId,
-        userId,
+        id: userId,
         status: 'ACTIVE',
-        hotel: {
-          status: 'ACTIVE',
-        },
         role: {
           isActive: true,
         },
       },
-      include: {
-        user: true,
-        hotel: true,
-        role: {
-          include: {
-            permissions: {
-              where: {
-                permission: {
-                  isActive: true,
-                },
-              },
-              include: {
-                permission: {
-                  select: {
-                    key: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        department: true,
-      },
+      include: authUserInclude,
     });
   }
 
-  findActiveMembershipsForUser(userId: number) {
-    return this.prisma.hotelUser.findMany({
-      where: {
-        userId,
-        status: 'ACTIVE',
-        hotel: {
-          status: 'ACTIVE',
-        },
-        role: {
-          isActive: true,
-        },
-      },
-      include: {
-        hotel: true,
-        role: true,
-        department: true,
-      },
-      orderBy: [
-        {
-          hotel: {
-            name: 'asc',
-          },
-        },
-        {
-          id: 'asc',
-        },
-      ],
-    });
-  }
-
-  findAssignableRole(hotelId: number, roleId: number) {
+  findAssignableRole(roleId: number) {
     return this.prisma.role.findFirst({
       where: {
         id: roleId,
         isActive: true,
-        OR: [
-          {
-            hotelId: null,
-          },
-          {
-            hotelId,
-          },
-        ],
       },
     });
   }
 
-  findActiveDepartment(hotelId: number, departmentId: number) {
+  findActiveDepartment(departmentId: number) {
     return this.prisma.department.findFirst({
       where: {
         id: departmentId,
-        hotelId,
         isActive: true,
       },
     });
@@ -135,8 +74,28 @@ export class UsersRepository {
   findByEmailForManagement(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
-      include: {
-        hotelUsers: true,
+    });
+  }
+
+  findByEmailForPasswordReset(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+      },
+    });
+  }
+
+  findByIdForPasswordChange(userId: number) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        status: true,
       },
     });
   }
@@ -146,53 +105,37 @@ export class UsersRepository {
     passwordHash: string;
     fullName: string;
     phone?: string | null;
+    roleId: number;
+    departmentId?: number | null;
   }) {
     return this.prisma.user.create({
       data,
     });
   }
 
-  createHotelMembership(data: {
-    userId: number;
-    hotelId: number;
-    roleId: number;
-    departmentId?: number | null;
-  }) {
-    return this.prisma.hotelUser.create({
-      data,
-    });
-  }
-
-  listHotelUsers({
-    hotelId,
+  listUsers({
     skip,
     take,
     search,
   }: {
-    hotelId: number;
     skip: number;
     take: number;
     search?: string;
   }) {
     const where = {
-      hotelId,
       ...(search
         ? {
             OR: [
               {
-                user: {
-                  fullName: {
-                    contains: search,
-                    mode: 'insensitive' as const,
-                  },
+                fullName: {
+                  contains: search,
+                  mode: 'insensitive' as const,
                 },
               },
               {
-                user: {
-                  email: {
-                    contains: search,
-                    mode: 'insensitive' as const,
-                  },
+                email: {
+                  contains: search,
+                  mode: 'insensitive' as const,
                 },
               },
             ],
@@ -201,21 +144,15 @@ export class UsersRepository {
     };
 
     return Promise.all([
-      this.prisma.hotelUser.count({ where }),
-      this.prisma.hotelUser.findMany({
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
         where,
         skip,
         take,
-        include: {
-          user: true,
-          role: true,
-          department: true,
-        },
+        include: userProfileInclude,
         orderBy: [
           {
-            user: {
-              fullName: 'asc',
-            },
+            fullName: 'asc',
           },
           {
             id: 'asc',
@@ -225,17 +162,12 @@ export class UsersRepository {
     ]);
   }
 
-  findHotelUserProfile(hotelId: number, userId: number) {
-    return this.prisma.hotelUser.findFirst({
+  findUserProfile(userId: number) {
+    return this.prisma.user.findUnique({
       where: {
-        hotelId,
-        userId,
+        id: userId,
       },
-      include: {
-        user: true,
-        role: true,
-        department: true,
-      },
+      include: userProfileInclude,
     });
   }
 
@@ -245,28 +177,13 @@ export class UsersRepository {
       email?: string;
       fullName?: string;
       phone?: string | null;
+      departmentId?: number | null;
+      status?: 'ACTIVE' | 'INACTIVE';
+      roleId?: number;
     },
   ) {
     return this.prisma.user.update({
       where: { id: userId },
-      data,
-    });
-  }
-
-  updateHotelMembership(
-    hotelId: number,
-    userId: number,
-    data: {
-      roleId?: number;
-      departmentId?: number | null;
-      status?: 'ACTIVE' | 'INACTIVE';
-    },
-  ) {
-    return this.prisma.hotelUser.updateMany({
-      where: {
-        hotelId,
-        userId,
-      },
       data,
     });
   }
