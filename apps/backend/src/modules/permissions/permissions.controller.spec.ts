@@ -25,9 +25,6 @@ describe('PermissionsController', () => {
         {
           provide: PrismaService,
           useValue: {
-            hotelUser: {
-              findFirst: jest.fn(),
-            },
             role: {
               findFirst: jest.fn(),
             },
