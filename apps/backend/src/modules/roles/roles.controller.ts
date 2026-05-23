@@ -15,7 +15,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import { HotelAccessGuard } from '../../common/guards/hotel-access.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
@@ -26,14 +25,14 @@ import { RolesService } from './roles.service';
 
 @ApiTags('Roles')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, HotelAccessGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('roles')
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
   @Get()
   @Permissions('roles.read')
-  @ApiOperation({ summary: 'List system and current hotel roles' })
+  @ApiOperation({ summary: 'List roles' })
   list(@CurrentUser() currentUser: CurrentUserPayload) {
     return this.rolesService.list(currentUser);
   }
@@ -50,7 +49,7 @@ export class RolesController {
 
   @Post()
   @Permissions('roles.create')
-  @ApiOperation({ summary: 'Create a custom hotel role' })
+  @ApiOperation({ summary: 'Create a custom role' })
   create(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Body() createRoleDto: CreateRoleDto,
@@ -72,7 +71,7 @@ export class RolesController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @Permissions('roles.delete')
-  @ApiOperation({ summary: 'Delete a custom hotel role' })
+  @ApiOperation({ summary: 'Delete a custom role' })
   remove(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) roleId: number,
