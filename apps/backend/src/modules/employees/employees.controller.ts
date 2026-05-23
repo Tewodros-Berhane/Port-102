@@ -15,7 +15,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import { HotelAccessGuard } from '../../common/guards/hotel-access.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
@@ -27,14 +26,14 @@ import { EmployeesService } from './employees.service';
 
 @ApiTags('Employees')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, HotelAccessGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('employees')
 export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
   @Post()
   @Permissions('employees.create')
-  @ApiOperation({ summary: 'Create a hotel-scoped employee profile' })
+  @ApiOperation({ summary: 'Create an employee profile' })
   create(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Body() createEmployeeDto: CreateEmployeeDto,
@@ -44,7 +43,7 @@ export class EmployeesController {
 
   @Get()
   @Permissions('employees.read')
-  @ApiOperation({ summary: 'List hotel-scoped employee profiles' })
+  @ApiOperation({ summary: 'List employee profiles' })
   list(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Query() query: ListEmployeesQueryDto,
@@ -54,7 +53,7 @@ export class EmployeesController {
 
   @Get(':id')
   @Permissions('employees.read')
-  @ApiOperation({ summary: 'Get one hotel-scoped employee profile' })
+  @ApiOperation({ summary: 'Get one employee profile' })
   getById(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) employeeId: number,
@@ -64,7 +63,7 @@ export class EmployeesController {
 
   @Patch(':id')
   @Permissions('employees.update')
-  @ApiOperation({ summary: 'Update one hotel-scoped employee profile' })
+  @ApiOperation({ summary: 'Update one employee profile' })
   update(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) employeeId: number,
@@ -79,7 +78,7 @@ export class EmployeesController {
 
   @Patch(':id/deactivate')
   @Permissions('employees.deactivate')
-  @ApiOperation({ summary: 'Deactivate a hotel-scoped employee profile' })
+  @ApiOperation({ summary: 'Deactivate an employee profile' })
   deactivate(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) employeeId: number,
@@ -90,7 +89,7 @@ export class EmployeesController {
   @Post(':id/link-user')
   @HttpCode(HttpStatus.OK)
   @Permissions('employees.update', 'users.assign_role')
-  @ApiOperation({ summary: 'Link an employee profile to a hotel login user' })
+  @ApiOperation({ summary: 'Link an employee profile to a login user' })
   linkUser(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) employeeId: number,
