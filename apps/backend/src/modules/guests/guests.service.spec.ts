@@ -6,35 +6,31 @@ import { GuestsRepository } from './repositories/guests.repository';
 describe('GuestsService', () => {
   let service: GuestsService;
   let guestsRepository: {
-    findGuestByEmail: jest.Mock;
     createGuest: jest.Mock;
     listGuests: jest.Mock;
     findGuestProfile: jest.Mock;
     updateGuest: jest.Mock;
   };
 
+  const now = new Date('2026-05-23T00:00:00.000Z');
   const currentUser = {
     sub: 1,
     email: 'admin@demo-hotel.com',
-    hotelId: 10,
-    membershipId: 20,
     roleKey: 'HOTEL_ADMIN',
+    roleId: 2,
+    departmentId: 3,
     tokenVersion: 0,
   };
-  const now = new Date('2026-05-22T00:00:00.000Z');
-  const guestProfile = {
+  const guest = {
     id: 5,
-    hotelId: 10,
     firstName: 'Demo',
     lastName: 'Guest',
-    email: 'guest@demo-hotel.com',
-    phone: '+251911111111',
-    nationality: 'ET',
-    documentNumber: 'PASSPORT-1',
+    email: 'guest@example.com',
+    phone: null,
+    nationality: null,
+    documentNumber: null,
     status: 'ACTIVE',
-    preferences: {
-      pillow: 'firm',
-    },
+    preferences: { pillow: 'firm' },
     createdAt: now,
     updatedAt: now,
     user: null,
@@ -42,10 +38,9 @@ describe('GuestsService', () => {
 
   beforeEach(async () => {
     guestsRepository = {
-      findGuestByEmail: jest.fn(),
-      createGuest: jest.fn().mockResolvedValue(guestProfile),
-      listGuests: jest.fn().mockResolvedValue([1, [guestProfile]]),
-      findGuestProfile: jest.fn().mockResolvedValue(guestProfile),
+      createGuest: jest.fn().mockResolvedValue(guest),
+      listGuests: jest.fn().mockResolvedValue([1, [guest]]),
+      findGuestProfile: jest.fn().mockResolvedValue(guest),
       updateGuest: jest.fn().mockResolvedValue({ count: 1 }),
     };
 
@@ -62,63 +57,27 @@ describe('GuestsService', () => {
     service = module.get<GuestsService>(GuestsService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('creates a guest without a linked login user', async () => {
-    const result = await service.create(currentUser, {
+  it('creates guest profiles without hotel ownership or global email uniqueness checks', async () => {
+    await service.create(currentUser, {
       firstName: ' Demo ',
       lastName: ' Guest ',
-      email: ' GUEST@DEMO-HOTEL.COM ',
-      phone: ' +251911111111 ',
-      nationality: ' ET ',
-      documentNumber: ' PASSPORT-1 ',
-      preferences: {
-        pillow: 'firm',
-      },
+      email: ' GUEST@EXAMPLE.COM ',
+      preferences: { pillow: 'firm' },
     });
 
-    expect(guestsRepository.findGuestByEmail).toHaveBeenCalledWith(
-      10,
-      'guest@demo-hotel.com',
-    );
     expect(guestsRepository.createGuest).toHaveBeenCalledWith({
-      hotelId: 10,
       firstName: 'Demo',
       lastName: 'Guest',
-      email: 'guest@demo-hotel.com',
-      phone: '+251911111111',
-      nationality: 'ET',
-      documentNumber: 'PASSPORT-1',
-      preferences: {
-        pillow: 'firm',
-      },
-    });
-    expect(result).toMatchObject({
-      id: 5,
-      email: 'guest@demo-hotel.com',
-      preferences: {
-        pillow: 'firm',
-      },
-      user: null,
+      email: 'guest@example.com',
+      phone: null,
+      nationality: null,
+      documentNumber: null,
+      preferences: { pillow: 'firm' },
     });
   });
 
-  it('rejects duplicate guest emails inside the same hotel', async () => {
-    guestsRepository.findGuestByEmail.mockResolvedValue(guestProfile);
-
-    await expect(
-      service.create(currentUser, {
-        firstName: 'Demo',
-        lastName: 'Guest',
-        email: 'guest@demo-hotel.com',
-      }),
-    ).rejects.toThrow('Guest email already exists in this hotel.');
-  });
-
-  it('lists guests with pagination metadata', async () => {
-    const result = await service.list(currentUser, {
+  it('lists guests without hotel filters', async () => {
+    await service.list(currentUser, {
       page: 2,
       pageSize: 10,
       search: ' demo ',
@@ -126,64 +85,31 @@ describe('GuestsService', () => {
     });
 
     expect(guestsRepository.listGuests).toHaveBeenCalledWith({
-      hotelId: 10,
       skip: 10,
       take: 10,
       search: 'demo',
       status: 'ACTIVE',
     });
-    expect(result.pagination).toEqual({
-      page: 2,
-      pageSize: 10,
-      total: 1,
-      totalPages: 1,
-    });
   });
 
-  it('rejects guest lookups outside the current hotel', async () => {
+  it('throws when a guest is missing', async () => {
     guestsRepository.findGuestProfile.mockResolvedValue(null);
 
-    await expect(service.getById(currentUser, 5)).rejects.toThrow(
-      'Guest was not found in this hotel.',
+    await expect(service.getById(currentUser, 404)).rejects.toThrow(
+      'Guest was not found.',
     );
   });
 
-  it('updates a guest profile and preferences in the current hotel', async () => {
+  it('updates a guest profile directly', async () => {
     await service.update(currentUser, 5, {
-      firstName: 'Updated',
-      email: ' UPDATED@DEMO-HOTEL.COM ',
-      preferences: {
-        floor: 'high',
-      },
-    });
-
-    expect(guestsRepository.findGuestByEmail).toHaveBeenCalledWith(
-      10,
-      'updated@demo-hotel.com',
-    );
-    expect(guestsRepository.updateGuest).toHaveBeenCalledWith(10, 5, {
-      firstName: 'Updated',
-      email: 'updated@demo-hotel.com',
-      preferences: {
-        floor: 'high',
-      },
-    });
-  });
-
-  it('allows clearing optional guest fields', async () => {
-    await service.update(currentUser, 5, {
-      email: null,
-      phone: null,
-      nationality: null,
-      documentNumber: null,
+      firstName: ' Updated ',
+      email: ' UPDATED@EXAMPLE.COM ',
       preferences: null,
     });
 
-    expect(guestsRepository.updateGuest).toHaveBeenCalledWith(10, 5, {
-      email: null,
-      phone: null,
-      nationality: null,
-      documentNumber: null,
+    expect(guestsRepository.updateGuest).toHaveBeenCalledWith(5, {
+      firstName: 'Updated',
+      email: 'updated@example.com',
       preferences: null,
     });
   });
