@@ -15,7 +15,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import { HotelAccessGuard } from '../../common/guards/hotel-access.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
@@ -28,14 +27,14 @@ import { UsersService } from './users.service';
 
 @ApiTags('Users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, HotelAccessGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
   @Permissions('users.create')
-  @ApiOperation({ summary: 'Create a hotel-scoped login user' })
+  @ApiOperation({ summary: 'Create a login user' })
   create(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Body() createUserDto: CreateUserDto,
@@ -45,7 +44,7 @@ export class UsersController {
 
   @Get()
   @Permissions('users.read')
-  @ApiOperation({ summary: 'List hotel-scoped users' })
+  @ApiOperation({ summary: 'List users' })
   list(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Query() query: ListUsersQueryDto,
@@ -55,7 +54,7 @@ export class UsersController {
 
   @Get(':id')
   @Permissions('users.read')
-  @ApiOperation({ summary: 'Get one hotel-scoped user' })
+  @ApiOperation({ summary: 'Get one user' })
   getById(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) userId: number,
@@ -65,7 +64,7 @@ export class UsersController {
 
   @Patch(':id')
   @Permissions('users.update')
-  @ApiOperation({ summary: 'Update one hotel-scoped user' })
+  @ApiOperation({ summary: 'Update one user' })
   update(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) userId: number,
@@ -77,7 +76,7 @@ export class UsersController {
   @Patch(':id/deactivate')
   @Permissions('users.deactivate')
   @ApiOperation({
-    summary: 'Deactivate a user membership in the current hotel',
+    summary: 'Deactivate a user',
   })
   deactivate(
     @CurrentUser() currentUser: CurrentUserPayload,
@@ -88,7 +87,7 @@ export class UsersController {
 
   @Patch(':id/activate')
   @Permissions('users.activate')
-  @ApiOperation({ summary: 'Activate a user membership in the current hotel' })
+  @ApiOperation({ summary: 'Activate a user' })
   activate(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) userId: number,
@@ -99,7 +98,7 @@ export class UsersController {
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.OK)
   @Permissions('users.reset_password')
-  @ApiOperation({ summary: 'Reset a hotel user password' })
+  @ApiOperation({ summary: 'Reset a user password' })
   resetPassword(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) userId: number,
@@ -115,7 +114,7 @@ export class UsersController {
   @Post(':id/assign-role')
   @HttpCode(HttpStatus.OK)
   @Permissions('users.assign_role', 'roles.assign')
-  @ApiOperation({ summary: 'Assign a role to a user in the current hotel' })
+  @ApiOperation({ summary: 'Assign a role to a user' })
   assignRole(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) userId: number,
