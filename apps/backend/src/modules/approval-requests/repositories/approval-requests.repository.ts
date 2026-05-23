@@ -15,35 +15,11 @@ const approvalRequestInclude = {
       fullName: true,
     },
   },
-  requestedByHotelUser: {
-    select: {
-      id: true,
-      role: {
-        select: {
-          id: true,
-          key: true,
-          name: true,
-        },
-      },
-    },
-  },
   decidedByUser: {
     select: {
       id: true,
       email: true,
       fullName: true,
-    },
-  },
-  decidedByHotelUser: {
-    select: {
-      id: true,
-      role: {
-        select: {
-          id: true,
-          key: true,
-          name: true,
-        },
-      },
     },
   },
 } as const;
@@ -53,9 +29,7 @@ export class ApprovalRequestsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   createApprovalRequest(data: {
-    hotelId: number;
     requestedByUserId: number;
-    requestedByHotelUserId?: number | null;
     type: ApprovalRequestType;
     title: string;
     reason?: string | null;
@@ -63,9 +37,7 @@ export class ApprovalRequestsRepository {
   }) {
     return this.prisma.approvalRequest.create({
       data: {
-        hotelId: data.hotelId,
         requestedByUserId: data.requestedByUserId,
-        requestedByHotelUserId: data.requestedByHotelUserId ?? null,
         type: data.type,
         title: data.title,
         reason: data.reason ?? null,
@@ -78,20 +50,17 @@ export class ApprovalRequestsRepository {
   }
 
   listApprovalRequests({
-    hotelId,
     skip,
     take,
     status,
     type,
   }: {
-    hotelId: number;
     skip: number;
     take: number;
     status?: ApprovalStatus;
     type?: ApprovalRequestType;
   }) {
     const where = {
-      hotelId,
       ...(status ? { status } : {}),
       ...(type ? { type } : {}),
     };
@@ -115,37 +84,30 @@ export class ApprovalRequestsRepository {
     ]);
   }
 
-  findApprovalRequest(hotelId: number, approvalRequestId: number) {
-    return this.prisma.approvalRequest.findFirst({
+  findApprovalRequest(approvalRequestId: number) {
+    return this.prisma.approvalRequest.findUnique({
       where: {
         id: approvalRequestId,
-        hotelId,
       },
       include: approvalRequestInclude,
     });
   }
 
   decideApprovalRequest(data: {
-    hotelId: number;
     approvalRequestId: number;
-    requestType: ApprovalRequestType;
     status: typeof ApprovalStatus.APPROVED | typeof ApprovalStatus.REJECTED;
     decidedByUserId: number;
-    decidedByHotelUserId?: number | null;
     decisionNote?: string | null;
-    auditAction: string;
   }) {
     return this.prisma.$transaction(async (prisma) => {
       const result = await prisma.approvalRequest.updateMany({
         where: {
           id: data.approvalRequestId,
-          hotelId: data.hotelId,
           status: ApprovalStatus.PENDING,
         },
         data: {
           status: data.status,
           decidedByUserId: data.decidedByUserId,
-          decidedByHotelUserId: data.decidedByHotelUserId ?? null,
           decisionNote: data.decisionNote ?? null,
           decidedAt: new Date(),
         },
@@ -155,26 +117,9 @@ export class ApprovalRequestsRepository {
         return null;
       }
 
-      await prisma.auditLog.create({
-        data: {
-          hotelId: data.hotelId,
-          actorUserId: data.decidedByUserId,
-          actorHotelUserId: data.decidedByHotelUserId ?? null,
-          action: data.auditAction,
-          entityType: 'ApprovalRequest',
-          entityId: String(data.approvalRequestId),
-          metadata: {
-            approvalRequestId: data.approvalRequestId,
-            type: data.requestType,
-            status: data.status,
-          },
-        },
-      });
-
-      return prisma.approvalRequest.findFirst({
+      return prisma.approvalRequest.findUnique({
         where: {
           id: data.approvalRequestId,
-          hotelId: data.hotelId,
         },
         include: approvalRequestInclude,
       });
