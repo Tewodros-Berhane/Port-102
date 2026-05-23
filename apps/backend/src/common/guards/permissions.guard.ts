@@ -7,17 +7,19 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
+import type { Request } from 'express';
+
 import type { CurrentUserPayload } from '../../modules/auth/types/current-user-payload.type';
 import { PrismaService } from '../../prisma/prisma.service';
 import { REQUIRED_PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { IS_PUBLIC_ROUTE_KEY } from '../decorators/public.decorator';
-import type { HotelAccessRequest } from './hotel-access.guard';
 
-export type PermissionsRequest = HotelAccessRequest & {
+export type PermissionsRequest = Request & {
+  user?: CurrentUserPayload;
   permissionKeys?: string[];
 };
 
-type MembershipPermissions = {
+type RolePermissions = {
   role: {
     permissions: {
       permission: {
@@ -52,7 +54,7 @@ export class PermissionsGuard implements CanActivate {
       throw new UnauthorizedException('Authentication is required.');
     }
 
-    const permissionKeys = await this.getPermissionKeys(request, user);
+    const permissionKeys = await this.getPermissionKeys(user);
     const grantedPermissions = new Set(permissionKeys);
     const missingPermission = requiredPermissions.find(
       (permission) => !grantedPermissions.has(permission),
@@ -76,26 +78,21 @@ export class PermissionsGuard implements CanActivate {
     );
   }
 
-  private async getPermissionKeys(
-    request: PermissionsRequest,
-    user: CurrentUserPayload,
-  ) {
-    const membership = request.hotelContext
-      ? await this.findPermissionsByRoleId(
-          request.hotelContext.membership.roleId,
-        )
-      : await this.findPermissionsByMembership(user);
+  private async getPermissionKeys(user: CurrentUserPayload) {
+    const rolePermissions = await this.findPermissionsByRoleId(user.roleId);
 
-    if (!membership) {
-      throw new ForbiddenException('Hotel access is not allowed.');
+    if (!rolePermissions) {
+      throw new ForbiddenException('Role access is not allowed.');
     }
 
-    return membership.role.permissions.map(({ permission }) => permission.key);
+    return rolePermissions.role.permissions.map(
+      ({ permission }) => permission.key,
+    );
   }
 
   private async findPermissionsByRoleId(
     roleId: number,
-  ): Promise<MembershipPermissions | null> {
+  ): Promise<RolePermissions | null> {
     const role = await this.prisma.role.findFirst({
       where: {
         id: roleId,
@@ -120,45 +117,6 @@ export class PermissionsGuard implements CanActivate {
     });
 
     return role ? { role } : null;
-  }
-
-  private async findPermissionsByMembership(
-    user: CurrentUserPayload,
-  ): Promise<MembershipPermissions | null> {
-    return this.prisma.hotelUser.findFirst({
-      where: {
-        id: user.membershipId,
-        userId: user.sub,
-        hotelId: user.hotelId,
-        status: 'ACTIVE',
-        hotel: {
-          status: 'ACTIVE',
-        },
-        role: {
-          isActive: true,
-        },
-      },
-      include: {
-        role: {
-          include: {
-            permissions: {
-              where: {
-                permission: {
-                  isActive: true,
-                },
-              },
-              include: {
-                permission: {
-                  select: {
-                    key: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
   }
 
   private isPublicRoute(context: ExecutionContext) {
