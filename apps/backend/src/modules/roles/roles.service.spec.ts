@@ -1,75 +1,90 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { RolesRepository } from './repositories/roles.repository';
 import { RolesService } from './roles.service';
 
 describe('RolesService', () => {
   let service: RolesService;
   let rolesRepository: {
-    listVisibleRoles: jest.Mock;
-    findVisibleRole: jest.Mock;
-    findHotelRoleByKey: jest.Mock;
+    listRoles: jest.Mock;
+    findRole: jest.Mock;
+    findRoleByKey: jest.Mock;
     findActivePermissionsByKeys: jest.Mock;
     createCustomRole: jest.Mock;
     updateRole: jest.Mock;
     replaceRolePermissions: jest.Mock;
     deleteRole: jest.Mock;
   };
+  let auditLogsService: {
+    record: jest.Mock;
+  };
 
+  const now = new Date('2026-05-23T00:00:00.000Z');
   const currentUser = {
     sub: 1,
     email: 'admin@demo-hotel.com',
-    hotelId: 10,
-    membershipId: 20,
     roleKey: 'HOTEL_ADMIN',
+    roleId: 2,
+    departmentId: 3,
     tokenVersion: 0,
   };
-  const now = new Date('2026-05-21T00:00:00.000Z');
-  const permission = {
-    id: 1,
+
+  const usersRead = {
+    id: 11,
     key: 'users.read',
-    name: 'Users Read',
-    category: 'users_roles',
+    name: 'Read Users',
+    category: 'users',
     description: null,
     isActive: true,
   };
-  const customRole = {
-    id: 2,
-    hotelId: 10,
-    key: 'NIGHT_AUDITOR',
-    systemKey: null,
-    name: 'Night Auditor',
+  const usersCreate = {
+    id: 12,
+    key: 'users.create',
+    name: 'Create Users',
+    category: 'users',
     description: null,
-    isSystem: false,
     isActive: true,
-    createdAt: now,
-    updatedAt: now,
-    permissions: [
-      {
-        permission,
-      },
-    ],
   };
-  const systemRole = {
-    ...customRole,
-    id: 3,
-    hotelId: null,
-    key: 'HOTEL_ADMIN',
-    systemKey: 'HOTEL_ADMIN',
-    name: 'Hotel Admin',
-    isSystem: true,
-  };
+
+  function createRole(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 2,
+      key: 'NIGHT_AUDITOR',
+      systemKey: null,
+      name: 'Night Auditor',
+      description: 'Night audit role',
+      isSystem: false,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+      permissions: [
+        {
+          permission: usersCreate,
+        },
+        {
+          permission: usersRead,
+        },
+      ],
+      ...overrides,
+    };
+  }
 
   beforeEach(async () => {
     rolesRepository = {
-      listVisibleRoles: jest.fn().mockResolvedValue([systemRole, customRole]),
-      findVisibleRole: jest.fn().mockResolvedValue(customRole),
-      findHotelRoleByKey: jest.fn(),
-      findActivePermissionsByKeys: jest.fn().mockResolvedValue([permission]),
-      createCustomRole: jest.fn().mockResolvedValue(customRole),
-      updateRole: jest.fn().mockResolvedValue(customRole),
-      replaceRolePermissions: jest.fn().mockResolvedValue(customRole),
+      listRoles: jest.fn().mockResolvedValue([createRole()]),
+      findRole: jest.fn().mockResolvedValue(createRole()),
+      findRoleByKey: jest.fn().mockResolvedValue(null),
+      findActivePermissionsByKeys: jest
+        .fn()
+        .mockResolvedValue([usersCreate, usersRead]),
+      createCustomRole: jest.fn().mockResolvedValue(createRole()),
+      updateRole: jest.fn().mockResolvedValue(createRole({ name: 'Updated' })),
+      replaceRolePermissions: jest.fn().mockResolvedValue(createRole()),
       deleteRole: jest.fn(),
+    };
+    auditLogsService = {
+      record: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -79,81 +94,89 @@ describe('RolesService', () => {
           provide: RolesRepository,
           useValue: rolesRepository,
         },
+        {
+          provide: AuditLogsService,
+          useValue: auditLogsService,
+        },
       ],
     }).compile();
 
     service = module.get<RolesService>(RolesService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('lists system and current hotel roles with permission keys', async () => {
-    await expect(service.list(currentUser)).resolves.toMatchObject({
+  it('lists global roles with permission keys', async () => {
+    await expect(service.list(currentUser)).resolves.toEqual({
       items: [
         {
-          id: 3,
-          hotelId: null,
-          key: 'HOTEL_ADMIN',
-          isSystem: true,
+          id: 2,
+          key: 'NIGHT_AUDITOR',
+          name: 'Night Auditor',
+          description: 'Night audit role',
+          isSystem: false,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
           permissions: [
             {
+              id: 12,
+              key: 'users.create',
+              name: 'Create Users',
+              category: 'users',
+              description: null,
+            },
+            {
+              id: 11,
               key: 'users.read',
+              name: 'Read Users',
+              category: 'users',
+              description: null,
             },
           ],
         },
-        {
-          id: 2,
-          hotelId: 10,
-          key: 'NIGHT_AUDITOR',
-          isSystem: false,
-        },
       ],
     });
-    expect(rolesRepository.listVisibleRoles).toHaveBeenCalledWith(10);
+
+    expect(rolesRepository.listRoles).toHaveBeenCalled();
   });
 
-  it('creates a custom hotel role with validated permissions', async () => {
-    await service.create(currentUser, {
-      key: 'night_auditor',
+  it('creates a custom role with validated permissions', async () => {
+    const result = await service.create(currentUser, {
+      key: ' night_auditor ',
       name: ' Night Auditor ',
-      permissionKeys: ['users.read'],
+      description: ' Night audit role ',
+      permissionKeys: ['users.read', 'users.create'],
     });
 
-    expect(rolesRepository.findHotelRoleByKey).toHaveBeenCalledWith(
-      10,
-      'NIGHT_AUDITOR',
-    );
-    expect(rolesRepository.findActivePermissionsByKeys).toHaveBeenCalledWith([
-      'users.read',
-    ]);
+    expect(result).toMatchObject({
+      id: 2,
+      key: 'NIGHT_AUDITOR',
+    });
+    expect(rolesRepository.findRoleByKey).toHaveBeenCalledWith('NIGHT_AUDITOR');
     expect(rolesRepository.createCustomRole).toHaveBeenCalledWith({
-      hotelId: 10,
       key: 'NIGHT_AUDITOR',
       name: 'Night Auditor',
-      description: null,
-      permissionIds: [1],
+      description: 'Night audit role',
+      permissionIds: [12, 11],
     });
   });
 
-  it('rejects duplicate custom role keys in the same hotel', async () => {
-    rolesRepository.findHotelRoleByKey.mockResolvedValue(customRole);
+  it('rejects duplicate role keys globally', async () => {
+    rolesRepository.findRoleByKey.mockResolvedValue(createRole());
 
     await expect(
       service.create(currentUser, {
         key: 'NIGHT_AUDITOR',
         name: 'Night Auditor',
       }),
-    ).rejects.toThrow('Role key already exists in this hotel.');
+    ).rejects.toThrow('Role key already exists.');
   });
 
   it('rejects permission keys outside the active catalog', async () => {
-    rolesRepository.findActivePermissionsByKeys.mockResolvedValue([]);
+    rolesRepository.findActivePermissionsByKeys.mockResolvedValue([usersRead]);
 
     await expect(
       service.assignPermissions(currentUser, 2, {
-        permissionKeys: ['missing.permission'],
+        permissionKeys: ['users.read', 'users.delete'],
       }),
     ).rejects.toThrow(
       'One or more permissions do not exist in the active catalog.',
@@ -161,6 +184,10 @@ describe('RolesService', () => {
   });
 
   it('updates custom roles and replaces permissions when provided', async () => {
+    rolesRepository.findActivePermissionsByKeys.mockResolvedValueOnce([
+      usersRead,
+    ]);
+
     await service.update(currentUser, 2, {
       key: 'night_manager',
       name: 'Night Manager',
@@ -171,39 +198,61 @@ describe('RolesService', () => {
       key: 'NIGHT_MANAGER',
       name: 'Night Manager',
     });
-    expect(rolesRepository.replaceRolePermissions).toHaveBeenCalledWith(2, [1]);
-  });
-
-  it('protects system role keys from changes', async () => {
-    rolesRepository.findVisibleRole.mockResolvedValue(systemRole);
-
-    await expect(
-      service.update(currentUser, 3, {
-        key: 'OTHER_ROLE',
-      }),
-    ).rejects.toThrow('System role keys cannot be changed.');
-  });
-
-  it('rejects deleting system roles', async () => {
-    rolesRepository.findVisibleRole.mockResolvedValue(systemRole);
-
-    await expect(service.remove(currentUser, 3)).rejects.toThrow(
-      'System roles cannot be deleted.',
+    expect(rolesRepository.replaceRolePermissions).toHaveBeenCalledWith(
+      2,
+      [11],
     );
   });
 
-  it('deletes custom hotel roles', async () => {
+  it('protects system role keys from changes', async () => {
+    rolesRepository.findRole.mockResolvedValue(
+      createRole({
+        key: 'hotel_admin',
+        systemKey: 'HOTEL_ADMIN',
+        isSystem: true,
+      }),
+    );
+
+    await expect(
+      service.update(currentUser, 2, { key: 'OTHER_KEY' }),
+    ).rejects.toThrow('System role keys cannot be changed.');
+  });
+
+  it('rejects deleting system roles and deletes custom roles', async () => {
+    rolesRepository.findRole.mockResolvedValueOnce(
+      createRole({ isSystem: true }),
+    );
+
+    await expect(service.remove(currentUser, 2)).rejects.toThrow(
+      'System roles cannot be deleted.',
+    );
+
+    rolesRepository.findRole.mockResolvedValueOnce(createRole());
+
     await expect(service.remove(currentUser, 2)).resolves.toEqual({
       deleted: true,
     });
     expect(rolesRepository.deleteRole).toHaveBeenCalledWith(2);
   });
 
-  it('rejects roles outside the current hotel scope', async () => {
-    rolesRepository.findVisibleRole.mockResolvedValue(null);
+  it('records actorUserId when role permissions change', async () => {
+    rolesRepository.findActivePermissionsByKeys.mockResolvedValueOnce([
+      usersRead,
+    ]);
 
-    await expect(service.getById(currentUser, 99)).rejects.toThrow(
-      'Role was not found in this hotel.',
-    );
+    await service.assignPermissions(currentUser, 2, {
+      permissionKeys: ['users.read'],
+    });
+
+    expect(auditLogsService.record).toHaveBeenCalledWith({
+      actorUserId: 1,
+      action: 'roles.permissions_changed',
+      entityType: 'Role',
+      entityId: '2',
+      metadata: {
+        roleId: 2,
+        permissionKeys: ['users.read'],
+      },
+    });
   });
 });
