@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { Prisma } from '../../generated/prisma/client';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
@@ -37,18 +33,13 @@ export class GuestsService {
   constructor(private readonly guestsRepository: GuestsRepository) {}
 
   async create(
-    currentUser: CurrentUserPayload,
+    _currentUser: CurrentUserPayload,
     createGuestDto: CreateGuestDto,
   ) {
-    const email = this.normalizeOptionalEmail(createGuestDto.email);
-
-    await this.ensureEmailAvailable(currentUser.hotelId, email);
-
     const guest = await this.guestsRepository.createGuest({
-      hotelId: currentUser.hotelId,
       firstName: createGuestDto.firstName.trim(),
       lastName: createGuestDto.lastName.trim(),
-      email,
+      email: this.normalizeOptionalEmail(createGuestDto.email),
       phone: this.normalizeOptionalString(createGuestDto.phone),
       nationality: this.normalizeOptionalString(createGuestDto.nationality),
       documentNumber: this.normalizeOptionalString(
@@ -60,12 +51,11 @@ export class GuestsService {
     return this.serializeGuest(guest);
   }
 
-  async list(currentUser: CurrentUserPayload, query: ListGuestsQueryDto) {
+  async list(_currentUser: CurrentUserPayload, query: ListGuestsQueryDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
     const search = this.normalizeOptionalString(query.search);
     const [total, guests] = await this.guestsRepository.listGuests({
-      hotelId: currentUser.hotelId,
       skip: (page - 1) * pageSize,
       take: pageSize,
       search: search ?? undefined,
@@ -83,8 +73,8 @@ export class GuestsService {
     };
   }
 
-  async getById(currentUser: CurrentUserPayload, guestId: number) {
-    const guest = await this.findRequiredGuest(currentUser.hotelId, guestId);
+  async getById(_currentUser: CurrentUserPayload, guestId: number) {
+    const guest = await this.findRequiredGuest(guestId);
 
     return this.serializeGuest(guest);
   }
@@ -94,7 +84,7 @@ export class GuestsService {
     guestId: number,
     updateGuestDto: UpdateGuestDto,
   ) {
-    const guest = await this.findRequiredGuest(currentUser.hotelId, guestId);
+    const guest = await this.findRequiredGuest(guestId);
     const data: {
       firstName?: string;
       lastName?: string;
@@ -106,10 +96,7 @@ export class GuestsService {
     } = {};
 
     if (updateGuestDto.email !== undefined) {
-      const email = this.normalizeOptionalEmail(updateGuestDto.email);
-
-      await this.ensureEmailAvailable(currentUser.hotelId, email, guest.id);
-      data.email = email;
+      data.email = this.normalizeOptionalEmail(updateGuestDto.email);
     }
 
     if (updateGuestDto.firstName !== undefined) {
@@ -141,48 +128,23 @@ export class GuestsService {
     }
 
     if (Object.keys(data).length > 0) {
-      await this.updateGuestOrThrow(currentUser.hotelId, guest.id, data);
+      await this.updateGuestOrThrow(guest.id, data);
     }
 
     return this.getById(currentUser, guest.id);
   }
 
-  private async findRequiredGuest(hotelId: number, guestId: number) {
-    const guest = await this.guestsRepository.findGuestProfile(
-      hotelId,
-      guestId,
-    );
+  private async findRequiredGuest(guestId: number) {
+    const guest = await this.guestsRepository.findGuestProfile(guestId);
 
     if (!guest) {
-      throw new NotFoundException('Guest was not found in this hotel.');
+      throw new NotFoundException('Guest was not found.');
     }
 
     return guest;
   }
 
-  private async ensureEmailAvailable(
-    hotelId: number,
-    email?: string | null,
-    currentGuestId?: number,
-  ) {
-    if (!email) {
-      return null;
-    }
-
-    const existingGuest = await this.guestsRepository.findGuestByEmail(
-      hotelId,
-      email,
-    );
-
-    if (existingGuest && existingGuest.id !== currentGuestId) {
-      throw new ConflictException('Guest email already exists in this hotel.');
-    }
-
-    return existingGuest;
-  }
-
   private async updateGuestOrThrow(
-    hotelId: number,
     guestId: number,
     data: {
       firstName?: string;
@@ -194,14 +156,10 @@ export class GuestsService {
       preferences?: Prisma.InputJsonValue | null;
     },
   ) {
-    const result = await this.guestsRepository.updateGuest(
-      hotelId,
-      guestId,
-      data,
-    );
+    const result = await this.guestsRepository.updateGuest(guestId, data);
 
     if (result.count === 0) {
-      throw new NotFoundException('Guest was not found in this hotel.');
+      throw new NotFoundException('Guest was not found.');
     }
   }
 
