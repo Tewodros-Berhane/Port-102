@@ -19,17 +19,7 @@ const guestInclude = {
 export class GuestsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findGuestByEmail(hotelId: number, email: string) {
-    return this.prisma.guest.findFirst({
-      where: {
-        hotelId,
-        email,
-      },
-    });
-  }
-
   createGuest(data: {
-    hotelId: number;
     firstName: string;
     lastName: string;
     email?: string | null;
@@ -40,7 +30,6 @@ export class GuestsRepository {
   }) {
     return this.prisma.guest.create({
       data: {
-        hotelId: data.hotelId,
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email ?? null,
@@ -56,20 +45,17 @@ export class GuestsRepository {
   }
 
   listGuests({
-    hotelId,
     skip,
     take,
     search,
     status,
   }: {
-    hotelId: number;
     skip: number;
     take: number;
     search?: string;
     status?: 'ACTIVE' | 'INACTIVE';
   }) {
     const where = {
-      hotelId,
       ...(status ? { status } : {}),
       ...(search
         ? {
@@ -131,18 +117,16 @@ export class GuestsRepository {
     ]);
   }
 
-  findGuestProfile(hotelId: number, guestId: number) {
-    return this.prisma.guest.findFirst({
+  findGuestProfile(guestId: number) {
+    return this.prisma.guest.findUnique({
       where: {
         id: guestId,
-        hotelId,
       },
       include: guestInclude,
     });
   }
 
   updateGuest(
-    hotelId: number,
     guestId: number,
     data: {
       firstName?: string;
@@ -160,7 +144,6 @@ export class GuestsRepository {
     return this.prisma.guest.updateMany({
       where: {
         id: guestId,
-        hotelId,
       },
       data: {
         ...profileData,
