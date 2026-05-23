@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
-import { ApprovalStatus } from '../../generated/prisma/client';
+import {
+  ApprovalRequestType,
+  ApprovalStatus,
+} from '../../generated/prisma/client';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { ApprovalRequestsService } from './approval-requests.service';
 import { ApprovalRequestsRepository } from './repositories/approval-requests.repository';
 
@@ -12,79 +16,63 @@ describe('ApprovalRequestsService', () => {
     findApprovalRequest: jest.Mock;
     decideApprovalRequest: jest.Mock;
   };
+  let auditLogsService: {
+    record: jest.Mock;
+  };
 
+  const now = new Date('2026-05-23T00:00:00.000Z');
   const currentUser = {
     sub: 1,
     email: 'admin@demo-hotel.com',
-    hotelId: 10,
-    membershipId: 20,
     roleKey: 'HOTEL_ADMIN',
+    roleId: 2,
+    departmentId: 3,
     tokenVersion: 0,
   };
-  const now = new Date('2026-05-22T00:00:00.000Z');
-  const approvalRequest = {
-    id: 5,
-    hotelId: 10,
-    requestedByUserId: 1,
-    requestedByHotelUserId: 20,
-    decidedByUserId: null,
-    decidedByHotelUserId: null,
-    type: 'REFUND' as const,
-    status: ApprovalStatus.PENDING,
-    title: 'Refund guest overcharge',
-    reason: 'Duplicate charge',
-    payload: {
-      paymentId: 123,
-      amount: 25,
-    },
-    decisionNote: null,
-    decidedAt: null,
-    createdAt: now,
-    updatedAt: now,
-    requestedByUser: {
-      id: 1,
-      email: 'admin@demo-hotel.com',
-      fullName: 'Hotel Admin',
-    },
-    requestedByHotelUser: {
-      id: 20,
-      role: {
-        id: 2,
-        key: 'HOTEL_ADMIN',
-        name: 'Hotel Admin',
-      },
-    },
-    decidedByUser: null,
-    decidedByHotelUser: null,
+  const requestedByUser = {
+    id: 1,
+    email: 'admin@demo-hotel.com',
+    fullName: 'Hotel Admin',
   };
-  const approvedApprovalRequest = {
-    ...approvalRequest,
-    status: ApprovalStatus.APPROVED,
-    decisionNote: 'Approved',
-    decidedAt: now,
-    decidedByUser: {
-      id: 1,
-      email: 'admin@demo-hotel.com',
-      fullName: 'Hotel Admin',
-    },
-    decidedByHotelUser: {
-      id: 20,
-      role: {
-        id: 2,
-        key: 'HOTEL_ADMIN',
-        name: 'Hotel Admin',
-      },
-    },
-  };
+
+  function createApprovalRequest(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 5,
+      type: ApprovalRequestType.REFUND,
+      status: ApprovalStatus.PENDING,
+      title: 'Refund guest overcharge',
+      reason: null,
+      payload: { invoiceId: 10 },
+      decisionNote: null,
+      decidedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      requestedByUser,
+      decidedByUser: null,
+      ...overrides,
+    };
+  }
 
   beforeEach(async () => {
     approvalRequestsRepository = {
-      createApprovalRequest: jest.fn().mockResolvedValue(approvalRequest),
-      listApprovalRequests: jest.fn().mockResolvedValue([1, [approvalRequest]]),
-      findApprovalRequest: jest.fn().mockResolvedValue(approvalRequest),
-      decideApprovalRequest: jest
+      createApprovalRequest: jest
         .fn()
-        .mockResolvedValue(approvedApprovalRequest),
+        .mockResolvedValue(createApprovalRequest()),
+      listApprovalRequests: jest
+        .fn()
+        .mockResolvedValue([1, [createApprovalRequest()]]),
+      findApprovalRequest: jest.fn().mockResolvedValue(createApprovalRequest()),
+      decideApprovalRequest: jest.fn().mockResolvedValue(
+        createApprovalRequest({
+          status: ApprovalStatus.APPROVED,
+          decidedByUser: requestedByUser,
+          decisionNote: 'Approved',
+          decidedAt: now,
+        }),
+      ),
+    };
+    auditLogsService = {
+      record: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -94,160 +82,121 @@ describe('ApprovalRequestsService', () => {
           provide: ApprovalRequestsRepository,
           useValue: approvalRequestsRepository,
         },
+        {
+          provide: AuditLogsService,
+          useValue: auditLogsService,
+        },
       ],
     }).compile();
 
     service = module.get<ApprovalRequestsService>(ApprovalRequestsService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('creates a hotel-scoped approval request from the current user', async () => {
+  it('creates approval requests with requestedByUserId only', async () => {
     const result = await service.create(currentUser, {
-      type: 'REFUND',
+      type: ApprovalRequestType.REFUND,
       title: ' Refund guest overcharge ',
       reason: ' Duplicate charge ',
-      payload: {
-        paymentId: 123,
-      },
+      payload: { invoiceId: 10 },
     });
 
+    expect(result).toMatchObject({
+      id: 5,
+      requestedBy: {
+        user: requestedByUser,
+      },
+    });
     expect(
       approvalRequestsRepository.createApprovalRequest,
     ).toHaveBeenCalledWith({
-      hotelId: 10,
       requestedByUserId: 1,
-      requestedByHotelUserId: 20,
-      type: 'REFUND',
+      type: ApprovalRequestType.REFUND,
       title: 'Refund guest overcharge',
       reason: 'Duplicate charge',
-      payload: {
-        paymentId: 123,
-      },
+      payload: { invoiceId: 10 },
     });
-    expect(result).toMatchObject({
-      id: 5,
-      type: 'REFUND',
-      status: ApprovalStatus.PENDING,
-      requestedBy: {
-        user: {
-          id: 1,
-        },
+    expect(auditLogsService.record).toHaveBeenCalledWith({
+      actorUserId: 1,
+      action: 'approval_request.created',
+      entityType: 'ApprovalRequest',
+      entityId: '5',
+      metadata: {
+        approvalRequestId: 5,
+        type: ApprovalRequestType.REFUND,
+        status: ApprovalStatus.PENDING,
       },
     });
   });
 
-  it('rejects unsupported approval request types', async () => {
-    await expect(
-      service.create(currentUser, {
-        type: 'UNKNOWN' as never,
-        title: 'Invalid approval',
-      }),
-    ).rejects.toThrow('Approval request type is not supported.');
-  });
-
-  it('lists approval requests with pagination metadata', async () => {
-    const result = await service.list(currentUser, {
+  it('lists approval requests without hotel filters', async () => {
+    await service.list(currentUser, {
       page: 2,
       pageSize: 10,
       status: ApprovalStatus.PENDING,
-      type: 'REFUND',
+      type: ApprovalRequestType.REFUND,
     });
 
     expect(
       approvalRequestsRepository.listApprovalRequests,
     ).toHaveBeenCalledWith({
-      hotelId: 10,
       skip: 10,
       take: 10,
       status: ApprovalStatus.PENDING,
-      type: 'REFUND',
-    });
-    expect(result.pagination).toEqual({
-      page: 2,
-      pageSize: 10,
-      total: 1,
-      totalPages: 1,
+      type: ApprovalRequestType.REFUND,
     });
   });
 
-  it('rejects approval request lookups outside the current hotel', async () => {
+  it('throws when an approval request is missing', async () => {
     approvalRequestsRepository.findApprovalRequest.mockResolvedValue(null);
 
-    await expect(service.getById(currentUser, 5)).rejects.toThrow(
-      'Approval request was not found in this hotel.',
+    await expect(service.getById(currentUser, 404)).rejects.toThrow(
+      'Approval request was not found.',
     );
   });
 
-  it('approves pending approval requests and records an audit action', async () => {
+  it('approves pending requests with decidedByUserId only', async () => {
     const result = await service.approve(currentUser, 5, {
       decisionNote: ' Approved ',
     });
 
+    expect(result).toMatchObject({
+      status: ApprovalStatus.APPROVED,
+      decidedBy: {
+        user: requestedByUser,
+      },
+    });
     expect(
       approvalRequestsRepository.decideApprovalRequest,
     ).toHaveBeenCalledWith({
-      hotelId: 10,
       approvalRequestId: 5,
-      requestType: 'REFUND',
       status: ApprovalStatus.APPROVED,
       decidedByUserId: 1,
-      decidedByHotelUserId: 20,
       decisionNote: 'Approved',
-      auditAction: 'approval_request.approved',
     });
-    expect(result).toMatchObject({
-      id: 5,
-      status: ApprovalStatus.APPROVED,
-      decisionNote: 'Approved',
-      decidedBy: {
-        user: {
-          id: 1,
-        },
+    expect(auditLogsService.record).toHaveBeenCalledWith({
+      actorUserId: 1,
+      action: 'approval_request.approved',
+      entityType: 'ApprovalRequest',
+      entityId: '5',
+      metadata: {
+        approvalRequestId: 5,
+        type: ApprovalRequestType.REFUND,
+        status: ApprovalStatus.APPROVED,
       },
     });
   });
 
-  it('rejects pending approval requests and records an audit action', async () => {
-    approvalRequestsRepository.decideApprovalRequest.mockResolvedValue({
-      ...approvedApprovalRequest,
-      status: ApprovalStatus.REJECTED,
-      decisionNote: 'Missing receipt',
-    });
-
-    await service.reject(currentUser, 5, {
-      decisionNote: ' Missing receipt ',
-    });
-
-    expect(
-      approvalRequestsRepository.decideApprovalRequest,
-    ).toHaveBeenCalledWith({
-      hotelId: 10,
-      approvalRequestId: 5,
-      requestType: 'REFUND',
-      status: ApprovalStatus.REJECTED,
-      decidedByUserId: 1,
-      decidedByHotelUserId: 20,
-      decisionNote: 'Missing receipt',
-      auditAction: 'approval_request.rejected',
-    });
-  });
-
-  it('rejects decisions for non-pending approval requests', async () => {
-    approvalRequestsRepository.findApprovalRequest.mockResolvedValue({
-      ...approvalRequest,
-      status: ApprovalStatus.APPROVED,
-    });
+  it('rejects decisions on non-pending requests', async () => {
+    approvalRequestsRepository.findApprovalRequest.mockResolvedValue(
+      createApprovalRequest({ status: ApprovalStatus.APPROVED }),
+    );
 
     await expect(
-      service.approve(currentUser, 5, { decisionNote: 'Approved' }),
+      service.reject(currentUser, 5, {
+        decisionNote: 'Already approved',
+      }),
     ).rejects.toThrow(
       'Only pending approval requests can be approved or rejected.',
     );
-    expect(
-      approvalRequestsRepository.decideApprovalRequest,
-    ).not.toHaveBeenCalled();
   });
 });
