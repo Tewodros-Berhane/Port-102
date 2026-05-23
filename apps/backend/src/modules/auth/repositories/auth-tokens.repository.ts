@@ -8,7 +8,6 @@ export class AuthTokensRepository {
 
   createRefreshToken(data: {
     userId: number;
-    hotelUserId: number;
     tokenHash: string;
     expiresAt: Date;
   }) {
@@ -24,11 +23,26 @@ export class AuthTokensRepository {
         status: 'ACTIVE',
       },
       include: {
-        user: true,
-        hotelUser: {
+        user: {
           include: {
-            hotel: true,
-            role: true,
+            role: {
+              include: {
+                permissions: {
+                  where: {
+                    permission: {
+                      isActive: true,
+                    },
+                  },
+                  include: {
+                    permission: {
+                      select: {
+                        key: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
             department: true,
           },
         },
@@ -73,15 +87,12 @@ export class AuthTokensRepository {
     });
   }
 
-  findJwtMembership(userId: number, membershipId: number) {
-    return this.prisma.hotelUser.findFirst({
+  findJwtUser(userId: number) {
+    return this.prisma.user.findUnique({
       where: {
-        id: membershipId,
-        userId,
+        id: userId,
       },
       include: {
-        user: true,
-        hotel: true,
         role: true,
       },
     });
