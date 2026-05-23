@@ -13,7 +13,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import { HotelAccessGuard } from '../../common/guards/hotel-access.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
@@ -24,7 +23,7 @@ import { ListApprovalRequestsQueryDto } from './dto/list-approval-requests-query
 
 @ApiTags('Approval Requests')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, HotelAccessGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('approval-requests')
 export class ApprovalRequestsController {
   constructor(
@@ -33,7 +32,7 @@ export class ApprovalRequestsController {
 
   @Post()
   @Permissions('approval_requests.create')
-  @ApiOperation({ summary: 'Create a hotel-scoped approval request' })
+  @ApiOperation({ summary: 'Create an approval request' })
   create(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Body() createApprovalRequestDto: CreateApprovalRequestDto,
@@ -46,7 +45,7 @@ export class ApprovalRequestsController {
 
   @Get()
   @Permissions('approval_requests.read')
-  @ApiOperation({ summary: 'List hotel-scoped approval requests' })
+  @ApiOperation({ summary: 'List approval requests' })
   list(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Query() query: ListApprovalRequestsQueryDto,
@@ -56,7 +55,7 @@ export class ApprovalRequestsController {
 
   @Get(':id')
   @Permissions('approval_requests.read')
-  @ApiOperation({ summary: 'Get one hotel-scoped approval request' })
+  @ApiOperation({ summary: 'Get one approval request' })
   getById(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Param('id', ParseIntPipe) approvalRequestId: number,
