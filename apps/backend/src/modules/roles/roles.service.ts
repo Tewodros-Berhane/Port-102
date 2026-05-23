@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { AssignRolePermissionsDto } from './dto/assign-role-permissions.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -14,7 +15,6 @@ import { RolesRepository } from './repositories/roles.repository';
 
 type RoleWithPermissions = {
   id: number;
-  hotelId: number | null;
   key: string;
   systemKey: string | null;
   name: string;
@@ -37,40 +37,37 @@ type RoleWithPermissions = {
 
 @Injectable()
 export class RolesService {
-  constructor(private readonly rolesRepository: RolesRepository) {}
+  constructor(
+    private readonly rolesRepository: RolesRepository,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
-  async list(currentUser: CurrentUserPayload) {
-    const roles = await this.rolesRepository.listVisibleRoles(
-      currentUser.hotelId,
-    );
+  async list(_currentUser: CurrentUserPayload) {
+    const roles = await this.rolesRepository.listRoles();
 
     return {
       items: roles.map((role) => this.serializeRole(role)),
     };
   }
 
-  async getById(currentUser: CurrentUserPayload, roleId: number) {
-    const role = await this.findVisibleRoleOrThrow(currentUser.hotelId, roleId);
+  async getById(_currentUser: CurrentUserPayload, roleId: number) {
+    const role = await this.findRoleOrThrow(roleId);
 
     return this.serializeRole(role);
   }
 
-  async create(currentUser: CurrentUserPayload, createRoleDto: CreateRoleDto) {
+  async create(_currentUser: CurrentUserPayload, createRoleDto: CreateRoleDto) {
     const key = this.normalizeRoleKey(createRoleDto.key);
-    const existingRole = await this.rolesRepository.findHotelRoleByKey(
-      currentUser.hotelId,
-      key,
-    );
+    const existingRole = await this.rolesRepository.findRoleByKey(key);
 
     if (existingRole) {
-      throw new ConflictException('Role key already exists in this hotel.');
+      throw new ConflictException('Role key already exists.');
     }
 
     const permissions = await this.findRequiredPermissions(
       createRoleDto.permissionKeys ?? [],
     );
     const role = await this.rolesRepository.createCustomRole({
-      hotelId: currentUser.hotelId,
       key,
       name: createRoleDto.name.trim(),
       description: this.normalizeOptionalString(createRoleDto.description),
@@ -85,7 +82,7 @@ export class RolesService {
     roleId: number,
     updateRoleDto: UpdateRoleDto,
   ) {
-    const role = await this.findVisibleRoleOrThrow(currentUser.hotelId, roleId);
+    const role = await this.findRoleOrThrow(roleId);
     const data: {
       key?: string;
       name?: string;
@@ -101,13 +98,10 @@ export class RolesService {
       }
 
       if (!role.isSystem) {
-        const existingRole = await this.rolesRepository.findHotelRoleByKey(
-          currentUser.hotelId,
-          key,
-        );
+        const existingRole = await this.rolesRepository.findRoleByKey(key);
 
         if (existingRole && existingRole.id !== role.id) {
-          throw new ConflictException('Role key already exists in this hotel.');
+          throw new ConflictException('Role key already exists.');
         }
 
         data.key = key;
@@ -142,8 +136,8 @@ export class RolesService {
     });
   }
 
-  async remove(currentUser: CurrentUserPayload, roleId: number) {
-    const role = await this.findVisibleRoleOrThrow(currentUser.hotelId, roleId);
+  async remove(_currentUser: CurrentUserPayload, roleId: number) {
+    const role = await this.findRoleOrThrow(roleId);
 
     if (role.isSystem) {
       throw new ForbiddenException('System roles cannot be deleted.');
@@ -159,7 +153,7 @@ export class RolesService {
     roleId: number,
     assignRolePermissionsDto: AssignRolePermissionsDto,
   ) {
-    const role = await this.findVisibleRoleOrThrow(currentUser.hotelId, roleId);
+    const role = await this.findRoleOrThrow(roleId);
     const permissions = await this.findRequiredPermissions(
       assignRolePermissionsDto.permissionKeys,
     );
@@ -167,15 +161,25 @@ export class RolesService {
       role.id,
       permissions.map((permission) => permission.id),
     );
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'roles.permissions_changed',
+      entityType: 'Role',
+      entityId: String(role.id),
+      metadata: {
+        roleId: role.id,
+        permissionKeys: permissions.map((permission) => permission.key),
+      },
+    });
 
     return this.serializeRole(updatedRole);
   }
 
-  private async findVisibleRoleOrThrow(hotelId: number, roleId: number) {
-    const role = await this.rolesRepository.findVisibleRole(hotelId, roleId);
+  private async findRoleOrThrow(roleId: number) {
+    const role = await this.rolesRepository.findRole(roleId);
 
     if (!role) {
-      throw new NotFoundException('Role was not found in this hotel.');
+      throw new NotFoundException('Role was not found.');
     }
 
     return role;
@@ -198,7 +202,6 @@ export class RolesService {
   private serializeRole(role: RoleWithPermissions) {
     return {
       id: role.id,
-      hotelId: role.hotelId,
       key: role.systemKey ?? role.key,
       name: role.name,
       description: role.description,
