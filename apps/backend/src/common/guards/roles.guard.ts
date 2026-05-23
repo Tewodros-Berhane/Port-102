@@ -6,23 +6,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import type { Request } from 'express';
 
 import type { CurrentUserPayload } from '../../modules/auth/types/current-user-payload.type';
-import { PrismaService } from '../../prisma/prisma.service';
 import { IS_PUBLIC_ROUTE_KEY } from '../decorators/public.decorator';
 import { REQUIRED_ROLES_KEY } from '../decorators/roles.decorator';
-import type { HotelAccessRequest } from './hotel-access.guard';
 
-export type RolesRequest = HotelAccessRequest & {
+export type RolesRequest = Request & {
+  user?: CurrentUserPayload;
   roleKey?: string;
 };
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly reflector: Reflector,
-  ) {}
+  constructor(private readonly reflector: Reflector) {}
 
   async canActivate(context: ExecutionContext) {
     if (this.isPublicRoute(context)) {
@@ -42,19 +39,11 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('Authentication is required.');
     }
 
-    const roleKey =
-      request.hotelContext?.role.key ??
-      (await this.findRoleKeyByMembership(user));
-
-    if (!roleKey) {
-      throw new ForbiddenException('Hotel access is not allowed.');
-    }
-
-    if (!requiredRoles.includes(roleKey)) {
+    if (!requiredRoles.includes(user.roleKey)) {
       throw new ForbiddenException('Required role is missing.');
     }
 
-    request.roleKey = roleKey;
+    request.roleKey = user.roleKey;
 
     return true;
   }
@@ -66,35 +55,6 @@ export class RolesGuard implements CanActivate {
         context.getHandler(),
       ]) ?? []
     );
-  }
-
-  private async findRoleKeyByMembership(user: CurrentUserPayload) {
-    const membership = await this.prisma.hotelUser.findFirst({
-      where: {
-        id: user.membershipId,
-        userId: user.sub,
-        hotelId: user.hotelId,
-        status: 'ACTIVE',
-        hotel: {
-          status: 'ACTIVE',
-        },
-        role: {
-          isActive: true,
-        },
-      },
-      select: {
-        role: {
-          select: {
-            key: true,
-            systemKey: true,
-          },
-        },
-      },
-    });
-
-    return membership
-      ? (membership.role.systemKey ?? membership.role.key)
-      : null;
   }
 
   private isPublicRoute(context: ExecutionContext) {
