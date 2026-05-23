@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { hash } from 'bcryptjs';
 
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { UsersRepository } from '../users/repositories/users.repository';
 import { AuthService } from './auth.service';
 import { AuthTokensRepository } from './repositories/auth-tokens.repository';
@@ -11,9 +12,10 @@ describe('AuthService', () => {
   let service: AuthService;
   let usersRepository: {
     findByEmailForLogin: jest.Mock;
-    findByIdForHotelSelection: jest.Mock;
-    findActiveMembershipProfile: jest.Mock;
-    findActiveMembershipsForUser: jest.Mock;
+    findActiveUserProfile: jest.Mock;
+    findByIdForPasswordChange: jest.Mock;
+    findByEmailForPasswordReset: jest.Mock;
+    updatePassword: jest.Mock;
   };
   let authTokensRepository: {
     createRefreshToken: jest.Mock;
@@ -21,38 +23,44 @@ describe('AuthService', () => {
     revokeRefreshTokenByHash: jest.Mock;
     revokeActiveRefreshTokensForUser: jest.Mock;
     incrementUserTokenVersion: jest.Mock;
-    findJwtMembership: jest.Mock;
+    findJwtUser: jest.Mock;
   };
   let jwtService: {
     signAsync: jest.Mock;
-    verifyAsync: jest.Mock;
   };
   let configService: {
     getOrThrow: jest.Mock;
+    get: jest.Mock;
+  };
+  let auditLogsService: {
+    record: jest.Mock;
   };
   let passwordHash: string;
 
-  const activeMembership = {
-    id: 10,
-    status: 'ACTIVE',
-    hotel: {
-      id: 1,
-      name: 'Demo Hotel',
-      code: 'DEMO',
-      status: 'ACTIVE',
-    },
-    role: {
-      id: 2,
-      key: 'HOTEL_ADMIN',
-      systemKey: 'HOTEL_ADMIN',
-      name: 'Hotel Admin',
-      isActive: true,
-    },
-    department: {
-      id: 3,
-      key: 'ADMINISTRATION',
-      name: 'Administration',
-    },
+  const role = {
+    id: 2,
+    key: 'hotel_admin',
+    systemKey: 'HOTEL_ADMIN',
+    name: 'Hotel Admin',
+    isActive: true,
+    permissions: [
+      {
+        permission: {
+          key: 'users.read',
+        },
+      },
+      {
+        permission: {
+          key: 'roles.read',
+        },
+      },
+    ],
+  };
+
+  const department = {
+    id: 3,
+    key: 'ADMINISTRATION',
+    name: 'Administration',
   };
 
   function createUser(overrides: Record<string, unknown> = {}) {
@@ -63,18 +71,31 @@ describe('AuthService', () => {
       passwordHash,
       status: 'ACTIVE',
       tokenVersion: 0,
-      hotelUsers: [activeMembership],
+      roleId: role.id,
+      departmentId: department.id,
+      role,
+      department,
       ...overrides,
     };
   }
+
+  const currentUser = {
+    sub: 1,
+    email: 'admin@demo-hotel.com',
+    roleKey: 'HOTEL_ADMIN',
+    roleId: 2,
+    departmentId: 3,
+    tokenVersion: 0,
+  };
 
   beforeEach(async () => {
     passwordHash = await hash('CorrectPassword123!', 4);
     usersRepository = {
       findByEmailForLogin: jest.fn(),
-      findByIdForHotelSelection: jest.fn(),
-      findActiveMembershipProfile: jest.fn(),
-      findActiveMembershipsForUser: jest.fn(),
+      findActiveUserProfile: jest.fn(),
+      findByIdForPasswordChange: jest.fn(),
+      findByEmailForPasswordReset: jest.fn(),
+      updatePassword: jest.fn(),
     };
     authTokensRepository = {
       createRefreshToken: jest.fn(),
@@ -82,22 +103,24 @@ describe('AuthService', () => {
       revokeRefreshTokenByHash: jest.fn(),
       revokeActiveRefreshTokensForUser: jest.fn(),
       incrementUserTokenVersion: jest.fn(),
-      findJwtMembership: jest.fn(),
+      findJwtUser: jest.fn(),
     };
     jwtService = {
       signAsync: jest.fn().mockResolvedValue('access-token'),
-      verifyAsync: jest.fn(),
     };
     configService = {
+      get: jest.fn().mockReturnValue(4),
       getOrThrow: jest.fn((key: string) => {
         const values: Record<string, string> = {
           'jwt.accessExpiresIn': '15m',
           'jwt.refreshExpiresIn': '30d',
-          'jwt.hotelSelectionExpiresIn': '10m',
         };
 
         return values[key] ?? 'secret';
       }),
+    };
+    auditLogsService = {
+      record: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -119,80 +142,50 @@ describe('AuthService', () => {
           provide: ConfigService,
           useValue: configService,
         },
+        {
+          provide: AuditLogsService,
+          useValue: auditLogsService,
+        },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('accepts valid credentials for a single active hotel membership', async () => {
+  it('accepts valid credentials for an active user with a direct role', async () => {
     usersRepository.findByEmailForLogin.mockResolvedValue(createUser());
 
-    const user = await service.validateLocalCredentials(
-      ' ADMIN@DEMO-HOTEL.COM ',
+    const result = await service.validateLocalCredentials(
+      ' Admin@Demo-Hotel.com ',
       'CorrectPassword123!',
     );
-    const response = await service.buildLoginResponse(user);
 
+    expect(result).toMatchObject({
+      id: 1,
+      email: 'admin@demo-hotel.com',
+      fullName: 'Hotel Admin',
+      status: 'ACTIVE',
+      role: {
+        id: 2,
+        key: 'HOTEL_ADMIN',
+        name: 'Hotel Admin',
+      },
+      department,
+      permissions: ['users.read', 'roles.read'],
+    });
     expect(usersRepository.findByEmailForLogin).toHaveBeenCalledWith(
       'admin@demo-hotel.com',
     );
-    expect(user).not.toHaveProperty('passwordHash');
-    expect(response).toMatchObject({
-      status: 'authenticated',
-      requiresHotelSelection: false,
-      activeHotel: {
-        id: 1,
-        name: 'Demo Hotel',
-        code: 'DEMO',
-      },
-      membership: {
-        id: 10,
-        role: {
-          key: 'HOTEL_ADMIN',
-        },
-      },
-      tokens: {
-        accessToken: 'access-token',
-        tokenType: 'Bearer',
-        expiresIn: '15m',
+    expect(auditLogsService.record).toHaveBeenCalledWith({
+      actorUserId: 1,
+      action: 'auth.login_success',
+      entityType: 'User',
+      entityId: '1',
+      metadata: {
+        email: 'admin@demo-hotel.com',
+        roleKey: 'HOTEL_ADMIN',
       },
     });
-    expect(jwtService.signAsync).toHaveBeenCalledWith(
-      {
-        sub: 1,
-        email: 'admin@demo-hotel.com',
-        hotelId: 1,
-        membershipId: 10,
-        roleKey: 'HOTEL_ADMIN',
-        tokenVersion: 0,
-      },
-      { expiresIn: '15m' },
-    );
-    expect(authTokensRepository.createRefreshToken).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: 1,
-        hotelUserId: 10,
-        tokenHash: expect.not.stringContaining(
-          response.tokens?.refreshToken ?? '',
-        ),
-      }),
-    );
-  });
-
-  it('rejects invalid credentials', async () => {
-    usersRepository.findByEmailForLogin.mockResolvedValue(createUser());
-
-    await expect(
-      service.validateLocalCredentials(
-        'admin@demo-hotel.com',
-        'WrongPassword123!',
-      ),
-    ).rejects.toThrow('Invalid email or password.');
   });
 
   it('rejects inactive users', async () => {
@@ -206,313 +199,112 @@ describe('AuthService', () => {
         'CorrectPassword123!',
       ),
     ).rejects.toThrow('User account is not active.');
-  });
-
-  it('rejects users without an active hotel membership', async () => {
-    usersRepository.findByEmailForLogin.mockResolvedValue(
-      createUser({
-        hotelUsers: [
-          {
-            ...activeMembership,
-            status: 'INACTIVE',
-          },
-        ],
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'auth.login_failure',
+        actorUserId: 1,
+        metadata: expect.objectContaining({
+          reason: 'inactive_user',
+        }),
       }),
     );
-
-    await expect(
-      service.validateLocalCredentials(
-        'admin@demo-hotel.com',
-        'CorrectPassword123!',
-      ),
-    ).rejects.toThrow('User has no active hotel membership.');
   });
 
-  it('returns hotel choices for a multi-hotel user', async () => {
-    usersRepository.findByEmailForLogin.mockResolvedValue(
-      createUser({
-        hotelUsers: [
-          activeMembership,
-          {
-            ...activeMembership,
-            id: 11,
-            hotel: {
-              id: 2,
-              name: 'Second Hotel',
-              code: 'SECOND',
-              status: 'ACTIVE',
-            },
-          },
-        ],
-      }),
-    );
-
-    const user = await service.validateLocalCredentials(
+  it('builds a login response and stores a user-only refresh token', async () => {
+    usersRepository.findByEmailForLogin.mockResolvedValue(createUser());
+    const authenticatedUser = await service.validateLocalCredentials(
       'admin@demo-hotel.com',
       'CorrectPassword123!',
     );
-    const response = await service.buildLoginResponse(user);
+
+    const response = await service.buildLoginResponse(authenticatedUser);
 
     expect(response).toMatchObject({
-      requiresHotelSelection: true,
-      activeHotel: null,
-      membership: null,
-      hotelSelectionToken: 'access-token',
-      tokens: null,
-    });
-    expect(response.hotelChoices).toHaveLength(2);
-    expect(jwtService.signAsync).toHaveBeenCalledWith(
-      {
-        sub: 1,
-        email: 'admin@demo-hotel.com',
-        tokenVersion: 0,
-        purpose: 'hotel-selection',
-      },
-      { expiresIn: '10m' },
-    );
-  });
-
-  it('returns the current user hotel context and permissions', async () => {
-    usersRepository.findActiveMembershipProfile.mockResolvedValue({
-      ...activeMembership,
-      userId: 1,
-      hotelId: 1,
+      status: 'authenticated',
       user: {
         id: 1,
         email: 'admin@demo-hotel.com',
         fullName: 'Hotel Admin',
+        status: 'ACTIVE',
       },
       role: {
-        ...activeMembership.role,
-        permissions: [
-          {
-            permission: {
-              key: 'users.read',
-            },
-          },
-          {
-            permission: {
-              key: 'reports.occupancy.read',
-            },
-          },
-        ],
-      },
-    });
-
-    await expect(
-      service.getMe({
-        sub: 1,
-        email: 'admin@demo-hotel.com',
-        hotelId: 1,
-        membershipId: 10,
-        roleKey: 'HOTEL_ADMIN',
-        tokenVersion: 0,
-      }),
-    ).resolves.toEqual({
-      id: 1,
-      name: 'Hotel Admin',
-      email: 'admin@demo-hotel.com',
-      activeHotel: {
-        id: 1,
-        name: 'Demo Hotel',
-        code: 'DEMO',
-      },
-      membership: {
-        id: 10,
-        role: {
-          id: 2,
-          key: 'HOTEL_ADMIN',
-          name: 'Hotel Admin',
-        },
-        department: {
-          id: 3,
-          key: 'ADMINISTRATION',
-          name: 'Administration',
-        },
-      },
-      permissions: ['users.read', 'reports.occupancy.read'],
-    });
-    expect(usersRepository.findActiveMembershipProfile).toHaveBeenCalledWith(
-      1,
-      10,
-    );
-  });
-
-  it('lists active hotels available to the current user', async () => {
-    usersRepository.findActiveMembershipsForUser.mockResolvedValue([
-      activeMembership,
-      {
-        ...activeMembership,
-        id: 11,
-        hotel: {
-          id: 2,
-          name: 'Second Hotel',
-          code: 'SECOND',
-          status: 'ACTIVE',
-        },
-      },
-    ]);
-
-    await expect(
-      service.getMyHotels({
-        sub: 1,
-        email: 'admin@demo-hotel.com',
-        hotelId: 1,
-        membershipId: 10,
-        roleKey: 'HOTEL_ADMIN',
-        tokenVersion: 0,
-      }),
-    ).resolves.toEqual([
-      {
-        id: 10,
-        hotel: {
-          id: 1,
-          name: 'Demo Hotel',
-          code: 'DEMO',
-        },
-        role: {
-          id: 2,
-          key: 'HOTEL_ADMIN',
-          name: 'Hotel Admin',
-        },
-        department: {
-          id: 3,
-          key: 'ADMINISTRATION',
-          name: 'Administration',
-        },
-      },
-      {
-        id: 11,
-        hotel: {
-          id: 2,
-          name: 'Second Hotel',
-          code: 'SECOND',
-        },
-        role: {
-          id: 2,
-          key: 'HOTEL_ADMIN',
-          name: 'Hotel Admin',
-        },
-        department: {
-          id: 3,
-          key: 'ADMINISTRATION',
-          name: 'Administration',
-        },
-      },
-    ]);
-  });
-
-  it('selects an active hotel and issues tokens', async () => {
-    jwtService.verifyAsync.mockResolvedValue({
-      sub: 1,
-      email: 'admin@demo-hotel.com',
-      tokenVersion: 0,
-      purpose: 'hotel-selection',
-    });
-    usersRepository.findByIdForHotelSelection.mockResolvedValue(
-      createUser({
-        hotelUsers: [
-          activeMembership,
-          {
-            ...activeMembership,
-            id: 11,
-            hotel: {
-              id: 2,
-              name: 'Second Hotel',
-              code: 'SECOND',
-              status: 'ACTIVE',
-            },
-          },
-        ],
-      }),
-    );
-
-    const response = await service.selectHotel('selection-token', 2);
-
-    expect(response).toMatchObject({
-      requiresHotelSelection: false,
-      activeHotel: {
         id: 2,
-        name: 'Second Hotel',
-        code: 'SECOND',
+        key: 'HOTEL_ADMIN',
+        name: 'Hotel Admin',
       },
-      membership: {
-        id: 11,
-      },
-      hotelSelectionToken: null,
+      department,
+      permissions: ['users.read', 'roles.read'],
       tokens: {
         accessToken: 'access-token',
         tokenType: 'Bearer',
         expiresIn: '15m',
       },
     });
-    expect(jwtService.verifyAsync).toHaveBeenCalledWith('selection-token');
-    expect(jwtService.signAsync).toHaveBeenLastCalledWith(
+    expect(jwtService.signAsync).toHaveBeenCalledWith(
       {
         sub: 1,
         email: 'admin@demo-hotel.com',
-        hotelId: 2,
-        membershipId: 11,
         roleKey: 'HOTEL_ADMIN',
+        roleId: 2,
+        departmentId: 3,
         tokenVersion: 0,
       },
-      { expiresIn: '15m' },
+      {
+        expiresIn: '15m',
+      },
     );
+    expect(authTokensRepository.createRefreshToken).toHaveBeenCalledWith({
+      userId: 1,
+      tokenHash: expect.any(String),
+      expiresAt: expect.any(Date),
+    });
   });
 
-  it('rejects invalid hotel selection tokens', async () => {
-    jwtService.verifyAsync.mockRejectedValue(new Error('expired'));
+  it('returns the current user role, department, and permissions without hotel fields', async () => {
+    usersRepository.findActiveUserProfile.mockResolvedValue(createUser());
 
-    await expect(service.selectHotel('expired-token', 1)).rejects.toThrow(
-      'Invalid hotel selection token.',
-    );
+    await expect(service.getMe(currentUser)).resolves.toEqual({
+      id: 1,
+      fullName: 'Hotel Admin',
+      email: 'admin@demo-hotel.com',
+      status: 'ACTIVE',
+      role: {
+        id: 2,
+        key: 'HOTEL_ADMIN',
+        name: 'Hotel Admin',
+      },
+      department,
+      permissions: ['users.read', 'roles.read'],
+    });
   });
 
-  it('rotates refresh tokens', async () => {
+  it('rotates refresh tokens for active users with active direct roles', async () => {
     authTokensRepository.findActiveRefreshTokenByHash.mockResolvedValue({
+      id: 1,
+      userId: 1,
+      tokenHash: 'hash',
+      status: 'ACTIVE',
       expiresAt: new Date(Date.now() + 60_000),
-      user: {
-        id: 1,
-        email: 'admin@demo-hotel.com',
-        fullName: 'Hotel Admin',
-        status: 'ACTIVE',
-        tokenVersion: 0,
-      },
-      hotelUser: activeMembership,
+      user: createUser(),
     });
 
     const tokens = await service.refresh('refresh-token');
 
-    expect(tokens).toMatchObject({
-      accessToken: 'access-token',
-      tokenType: 'Bearer',
-      expiresIn: '15m',
-    });
-    expect(authTokensRepository.revokeRefreshTokenByHash).toHaveBeenCalled();
-    expect(authTokensRepository.createRefreshToken).toHaveBeenCalled();
-  });
-
-  it('rejects expired refresh tokens', async () => {
-    authTokensRepository.findActiveRefreshTokenByHash.mockResolvedValue({
-      expiresAt: new Date(Date.now() - 60_000),
-    });
-
-    await expect(service.refresh('expired-token')).rejects.toThrow(
-      'Invalid refresh token.',
+    expect(tokens.accessToken).toBe('access-token');
+    expect(authTokensRepository.revokeRefreshTokenByHash).toHaveBeenCalledWith(
+      expect.any(String),
     );
+    expect(authTokensRepository.createRefreshToken).toHaveBeenCalledWith({
+      userId: 1,
+      tokenHash: expect.any(String),
+      expiresAt: expect.any(Date),
+    });
   });
 
   it('revokes all refresh tokens and increments token version on logout-all', async () => {
-    await expect(
-      service.logoutAll({
-        sub: 1,
-        email: 'admin@demo-hotel.com',
-        hotelId: 1,
-        membershipId: 10,
-        roleKey: 'HOTEL_ADMIN',
-        tokenVersion: 0,
-      }),
-    ).resolves.toEqual({ loggedOut: true });
+    await expect(service.logoutAll(currentUser)).resolves.toEqual({
+      loggedOut: true,
+    });
 
     expect(
       authTokensRepository.revokeActiveRefreshTokensForUser,
@@ -520,5 +312,54 @@ describe('AuthService', () => {
     expect(authTokensRepository.incrementUserTokenVersion).toHaveBeenCalledWith(
       1,
     );
+    expect(auditLogsService.record).toHaveBeenCalledWith({
+      actorUserId: 1,
+      action: 'auth.logout',
+      entityType: 'User',
+      entityId: '1',
+      metadata: {
+        scope: 'all_sessions',
+      },
+    });
+  });
+
+  it('changes the current user password and revokes old sessions', async () => {
+    usersRepository.findByIdForPasswordChange.mockResolvedValue({
+      id: 1,
+      email: 'admin@demo-hotel.com',
+      passwordHash,
+      status: 'ACTIVE',
+    });
+
+    await expect(
+      service.changePassword(currentUser, {
+        currentPassword: 'CorrectPassword123!',
+        newPassword: 'NewPassword123!',
+      }),
+    ).resolves.toEqual({ passwordChanged: true });
+
+    expect(usersRepository.updatePassword).toHaveBeenCalledWith(
+      1,
+      expect.any(String),
+    );
+    expect(
+      authTokensRepository.revokeActiveRefreshTokensForUser,
+    ).toHaveBeenCalledWith(1);
+    expect(auditLogsService.record).toHaveBeenCalledWith({
+      actorUserId: 1,
+      action: 'auth.password_change',
+      entityType: 'User',
+      entityId: '1',
+    });
+  });
+
+  it('validates JWT payloads against the current direct user role', async () => {
+    authTokensRepository.findJwtUser.mockResolvedValue(createUser());
+
+    await expect(service.validateJwtPayload(currentUser)).resolves.toBe(
+      currentUser,
+    );
+
+    expect(authTokensRepository.findJwtUser).toHaveBeenCalledWith(1);
   });
 });
