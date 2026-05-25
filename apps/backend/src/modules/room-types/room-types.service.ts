@@ -270,3 +270,93 @@ export class RoomTypesService {
 
   async removeAmenity(
     currentUser: CurrentUserPayload,
+    roomTypeId: number,
+    amenityId: number,
+  ) {
+    const roomType = await this.findRequiredRoomType(roomTypeId);
+    const amenity = await this.roomAmenitiesRepository.findAmenity(amenityId);
+
+    if (!amenity) {
+      throw new NotFoundException('Room amenity was not found.');
+    }
+
+    const existingAssignments =
+      await this.roomTypesRepository.findAssignedAmenityIds(roomType.id, [
+        amenity.id,
+      ]);
+
+    if (existingAssignments.length === 0) {
+      throw new NotFoundException('Amenity is not assigned to this room type.');
+    }
+
+    await this.roomTypesRepository.removeAmenity(roomType.id, amenity.id);
+    const updatedRoomType = await this.findRequiredRoomType(roomType.id);
+
+    await this.recordRoomTypeAudit(
+      currentUser,
+      'room_types.amenity_removed',
+      updatedRoomType,
+      {
+        amenityId: amenity.id,
+      },
+    );
+
+    return this.serializeRoomType(updatedRoomType);
+  }
+
+  private async findRequiredRoomType(roomTypeId: number) {
+    const roomType = await this.roomTypesRepository.findRoomType(roomTypeId);
+
+    if (!roomType) {
+      throw new NotFoundException('Room type was not found.');
+    }
+
+    return roomType;
+  }
+
+  private async ensureRoomTypeCanBeDeactivated(roomTypeId: number) {
+    const activeRoomCount =
+      await this.roomTypesRepository.countActiveRooms(roomTypeId);
+
+    if (activeRoomCount > 0) {
+      throw new BadRequestException(
+        'Cannot deactivate a room type with active rooms assigned.',
+      );
+    }
+  }
+
+  private async ensureAmenitiesAreActive(amenityIds: number[]) {
+    for (const amenityId of amenityIds) {
+      const amenity = await this.roomAmenitiesRepository.findAmenity(amenityId);
+
+      if (!amenity) {
+        throw new NotFoundException('Room amenity was not found.');
+      }
+
+      if (!amenity.isActive) {
+        throw new BadRequestException(
+          'Cannot assign inactive amenities to a room type.',
+        );
+      }
+    }
+  }
+
+  private serializeRoomType(roomType: RoomTypeRecord) {
+    return {
+      id: roomType.id,
+      name: roomType.name,
+      code: roomType.code,
+      description: roomType.description,
+      baseOccupancy: roomType.baseOccupancy,
+      maxOccupancy: roomType.maxOccupancy,
+      baseRate: this.serializeBaseRate(roomType.baseRate),
+      isActive: roomType.isActive,
+      createdAt: roomType.createdAt,
+      updatedAt: roomType.updatedAt,
+      amenities: roomType.amenities.map(({ amenity, createdAt }) => ({
+        id: amenity.id,
+        name: amenity.name,
+        key: amenity.key,
+        description: amenity.description,
+        isActive: amenity.isActive,
+        assignedAt: createdAt,
