@@ -33,3 +33,38 @@ export class CreateRoomTypeDto {
   })
   @IsString()
   @IsOptional()
+  description?: string;
+
+  @ApiPropertyOptional({
+    example: 2,
+    minimum: 1,
+    default: 1,
+  })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 0 })
+  @Min(1)
+  @IsOptional()
+  baseOccupancy?: number;
+
+  @ApiPropertyOptional({
+    example: 3,
+    minimum: 1,
+    default: 1,
+  })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 0 })
+  @Min(1)
+  @IsOptional()
+  maxOccupancy?: number;
+
+  @ApiPropertyOptional({
+    example: 125.5,
+    minimum: 0,
+    description: 'Base room rate with up to two decimal places.',
+  })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  baseRate?: number;
+}
