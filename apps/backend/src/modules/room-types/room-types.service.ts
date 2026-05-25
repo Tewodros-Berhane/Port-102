@@ -179,3 +179,94 @@ export class RoomTypesService {
       data,
     );
 
+    await this.recordRoomTypeAudit(
+      currentUser,
+      'room_types.updated',
+      updatedRoomType,
+      {
+        previous: this.auditSnapshot(roomType),
+        changes: data,
+      },
+    );
+
+    return this.serializeRoomType(updatedRoomType);
+  }
+
+  async remove(currentUser: CurrentUserPayload, roomTypeId: number) {
+    const roomType = await this.findRequiredRoomType(roomTypeId);
+
+    if (!roomType.isActive) {
+      return this.serializeRoomType(roomType);
+    }
+
+    await this.ensureRoomTypeCanBeDeactivated(roomType.id);
+
+    const updatedRoomType = await this.roomTypesRepository.updateRoomType(
+      roomType.id,
+      {
+        isActive: false,
+      },
+    );
+
+    await this.recordRoomTypeAudit(
+      currentUser,
+      'room_types.deactivated',
+      updatedRoomType,
+      {
+        previous: {
+          isActive: roomType.isActive,
+        },
+        changes: {
+          isActive: false,
+        },
+      },
+    );
+
+    return this.serializeRoomType(updatedRoomType);
+  }
+
+  async assignAmenities(
+    currentUser: CurrentUserPayload,
+    roomTypeId: number,
+    assignRoomTypeAmenitiesDto: AssignRoomTypeAmenitiesDto,
+  ) {
+    const roomType = await this.findRequiredRoomType(roomTypeId);
+
+    if (!roomType.isActive) {
+      throw new BadRequestException(
+        'Cannot assign amenities to an inactive room type.',
+      );
+    }
+
+    const amenityIds = assignRoomTypeAmenitiesDto.amenityIds;
+    await this.ensureAmenitiesAreActive(amenityIds);
+
+    const existingAssignments =
+      await this.roomTypesRepository.findAssignedAmenityIds(
+        roomType.id,
+        amenityIds,
+      );
+
+    if (existingAssignments.length > 0) {
+      throw new ConflictException(
+        'One or more amenities are already assigned to this room type.',
+      );
+    }
+
+    await this.roomTypesRepository.assignAmenities(roomType.id, amenityIds);
+    const updatedRoomType = await this.findRequiredRoomType(roomType.id);
+
+    await this.recordRoomTypeAudit(
+      currentUser,
+      'room_types.amenities_assigned',
+      updatedRoomType,
+      {
+        amenityIds,
+      },
+    );
+
+    return this.serializeRoomType(updatedRoomType);
+  }
+
+  async removeAmenity(
+    currentUser: CurrentUserPayload,
