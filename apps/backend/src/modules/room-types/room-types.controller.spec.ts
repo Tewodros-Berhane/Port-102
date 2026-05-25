@@ -60,3 +60,65 @@ describe('RoomTypesController', () => {
   it('should be defined', () => {
     expect(controller).toBeDefined();
   });
+
+  it('delegates room type creation', () => {
+    const dto = {
+      name: 'Deluxe King',
+      code: 'DLX-KING',
+    };
+
+    controller.create(currentUser, dto);
+
+    expect(roomTypesService.create).toHaveBeenCalledWith(currentUser, dto);
+  });
+
+  it('delegates paginated room type listing', () => {
+    const query = {
+      page: 2,
+      limit: 10,
+      isActive: true,
+    };
+
+    controller.list(currentUser, query);
+
+    expect(roomTypesService.list).toHaveBeenCalledWith(currentUser, query);
+  });
+
+  it('delegates room type detail, update, and removal', () => {
+    const updateDto = {
+      name: 'Updated Deluxe',
+    };
+
+    controller.getById(currentUser, 11);
+    controller.update(currentUser, 11, updateDto);
+    controller.remove(currentUser, 11);
+
+    expect(roomTypesService.getById).toHaveBeenCalledWith(currentUser, 11);
+    expect(roomTypesService.update).toHaveBeenCalledWith(
+      currentUser,
+      11,
+      updateDto,
+    );
+    expect(roomTypesService.remove).toHaveBeenCalledWith(currentUser, 11);
+  });
+
+  it('delegates amenity assignment and removal', () => {
+    const dto = {
+      amenityIds: [5],
+    };
+
+    controller.assignAmenities(currentUser, 11, dto);
+    controller.removeAmenity(currentUser, 11, 5);
+
+    expect(roomTypesService.assignAmenities).toHaveBeenCalledWith(
+      currentUser,
+      11,
+      dto,
+    );
+    expect(roomTypesService.removeAmenity).toHaveBeenCalledWith(
+      currentUser,
+      11,
+      5,
+    );
+  });
+});
