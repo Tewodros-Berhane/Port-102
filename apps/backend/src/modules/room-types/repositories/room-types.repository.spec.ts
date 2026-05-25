@@ -52,3 +52,57 @@ describe('RoomTypesRepository', () => {
           useValue: prisma,
         },
       ],
+    }).compile();
+
+    repository = module.get<RoomTypesRepository>(RoomTypesRepository);
+  });
+
+  it('creates room types through PrismaService', async () => {
+    await repository.createRoomType({
+      name: 'Deluxe King',
+      code: 'DLX-KING',
+      description: null,
+      baseOccupancy: 2,
+      maxOccupancy: 3,
+      baseRate: '125.50',
+    });
+
+    expect(prisma.roomType.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          name: 'Deluxe King',
+          code: 'DLX-KING',
+          description: null,
+          baseOccupancy: 2,
+          maxOccupancy: 3,
+          baseRate: '125.50',
+        },
+      }),
+    );
+  });
+
+  it('finds duplicate codes while excluding the current room type when requested', async () => {
+    await repository.findByCode('DLX-KING', 11);
+
+    expect(prisma.roomType.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          code: 'DLX-KING',
+          id: {
+            not: 11,
+          },
+        },
+      }),
+    );
+  });
+
+  it('lists room types with search, active filter, pagination, and stable ordering', async () => {
+    prisma.roomType.count.mockResolvedValue(0);
+    prisma.roomType.findMany.mockResolvedValue([]);
+
+    await repository.listRoomTypes({
+      skip: 10,
+      take: 5,
+      search: 'deluxe',
+      isActive: true,
+    });
