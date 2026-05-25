@@ -143,3 +143,75 @@ describe('RoomsRepository', () => {
         data: {
           displayName: null,
           floorId: null,
+        },
+      }),
+    );
+  });
+
+  it('creates room status logs through PrismaService', async () => {
+    await repository.createStatusLogs([
+      {
+        roomId: 9,
+        actorUserId: 1,
+        field: 'maintenanceStatus',
+        oldValue: RoomMaintenanceStatus.AVAILABLE,
+        newValue: RoomMaintenanceStatus.OUT_OF_ORDER,
+        reason: 'AC repair',
+      },
+    ]);
+
+    expect(prisma.roomStatusLog.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          roomId: 9,
+          actorUserId: 1,
+          field: 'maintenanceStatus',
+          oldValue: RoomMaintenanceStatus.AVAILABLE,
+          newValue: RoomMaintenanceStatus.OUT_OF_ORDER,
+          reason: 'AC repair',
+        },
+      ],
+    });
+  });
+
+  it('lists room status logs with pagination and stable ordering', async () => {
+    prisma.roomStatusLog.count.mockResolvedValue(0);
+    prisma.roomStatusLog.findMany.mockResolvedValue([]);
+
+    await repository.listStatusLogs({
+      roomId: 9,
+      skip: 20,
+      take: 10,
+    });
+
+    expect(prisma.roomStatusLog.count).toHaveBeenCalledWith({
+      where: {
+        roomId: 9,
+      },
+    });
+    expect(prisma.roomStatusLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          roomId: 9,
+        },
+        skip: 20,
+        take: 10,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
+  it('counts rooms with the provided filter', async () => {
+    await repository.countRooms({
+      isActive: true,
+      maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+    });
+
+    expect(prisma.room.count).toHaveBeenCalledWith({
+      where: {
+        isActive: true,
+        maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+      },
+    });
+  });
+});
