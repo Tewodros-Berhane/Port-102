@@ -222,3 +222,77 @@ describe('RoomTypesService', () => {
       'Cannot deactivate a room type with active rooms assigned.',
     );
     expect(roomTypesRepository.updateRoomType).not.toHaveBeenCalled();
+  });
+
+  it('soft-deactivates unused room types', async () => {
+    roomTypesRepository.updateRoomType.mockResolvedValue({
+      ...roomType,
+      isActive: false,
+    });
+
+    const result = await service.remove(currentUser, 11);
+
+    expect(result).toMatchObject({
+      id: 11,
+      isActive: false,
+    });
+    expect(roomTypesRepository.updateRoomType).toHaveBeenCalledWith(11, {
+      isActive: false,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'room_types.deactivated',
+      }),
+    );
+  });
+
+  it('assigns active amenities that are not already assigned', async () => {
+    const result = await service.assignAmenities(currentUser, 11, {
+      amenityIds: [5],
+    });
+
+    expect(result).toMatchObject({
+      id: 11,
+    });
+    expect(roomAmenitiesRepository.findAmenity).toHaveBeenCalledWith(5);
+    expect(roomTypesRepository.findAssignedAmenityIds).toHaveBeenCalledWith(
+      11,
+      [5],
+    );
+    expect(roomTypesRepository.assignAmenities).toHaveBeenCalledWith(11, [5]);
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'room_types.amenities_assigned',
+      }),
+    );
+  });
+
+  it('rejects duplicate room type amenity assignments', async () => {
+    roomTypesRepository.findAssignedAmenityIds.mockResolvedValue([
+      { amenityId: 5 },
+    ]);
+
+    await expect(
+      service.assignAmenities(currentUser, 11, {
+        amenityIds: [5],
+      }),
+    ).rejects.toThrow(
+      'One or more amenities are already assigned to this room type.',
+    );
+  });
+
+  it('removes an assigned room type amenity', async () => {
+    roomTypesRepository.findAssignedAmenityIds.mockResolvedValue([
+      { amenityId: 5 },
+    ]);
+
+    await service.removeAmenity(currentUser, 11, 5);
+
+    expect(roomTypesRepository.removeAmenity).toHaveBeenCalledWith(11, 5);
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'room_types.amenity_removed',
+      }),
+    );
+  });
+});
