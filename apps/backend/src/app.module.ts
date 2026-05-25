@@ -13,6 +13,7 @@ import { HealthModule } from './modules/health/health.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { RoomTypesModule } from './modules/room-types/room-types.module';
+import { RoomsModule } from './modules/rooms/rooms.module';
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -40,6 +41,7 @@ import { PrismaModule } from './prisma/prisma.module';
     PermissionsModule,
     FloorsModule,
     RoomTypesModule,
+    RoomsModule,
   ],
 })
 export class AppModule {}
