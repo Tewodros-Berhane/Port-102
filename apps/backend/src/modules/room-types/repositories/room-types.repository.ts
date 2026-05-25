@@ -101,3 +101,54 @@ export class RoomTypesRepository {
                 },
               },
               {
+                code: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                description: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    return Promise.all([
+      this.prisma.roomType.count({ where }),
+      this.prisma.roomType.findMany({
+        where,
+        skip,
+        take,
+        select: roomTypeSelect,
+        orderBy: [{ name: 'asc' }, { code: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
+  }
+
+  findRoomType(roomTypeId: number) {
+    return this.prisma.roomType.findUnique({
+      where: {
+        id: roomTypeId,
+      },
+      select: roomTypeSelect,
+    });
+  }
+
+  updateRoomType(
+    roomTypeId: number,
+    data: {
+      name?: string;
+      code?: string;
+      description?: string | null;
+      baseOccupancy?: number;
+      maxOccupancy?: number;
+      baseRate?: string | null;
+      isActive?: boolean;
+    },
+  ) {
+    return this.prisma.roomType.update({
+      where: {
