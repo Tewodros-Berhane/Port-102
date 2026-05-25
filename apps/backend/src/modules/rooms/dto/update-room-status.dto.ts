@@ -19,3 +19,23 @@ export class UpdateRoomStatusDto {
   @ApiPropertyOptional({
     enum: RoomCleaningStatus,
     example: RoomCleaningStatus.CLEAN,
+  })
+  @IsEnum(RoomCleaningStatus)
+  @IsOptional()
+  cleaningStatus?: RoomCleaningStatus;
+
+  @ApiPropertyOptional({
+    enum: RoomMaintenanceStatus,
+    example: RoomMaintenanceStatus.AVAILABLE,
+  })
+  @IsEnum(RoomMaintenanceStatus)
+  @IsOptional()
+  maintenanceStatus?: RoomMaintenanceStatus;
+
+  @ApiPropertyOptional({
+    example: 'Inspection completed after cleaning.',
+  })
+  @IsString()
+  @IsOptional()
+  reason?: string;
+}
