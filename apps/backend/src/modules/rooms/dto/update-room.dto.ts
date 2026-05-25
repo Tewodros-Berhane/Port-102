@@ -30,3 +30,34 @@ export class UpdateRoomDto {
 
   @ApiPropertyOptional({
     example: 1,
+    description: 'Active floor ID, or null to clear the room floor.',
+    minimum: 1,
+    nullable: true,
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  floorId?: number | null;
+
+  @ApiPropertyOptional({
+    example: 2,
+    description: 'Active room type ID.',
+    minimum: 1,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  roomTypeId?: number;
+
+  @ApiPropertyOptional({
+    example: 'Near the elevator.',
+    nullable: true,
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsOptional()
+  notes?: string | null;
+}
