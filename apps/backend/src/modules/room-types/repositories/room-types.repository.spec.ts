@@ -106,3 +106,57 @@ describe('RoomTypesRepository', () => {
       search: 'deluxe',
       isActive: true,
     });
+
+    expect(prisma.roomType.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        isActive: true,
+        OR: expect.any(Array),
+      }),
+    });
+    expect(prisma.roomType.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 10,
+        take: 5,
+        orderBy: [{ name: 'asc' }, { code: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
+  it('counts active rooms assigned to a room type', async () => {
+    await repository.countActiveRooms(11);
+
+    expect(prisma.room.count).toHaveBeenCalledWith({
+      where: {
+        roomTypeId: 11,
+        isActive: true,
+      },
+    });
+  });
+
+  it('creates and deletes room type amenity assignments', async () => {
+    await repository.assignAmenities(11, [5, 6]);
+    await repository.removeAmenity(11, 5);
+
+    expect(prisma.roomTypeAmenity.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          roomTypeId: 11,
+          amenityId: 5,
+        },
+        {
+          roomTypeId: 11,
+          amenityId: 6,
+        },
+      ],
+      skipDuplicates: false,
+    });
+    expect(prisma.roomTypeAmenity.delete).toHaveBeenCalledWith({
+      where: {
+        roomTypeId_amenityId: {
+          roomTypeId: 11,
+          amenityId: 5,
+        },
+      },
+    });
+  });
+});
