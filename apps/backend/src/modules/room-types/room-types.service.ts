@@ -89,3 +89,93 @@ export class RoomTypesService {
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getById(_currentUser: CurrentUserPayload, roomTypeId: number) {
+    const roomType = await this.findRequiredRoomType(roomTypeId);
+
+    return this.serializeRoomType(roomType);
+  }
+
+  async update(
+    currentUser: CurrentUserPayload,
+    roomTypeId: number,
+    updateRoomTypeDto: UpdateRoomTypeDto,
+  ) {
+    const roomType = await this.findRequiredRoomType(roomTypeId);
+    const data: {
+      name?: string;
+      code?: string;
+      description?: string | null;
+      baseOccupancy?: number;
+      maxOccupancy?: number;
+      baseRate?: string | null;
+      isActive?: boolean;
+    } = {};
+
+    if (updateRoomTypeDto.name !== undefined) {
+      data.name = this.normalizeRequiredString(
+        updateRoomTypeDto.name,
+        'Room type name is required.',
+      );
+    }
+
+    if (updateRoomTypeDto.code !== undefined) {
+      const code = this.normalizeRoomTypeCode(updateRoomTypeDto.code);
+
+      if (code !== roomType.code) {
+        const duplicateRoomType = await this.roomTypesRepository.findByCode(
+          code,
+          roomType.id,
+        );
+
+        if (duplicateRoomType) {
+          throw new ConflictException('Room type code already exists.');
+        }
+      }
+
+      data.code = code;
+    }
+
+    if (updateRoomTypeDto.description !== undefined) {
+      data.description = this.normalizeOptionalString(
+        updateRoomTypeDto.description,
+      );
+    }
+
+    if (updateRoomTypeDto.baseOccupancy !== undefined) {
+      data.baseOccupancy = updateRoomTypeDto.baseOccupancy;
+    }
+
+    if (updateRoomTypeDto.maxOccupancy !== undefined) {
+      data.maxOccupancy = updateRoomTypeDto.maxOccupancy;
+    }
+
+    this.assertValidOccupancy(
+      data.baseOccupancy ?? roomType.baseOccupancy,
+      data.maxOccupancy ?? roomType.maxOccupancy,
+    );
+
+    if (updateRoomTypeDto.baseRate !== undefined) {
+      data.baseRate = this.normalizeBaseRate(updateRoomTypeDto.baseRate);
+    }
+
+    if (updateRoomTypeDto.isActive !== undefined) {
+      if (updateRoomTypeDto.isActive === false && roomType.isActive) {
+        await this.ensureRoomTypeCanBeDeactivated(roomType.id);
+      }
+
+      data.isActive = updateRoomTypeDto.isActive;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.serializeRoomType(roomType);
+    }
+
+    const updatedRoomType = await this.roomTypesRepository.updateRoomType(
+      roomType.id,
+      data,
+    );
+
