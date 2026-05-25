@@ -55,3 +55,60 @@ export class GetRoomsQueryDto {
   })
   @Type(() => Number)
   @IsInt()
+  @Min(1)
+  @IsOptional()
+  floorId?: number;
+
+  @ApiPropertyOptional({
+    example: 2,
+    minimum: 1,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  roomTypeId?: number;
+
+  @ApiPropertyOptional({
+    enum: RoomOccupancyStatus,
+    example: RoomOccupancyStatus.VACANT,
+  })
+  @IsEnum(RoomOccupancyStatus)
+  @IsOptional()
+  occupancyStatus?: RoomOccupancyStatus;
+
+  @ApiPropertyOptional({
+    enum: RoomCleaningStatus,
+    example: RoomCleaningStatus.CLEAN,
+  })
+  @IsEnum(RoomCleaningStatus)
+  @IsOptional()
+  cleaningStatus?: RoomCleaningStatus;
+
+  @ApiPropertyOptional({
+    enum: RoomMaintenanceStatus,
+    example: RoomMaintenanceStatus.AVAILABLE,
+  })
+  @IsEnum(RoomMaintenanceStatus)
+  @IsOptional()
+  maintenanceStatus?: RoomMaintenanceStatus;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filter rooms by active state.',
+  })
+  @Transform(({ value }) => {
+    if (value === 'true') {
+      return true;
+    }
+
+    if (value === 'false') {
+      return false;
+    }
+
+    return value;
+  })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
