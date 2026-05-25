@@ -202,3 +202,71 @@ export class RoomsRepository {
       roomNumber?: string;
       displayName?: string | null;
       floorId?: number | null;
+      roomTypeId?: number;
+      occupancyStatus?: RoomOccupancyStatus;
+      cleaningStatus?: RoomCleaningStatus;
+      maintenanceStatus?: RoomMaintenanceStatus;
+      notes?: string | null;
+      isActive?: boolean;
+    },
+  ) {
+    return this.prisma.room.update({
+      where: {
+        id: roomId,
+      },
+      data,
+      select: roomSelect,
+    });
+  }
+
+  createStatusLogs(
+    data: {
+      roomId: number;
+      actorUserId?: number | null;
+      field: string;
+      oldValue?: string | null;
+      newValue?: string | null;
+      reason?: string | null;
+    }[],
+  ) {
+    return this.prisma.roomStatusLog.createMany({
+      data: data.map((log) => ({
+        roomId: log.roomId,
+        actorUserId: log.actorUserId ?? null,
+        field: log.field,
+        oldValue: log.oldValue ?? null,
+        newValue: log.newValue ?? null,
+        reason: log.reason ?? null,
+      })),
+    });
+  }
+
+  listStatusLogs({
+    roomId,
+    skip,
+    take,
+  }: {
+    roomId: number;
+    skip: number;
+    take: number;
+  }) {
+    const where = {
+      roomId,
+    };
+
+    return Promise.all([
+      this.prisma.roomStatusLog.count({ where }),
+      this.prisma.roomStatusLog.findMany({
+        where,
+        skip,
+        take,
+        select: roomStatusLogSelect,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
+  }
+
+  countRooms(where: Prisma.RoomWhereInput) {
+    return this.prisma.room.count({ where });
+  }
+}
