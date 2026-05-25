@@ -46,3 +46,50 @@ export class UpdateRoomTypeDto {
     minimum: 1,
   })
   @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 0 })
+  @Min(1)
+  @IsOptional()
+  baseOccupancy?: number;
+
+  @ApiPropertyOptional({
+    example: 3,
+    minimum: 1,
+  })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 0 })
+  @Min(1)
+  @IsOptional()
+  maxOccupancy?: number;
+
+  @ApiPropertyOptional({
+    example: 125.5,
+    minimum: 0,
+    nullable: true,
+    description: 'Base room rate with up to two decimal places.',
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  baseRate?: number | null;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether the room type can be assigned to rooms.',
+  })
+  @Transform(({ value }) => {
+    if (value === 'true') {
+      return true;
+    }
+
+    if (value === 'false') {
+      return false;
+    }
+
+    return value;
+  })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
