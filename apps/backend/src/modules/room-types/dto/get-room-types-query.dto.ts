@@ -30,3 +30,34 @@ export class GetRoomTypesQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
+  @IsOptional()
+  limit = 20;
+
+  @ApiPropertyOptional({
+    example: 'deluxe',
+    description: 'Search by room type name, code, or description.',
+  })
+  @IsString()
+  @IsOptional()
+  search?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filter room types by active state.',
+  })
+  @Transform(({ value }) => {
+    if (value === 'true') {
+      return true;
+    }
+
+    if (value === 'false') {
+      return false;
+    }
+
+    return value;
+  })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
