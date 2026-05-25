@@ -71,3 +71,75 @@ describe('RoomsRepository', () => {
           roomNumber: '101',
           displayName: 'Deluxe 101',
           floorId: 3,
+          roomTypeId: 4,
+          notes: null,
+        },
+      }),
+    );
+  });
+
+  it('finds duplicate room numbers while excluding the current room when requested', async () => {
+    await repository.findByRoomNumber('101', 9);
+
+    expect(prisma.room.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          roomNumber: '101',
+          id: {
+            not: 9,
+          },
+        },
+      }),
+    );
+  });
+
+  it('lists rooms with filters, pagination, search, and stable ordering', async () => {
+    prisma.room.count.mockResolvedValue(0);
+    prisma.room.findMany.mockResolvedValue([]);
+
+    await repository.listRooms({
+      skip: 10,
+      take: 5,
+      search: 'deluxe',
+      floorId: 3,
+      roomTypeId: 4,
+      occupancyStatus: RoomOccupancyStatus.VACANT,
+      cleaningStatus: RoomCleaningStatus.CLEAN,
+      maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+      isActive: true,
+    });
+
+    expect(prisma.room.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        isActive: true,
+        floorId: 3,
+        roomTypeId: 4,
+        occupancyStatus: RoomOccupancyStatus.VACANT,
+        cleaningStatus: RoomCleaningStatus.CLEAN,
+        maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+        OR: expect.any(Array),
+      }),
+    });
+    expect(prisma.room.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 10,
+        take: 5,
+        orderBy: [{ roomNumber: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
+  it('updates rooms by id', async () => {
+    await repository.updateRoom(9, {
+      displayName: null,
+      floorId: null,
+    });
+
+    expect(prisma.room.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 9,
+        },
+        data: {
+          displayName: null,
+          floorId: null,
