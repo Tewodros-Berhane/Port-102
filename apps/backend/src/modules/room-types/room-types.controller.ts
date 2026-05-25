@@ -112,3 +112,60 @@ export class RoomTypesController {
   @ApiOperation({ summary: 'Deactivate one room type' })
   @ApiOkResponse({ description: 'Room type deactivated successfully.' })
   @ApiBadRequestResponse({
+    description: 'Room type has active rooms and cannot be deactivated.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room type was not found.' })
+  remove(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) roomTypeId: number,
+  ) {
+    return this.roomTypesService.remove(currentUser, roomTypeId);
+  }
+
+  @Post(':id/amenities')
+  @Permissions('room_types.update')
+  @ApiOperation({ summary: 'Assign amenities to a room type' })
+  @ApiOkResponse({ description: 'Amenities assigned successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid amenity assignment.' })
+  @ApiConflictResponse({
+    description: 'One or more amenities are already assigned.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room type or amenity was not found.' })
+  assignAmenities(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) roomTypeId: number,
+    @Body() assignRoomTypeAmenitiesDto: AssignRoomTypeAmenitiesDto,
+  ) {
+    return this.roomTypesService.assignAmenities(
+      currentUser,
+      roomTypeId,
+      assignRoomTypeAmenitiesDto,
+    );
+  }
+
+  @Delete(':id/amenities/:amenityId')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('room_types.update')
+  @ApiOperation({ summary: 'Remove one amenity from a room type' })
+  @ApiOkResponse({ description: 'Amenity removed successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Room type, amenity, or assignment was not found.',
+  })
+  removeAmenity(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) roomTypeId: number,
+    @Param('amenityId', ParseIntPipe) amenityId: number,
+  ) {
+    return this.roomTypesService.removeAmenity(
+      currentUser,
+      roomTypeId,
+      amenityId,
+    );
+  }
+}
