@@ -50,3 +50,54 @@ export class RoomTypesRepository {
   createRoomType(data: {
     name: string;
     code: string;
+    description?: string | null;
+    baseOccupancy: number;
+    maxOccupancy: number;
+    baseRate?: string | null;
+  }) {
+    return this.prisma.roomType.create({
+      data: {
+        name: data.name,
+        code: data.code,
+        description: data.description ?? null,
+        baseOccupancy: data.baseOccupancy,
+        maxOccupancy: data.maxOccupancy,
+        baseRate: data.baseRate ?? null,
+      },
+      select: roomTypeSelect,
+    });
+  }
+
+  findByCode(code: string, excludeRoomTypeId?: number) {
+    return this.prisma.roomType.findFirst({
+      where: {
+        code,
+        ...(excludeRoomTypeId ? { id: { not: excludeRoomTypeId } } : {}),
+      },
+      select: roomTypeSelect,
+    });
+  }
+
+  listRoomTypes({
+    skip,
+    take,
+    search,
+    isActive,
+  }: {
+    skip: number;
+    take: number;
+    search?: string;
+    isActive?: boolean;
+  }) {
+    const where: Prisma.RoomTypeWhereInput = {
+      ...(isActive === undefined ? {} : { isActive }),
+      ...(search
+        ? {
+            OR: [
+              {
+                name: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
