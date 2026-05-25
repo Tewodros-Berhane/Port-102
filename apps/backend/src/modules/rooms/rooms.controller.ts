@@ -144,3 +144,75 @@ export class RoomsController {
   }
 
   @Patch(':id/status')
+  @Permissions('rooms.status.update')
+  @ApiOperation({ summary: 'Update room operational statuses' })
+  @ApiOkResponse({ description: 'Room status updated successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid room status payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room was not found.' })
+  updateStatus(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) roomId: number,
+    @Body() updateRoomStatusDto: UpdateRoomStatusDto,
+  ) {
+    return this.roomsService.updateStatus(
+      currentUser,
+      roomId,
+      updateRoomStatusDto,
+    );
+  }
+
+  @Patch(':id/mark-out-of-order')
+  @Permissions('rooms.out_of_order.mark')
+  @ApiOperation({ summary: 'Mark one room out of order' })
+  @ApiOkResponse({ description: 'Room marked out of order successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room was not found.' })
+  markOutOfOrder(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) roomId: number,
+    @Body() markRoomOutOfOrderDto: MarkRoomOutOfOrderDto,
+  ) {
+    return this.roomsService.markOutOfOrder(
+      currentUser,
+      roomId,
+      markRoomOutOfOrderDto,
+    );
+  }
+
+  @Patch(':id/clear-out-of-order')
+  @Permissions('rooms.out_of_order.clear')
+  @ApiOperation({ summary: 'Clear out-of-order status for one room' })
+  @ApiOkResponse({ description: 'Room released from out-of-order status.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room was not found.' })
+  clearOutOfOrder(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) roomId: number,
+    @Body() clearRoomOutOfOrderDto: ClearRoomOutOfOrderDto,
+  ) {
+    return this.roomsService.clearOutOfOrder(
+      currentUser,
+      roomId,
+      clearRoomOutOfOrderDto,
+    );
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('rooms.delete')
+  @ApiOperation({ summary: 'Deactivate one room' })
+  @ApiOkResponse({ description: 'Room deactivated successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room was not found.' })
+  remove(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) roomId: number,
+  ) {
+    return this.roomsService.remove(currentUser, roomId);
+  }
+}
