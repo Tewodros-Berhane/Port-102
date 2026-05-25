@@ -7,10 +7,12 @@ import { ApprovalRequestsModule } from './modules/approval-requests/approval-req
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmployeesModule } from './modules/employees/employees.module';
+import { FloorsModule } from './modules/floors/floors.module';
 import { GuestsModule } from './modules/guests/guests.module';
 import { HealthModule } from './modules/health/health.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { RoomTypesModule } from './modules/room-types/room-types.module';
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -36,6 +38,8 @@ import { PrismaModule } from './prisma/prisma.module';
     AuditLogsModule,
     RolesModule,
     PermissionsModule,
+    FloorsModule,
+    RoomTypesModule,
   ],
 })
 export class AppModule {}
