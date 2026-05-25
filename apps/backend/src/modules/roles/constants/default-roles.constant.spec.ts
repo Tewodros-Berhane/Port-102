@@ -69,4 +69,21 @@ describe('default role permissions', () => {
       expect.arrayContaining([...ROOM_INVENTORY_PERMISSION_KEYS]),
     );
   });
+
+  it('gives operational managers and front desk access to room availability', () => {
+    for (const roleKey of [
+      'HOTEL_OWNER',
+      'GENERAL_MANAGER',
+      'FRONT_DESK_CASHIER',
+      'MAINTENANCE_SUPERVISOR',
+    ] as const) {
+      expect(getRolePermissions(roleKey)).toEqual(
+        expect.arrayContaining([
+          'rooms.read',
+          'rooms.status.read',
+          'rooms.availability.read',
+        ]),
+      );
+    }
+  });
 });
