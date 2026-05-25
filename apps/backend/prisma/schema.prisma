@@ -64,6 +64,24 @@ enum ApprovalRequestType {
   ROOM_OUT_OF_ORDER
 }
 
+enum RoomOccupancyStatus {
+  VACANT
+  OCCUPIED
+}
+
+enum RoomCleaningStatus {
+  CLEAN
+  DIRTY
+  INSPECTED
+}
+
+enum RoomMaintenanceStatus {
+  AVAILABLE
+  OUT_OF_ORDER
+  OUT_OF_SERVICE
+  UNDER_MAINTENANCE
+}
+
 model User {
   id                        Int               @id @default(autoincrement())
   email                     String            @unique
