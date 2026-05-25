@@ -134,3 +134,71 @@ export class RoomsRepository {
       ...(cleaningStatus ? { cleaningStatus } : {}),
       ...(maintenanceStatus ? { maintenanceStatus } : {}),
       ...(search
+        ? {
+            OR: [
+              {
+                roomNumber: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                displayName: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                notes: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                roomType: {
+                  name: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+              {
+                roomType: {
+                  code: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    return Promise.all([
+      this.prisma.room.count({ where }),
+      this.prisma.room.findMany({
+        where,
+        skip,
+        take,
+        select: roomSelect,
+        orderBy: [{ roomNumber: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
+  }
+
+  findRoom(roomId: number) {
+    return this.prisma.room.findUnique({
+      where: {
+        id: roomId,
+      },
+      select: roomSelect,
+    });
+  }
+
+  updateRoom(
+    roomId: number,
+    data: {
+      roomNumber?: string;
+      displayName?: string | null;
+      floorId?: number | null;
