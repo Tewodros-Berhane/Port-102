@@ -152,3 +152,54 @@ export class RoomTypesRepository {
   ) {
     return this.prisma.roomType.update({
       where: {
+        id: roomTypeId,
+      },
+      data,
+      select: roomTypeSelect,
+    });
+  }
+
+  countActiveRooms(roomTypeId: number) {
+    return this.prisma.room.count({
+      where: {
+        roomTypeId,
+        isActive: true,
+      },
+    });
+  }
+
+  findAssignedAmenityIds(roomTypeId: number, amenityIds: number[]) {
+    return this.prisma.roomTypeAmenity.findMany({
+      where: {
+        roomTypeId,
+        amenityId: {
+          in: amenityIds,
+        },
+      },
+      select: {
+        amenityId: true,
+      },
+    });
+  }
+
+  assignAmenities(roomTypeId: number, amenityIds: number[]) {
+    return this.prisma.roomTypeAmenity.createMany({
+      data: amenityIds.map((amenityId) => ({
+        roomTypeId,
+        amenityId,
+      })),
+      skipDuplicates: false,
+    });
+  }
+
+  removeAmenity(roomTypeId: number, amenityId: number) {
+    return this.prisma.roomTypeAmenity.delete({
+      where: {
+        roomTypeId_amenityId: {
+          roomTypeId,
+          amenityId,
+        },
+      },
+    });
+  }
+}
