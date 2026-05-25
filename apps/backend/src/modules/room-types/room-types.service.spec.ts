@@ -147,3 +147,78 @@ describe('RoomTypesService', () => {
     roomTypesRepository.findByCode.mockResolvedValue(roomType);
 
     await expect(
+      service.create(currentUser, {
+        name: 'Deluxe King',
+        code: 'DLX-KING',
+      }),
+    ).rejects.toThrow('Room type code already exists.');
+  });
+
+  it('rejects max occupancy lower than base occupancy', async () => {
+    await expect(
+      service.create(currentUser, {
+        name: 'Deluxe King',
+        code: 'DLX-KING',
+        baseOccupancy: 3,
+        maxOccupancy: 2,
+      }),
+    ).rejects.toThrow(
+      'Max occupancy must be greater than or equal to base occupancy.',
+    );
+  });
+
+  it('lists room types with pagination and filters', async () => {
+    await service.list(currentUser, {
+      page: 2,
+      limit: 10,
+      search: ' deluxe ',
+      isActive: true,
+    });
+
+    expect(roomTypesRepository.listRoomTypes).toHaveBeenCalledWith({
+      skip: 10,
+      take: 10,
+      search: 'deluxe',
+      isActive: true,
+    });
+  });
+
+  it('updates room type profile fields and records audit metadata', async () => {
+    await service.update(currentUser, 11, {
+      name: ' Updated Deluxe King ',
+      code: 'upd-king',
+      baseOccupancy: 2,
+      maxOccupancy: 4,
+      baseRate: null,
+    });
+
+    expect(roomTypesRepository.findByCode).toHaveBeenCalledWith('UPD-KING', 11);
+    expect(roomTypesRepository.updateRoomType).toHaveBeenCalledWith(11, {
+      name: 'Updated Deluxe King',
+      code: 'UPD-KING',
+      baseOccupancy: 2,
+      maxOccupancy: 4,
+      baseRate: null,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'room_types.updated',
+      }),
+    );
+  });
+
+  it('throws when a room type is missing', async () => {
+    roomTypesRepository.findRoomType.mockResolvedValue(null);
+
+    await expect(service.getById(currentUser, 404)).rejects.toThrow(
+      'Room type was not found.',
+    );
+  });
+
+  it('blocks deactivation when active rooms use the room type', async () => {
+    roomTypesRepository.countActiveRooms.mockResolvedValue(2);
+
+    await expect(service.remove(currentUser, 11)).rejects.toThrow(
+      'Cannot deactivate a room type with active rooms assigned.',
+    );
+    expect(roomTypesRepository.updateRoomType).not.toHaveBeenCalled();
