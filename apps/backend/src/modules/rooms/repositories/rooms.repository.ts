@@ -66,3 +66,71 @@ const roomStatusLogSelect = {
 
 export type RoomRecord = Prisma.RoomGetPayload<{
   select: typeof roomSelect;
+}>;
+
+export type RoomStatusLogRecord = Prisma.RoomStatusLogGetPayload<{
+  select: typeof roomStatusLogSelect;
+}>;
+
+@Injectable()
+export class RoomsRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  createRoom(data: {
+    roomNumber: string;
+    displayName?: string | null;
+    floorId?: number | null;
+    roomTypeId: number;
+    notes?: string | null;
+  }) {
+    return this.prisma.room.create({
+      data: {
+        roomNumber: data.roomNumber,
+        displayName: data.displayName ?? null,
+        floorId: data.floorId ?? null,
+        roomTypeId: data.roomTypeId,
+        notes: data.notes ?? null,
+      },
+      select: roomSelect,
+    });
+  }
+
+  findByRoomNumber(roomNumber: string, excludeRoomId?: number) {
+    return this.prisma.room.findFirst({
+      where: {
+        roomNumber,
+        ...(excludeRoomId ? { id: { not: excludeRoomId } } : {}),
+      },
+      select: roomSelect,
+    });
+  }
+
+  listRooms({
+    skip,
+    take,
+    search,
+    floorId,
+    roomTypeId,
+    occupancyStatus,
+    cleaningStatus,
+    maintenanceStatus,
+    isActive,
+  }: {
+    skip: number;
+    take: number;
+    search?: string;
+    floorId?: number;
+    roomTypeId?: number;
+    occupancyStatus?: RoomOccupancyStatus;
+    cleaningStatus?: RoomCleaningStatus;
+    maintenanceStatus?: RoomMaintenanceStatus;
+    isActive?: boolean;
+  }) {
+    const where: Prisma.RoomWhereInput = {
+      ...(isActive === undefined ? {} : { isActive }),
+      ...(floorId === undefined ? {} : { floorId }),
+      ...(roomTypeId === undefined ? {} : { roomTypeId }),
+      ...(occupancyStatus ? { occupancyStatus } : {}),
+      ...(cleaningStatus ? { cleaningStatus } : {}),
+      ...(maintenanceStatus ? { maintenanceStatus } : {}),
+      ...(search
