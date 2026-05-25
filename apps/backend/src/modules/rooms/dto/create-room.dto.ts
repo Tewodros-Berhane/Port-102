@@ -24,3 +24,28 @@ export class CreateRoomDto {
     description:
       'Active floor ID. Omit when a room is not assigned to a floor.',
     minimum: 1,
+    nullable: true,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  floorId?: number | null;
+
+  @ApiProperty({
+    example: 2,
+    description: 'Active room type ID.',
+    minimum: 1,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  roomTypeId!: number;
+
+  @ApiPropertyOptional({
+    example: 'Near the elevator.',
+  })
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
