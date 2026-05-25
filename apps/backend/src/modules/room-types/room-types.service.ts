@@ -360,3 +360,93 @@ export class RoomTypesService {
         description: amenity.description,
         isActive: amenity.isActive,
         assignedAt: createdAt,
+      })),
+    };
+  }
+
+  private recordRoomTypeAudit(
+    currentUser: CurrentUserPayload,
+    action: string,
+    roomType: RoomTypeRecord,
+    metadata: Prisma.InputJsonValue,
+  ) {
+    return this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action,
+      entityType: 'RoomType',
+      entityId: String(roomType.id),
+      metadata,
+    });
+  }
+
+  private auditSnapshot(roomType: RoomTypeRecord) {
+    return {
+      name: roomType.name,
+      code: roomType.code,
+      description: roomType.description,
+      baseOccupancy: roomType.baseOccupancy,
+      maxOccupancy: roomType.maxOccupancy,
+      baseRate: this.serializeBaseRate(roomType.baseRate),
+      isActive: roomType.isActive,
+    };
+  }
+
+  private assertValidOccupancy(baseOccupancy: number, maxOccupancy: number) {
+    if (baseOccupancy < 1) {
+      throw new BadRequestException('Base occupancy must be at least 1.');
+    }
+
+    if (maxOccupancy < baseOccupancy) {
+      throw new BadRequestException(
+        'Max occupancy must be greater than or equal to base occupancy.',
+      );
+    }
+  }
+
+  private normalizeRoomTypeCode(code: string) {
+    const normalized = this.normalizeRequiredString(
+      code,
+      'Room type code is required.',
+    ).toUpperCase();
+
+    if (!/^[A-Z0-9_.-]+$/.test(normalized)) {
+      throw new BadRequestException(
+        'Room type code may only contain letters, numbers, underscores, periods, and hyphens.',
+      );
+    }
+
+    return normalized;
+  }
+
+  private normalizeBaseRate(value?: number | null) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    return value.toFixed(2);
+  }
+
+  private serializeBaseRate(value: Prisma.Decimal | null) {
+    return value?.toString() ?? null;
+  }
+
+  private normalizeRequiredString(value: string, message: string) {
+    const normalized = value.trim();
+
+    if (!normalized) {
+      throw new BadRequestException(message);
+    }
+
+    return normalized;
+  }
+
+  private normalizeOptionalString(value?: string | null) {
+    const normalized = value?.trim();
+
+    return normalized || null;
+  }
+}
