@@ -71,3 +71,76 @@ export class RoomsController {
   list(
     @CurrentUser() currentUser: CurrentUserPayload,
     @Query() query: GetRoomsQueryDto,
+  ) {
+    return this.roomsService.list(currentUser, query);
+  }
+
+  @Get('availability/summary')
+  @Permissions('rooms.availability.read')
+  @ApiOperation({ summary: 'Get room availability summary' })
+  @ApiOkResponse({ description: 'Room availability summary returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  getAvailabilitySummary(@CurrentUser() currentUser: CurrentUserPayload) {
+    return this.roomsService.getAvailabilitySummary(currentUser);
+  }
+
+  @Get('status/summary')
+  @Permissions('rooms.status.read')
+  @ApiOperation({ summary: 'Get room status summary' })
+  @ApiOkResponse({ description: 'Room status summary returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  getStatusSummary(@CurrentUser() currentUser: CurrentUserPayload) {
+    return this.roomsService.getStatusSummary(currentUser);
+  }
+
+  @Get(':id/status-logs')
+  @Permissions('rooms.status.read')
+  @ApiOperation({ summary: 'List status changes for one room' })
+  @ApiOkResponse({ description: 'Room status logs returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room was not found.' })
+  listStatusLogs(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) roomId: number,
+    @Query() query: GetRoomStatusLogsQueryDto,
+  ) {
+    return this.roomsService.listStatusLogs(currentUser, roomId, query);
+  }
+
+  @Get(':id')
+  @Permissions('rooms.read')
+  @ApiOperation({ summary: 'Get one room' })
+  @ApiOkResponse({ description: 'Room returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room was not found.' })
+  getById(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) roomId: number,
+  ) {
+    return this.roomsService.getById(currentUser, roomId);
+  }
+
+  @Patch(':id')
+  @Permissions('rooms.update')
+  @ApiOperation({ summary: 'Update one room' })
+  @ApiOkResponse({ description: 'Room updated successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid room payload.' })
+  @ApiConflictResponse({ description: 'Room number already exists.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Room, floor, or room type was not found.',
+  })
+  update(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) roomId: number,
+    @Body() updateRoomDto: UpdateRoomDto,
+  ) {
+    return this.roomsService.update(currentUser, roomId, updateRoomDto);
+  }
+
+  @Patch(':id/status')
