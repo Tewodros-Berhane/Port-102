@@ -35,3 +35,40 @@ export class GetReservationsQueryDto {
     default: 20,
   })
   @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  limit = 20;
+
+  @ApiPropertyOptional({
+    example: 'RES-20260527-0001',
+    description: 'Search reservation number or guest name/email/phone.',
+  })
+  @IsString()
+  @IsOptional()
+  search?: string;
+
+  @ApiPropertyOptional({
+    enum: ReservationStatus,
+    example: ReservationStatus.CONFIRMED,
+  })
+  @IsEnum(ReservationStatus)
+  @IsOptional()
+  status?: ReservationStatus;
+
+  @ApiPropertyOptional({
+    enum: ReservationSource,
+    example: ReservationSource.WALK_IN,
+  })
+  @IsEnum(ReservationSource)
+  @IsOptional()
+  source?: ReservationSource;
+
+  @ApiPropertyOptional({
+    example: 12,
+    minimum: 1,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
