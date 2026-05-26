@@ -78,3 +78,42 @@ describe('ReservationAvailabilityRepository', () => {
           checkInDate: {
             lt: new Date('2026-06-12T00:00:00.000Z'),
           },
+          checkOutDate: {
+            gt: new Date('2026-06-10T00:00:00.000Z'),
+          },
+        }),
+      }),
+    });
+  });
+
+  it('lists available rooms excluding overlapping reservation rooms', async () => {
+    await repository.listAvailableRooms({
+      roomTypeId: 4,
+      checkInDate: new Date('2026-06-10T00:00:00.000Z'),
+      checkOutDate: new Date('2026-06-12T00:00:00.000Z'),
+    });
+
+    expect(prisma.room.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          roomTypeId: 4,
+          isActive: true,
+          maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+          reservationRooms: {
+            none: expect.objectContaining({
+              reservation: expect.objectContaining({
+                checkInDate: {
+                  lt: new Date('2026-06-12T00:00:00.000Z'),
+                },
+                checkOutDate: {
+                  gt: new Date('2026-06-10T00:00:00.000Z'),
+                },
+              }),
+            }),
+          },
+        }),
+        orderBy: [{ roomNumber: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+});
