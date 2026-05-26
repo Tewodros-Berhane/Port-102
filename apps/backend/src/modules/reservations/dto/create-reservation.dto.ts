@@ -64,3 +64,36 @@ export class CreateReservationDto {
   @IsOptional()
   children = 0;
 
+  @ApiPropertyOptional({
+    enum: ReservationSource,
+    example: ReservationSource.WALK_IN,
+    default: ReservationSource.WALK_IN,
+  })
+  @IsEnum(ReservationSource)
+  @IsOptional()
+  source?: ReservationSource;
+
+  @ApiPropertyOptional({
+    example: 'Guest requested a quiet room.',
+  })
+  @IsString()
+  @IsOptional()
+  specialRequests?: string;
+
+  @ApiPropertyOptional({
+    example: 'VIP guest, verify ID on arrival.',
+  })
+  @IsString()
+  @IsOptional()
+  internalNotes?: string;
+
+  @ApiProperty({
+    type: [AddReservationRoomDto],
+    description: 'One or more room type reservations.',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => AddReservationRoomDto)
+  rooms!: AddReservationRoomDto[];
+}
