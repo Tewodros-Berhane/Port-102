@@ -215,3 +215,112 @@ describe('ReservationsService', () => {
     service = module.get<ReservationsService>(ReservationsService);
   });
 
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  it('creates a reservation in a transaction and records audit metadata', async () => {
+    const result = await service.create(currentUser, {
+      guestId: 12,
+      checkInDate: '2026-06-10',
+      checkOutDate: '2026-06-12',
+      adults: 2,
+      children: 1,
+      source: ReservationSource.PHONE,
+      specialRequests: ' Quiet room ',
+      internalNotes: ' VIP guest ',
+      rooms: [
+        {
+          roomTypeId: 4,
+          roomId: 9,
+          rate: 140,
+          notes: ' Near elevator ',
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      id: 20,
+      reservationNumber: 'RES-20260527-123450',
+      rooms: [
+        {
+          rate: '140',
+          roomType: {
+            baseRate: '125.50',
+          },
+        },
+      ],
+    });
+    expect(guestsRepository.findGuestProfile).toHaveBeenCalledWith(12);
+    expect(roomTypesRepository.findRoomType).toHaveBeenCalledWith(4);
+    expect(roomsRepository.findRoom).toHaveBeenCalledWith(9);
+    expect(
+      reservationAvailabilityRepository.countOverlappingRoomReservations,
+    ).toHaveBeenCalledWith({
+      roomId: 9,
+      checkInDate: new Date('2026-06-10T00:00:00.000Z'),
+      checkOutDate: new Date('2026-06-12T00:00:00.000Z'),
+    });
+    expect(reservationsRepository.runInTransaction).toHaveBeenCalled();
+    expect(reservationsRepository.createReservation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        guest: {
+          connect: {
+            id: 12,
+          },
+        },
+        source: ReservationSource.PHONE,
+        adults: 2,
+        children: 1,
+        specialRequests: 'Quiet room',
+        internalNotes: 'VIP guest',
+        rooms: {
+          create: [
+            {
+              roomType: {
+                connect: {
+                  id: 4,
+                },
+              },
+              room: {
+                connect: {
+                  id: 9,
+                },
+              },
+              rate: '140',
+              notes: 'Near elevator',
+            },
+          ],
+        },
+      }),
+      {},
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith({
+      actorUserId: 1,
+      action: 'reservations.created',
+      entityType: 'Reservation',
+      entityId: '20',
+      metadata: {
+        reservationNumber: 'RES-20260527-123450',
+        guestId: 12,
+        checkInDate: '2026-06-10T00:00:00.000Z',
+        checkOutDate: '2026-06-12T00:00:00.000Z',
+        roomCount: 1,
+      },
+    });
+  });
+
+  it('rejects invalid date ranges', async () => {
+    await expect(
+      service.create(currentUser, {
+        guestId: 12,
+        checkInDate: '2026-06-12',
+        checkOutDate: '2026-06-10',
+        rooms: [
+          {
+            roomTypeId: 4,
+          },
+        ],
+      }),
+    ).rejects.toThrow('Check-out date must be after check-in date.');
+
