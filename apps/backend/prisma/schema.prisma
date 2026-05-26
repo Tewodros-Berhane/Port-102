@@ -117,3 +117,121 @@ model User {
   phone                     String?
   status                    UserStatus        @default(ACTIVE)
   tokenVersion              Int               @default(0)
+  lastLoginAt               DateTime?
+  roleId                    Int
+  departmentId              Int?
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+  role                      Role              @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  department                Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  refreshTokens             RefreshToken[]
+  employees                 Employee[]
+  guests                    Guest[]
+  auditLogs                 AuditLog[]        @relation("AuditActor")
+  requestedApprovalRequests ApprovalRequest[] @relation("ApprovalRequester")
+  approvedApprovalRequests  ApprovalRequest[] @relation("ApprovalApprover")
+  roomStatusLogs            RoomStatusLog[]
+  createdReservations       Reservation[]     @relation("ReservationCreator")
+  cancelledReservations     Reservation[]     @relation("ReservationCanceller")
+
+  @@index([roleId])
+  @@index([departmentId])
+  @@map("users")
+}
+
+/// Singleton hotel profile/settings record. This is not used for tenancy or access control.
+model Hotel {
+  id              Int      @id @default(autoincrement())
+  name            String
+  code            String   @unique
+  timezone        String   @default("Africa/Nairobi")
+  defaultCurrency String   @default("ETB")
+  address         String?
+  phone           String?
+  email           String?
+  logoUrl         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("hotels")
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  key         String           @unique
+  systemKey   RoleKey?         @unique
+  name        String
+  description String?
+  isSystem    Boolean          @default(false)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       User[]
+  permissions RolePermission[]
+
+  @@index([isActive])
+  @@map("roles")
+}
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  key         String           @unique
+  name        String
+  category    String
+  description String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
+
+  @@index([category])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  createdAt    DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model RefreshToken {
+  id          Int                @id @default(autoincrement())
+  userId      Int
+  tokenHash   String             @unique
+  status      RefreshTokenStatus @default(ACTIVE)
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdByIp String?
+  revokedByIp String?
+  userAgent   String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Department {
+  id          Int        @id @default(autoincrement())
+  key         String     @unique
+  name        String
+  description String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  users       User[]
+  employees   Employee[]
+
+  @@index([isActive])
+  @@map("departments")
+}
+
+model Floor {
+  id          Int      @id @default(autoincrement())
