@@ -31,3 +31,36 @@ export class CreateReservationDto {
     example: '2026-06-10',
     description: 'Reservation arrival date as an ISO date string.',
   })
+  @IsDateString()
+  checkInDate!: string;
+
+  @ApiProperty({
+    example: '2026-06-12',
+    description: 'Reservation departure date as an ISO date string.',
+  })
+  @IsDateString()
+  @IsAfterDateProperty('checkInDate')
+  checkOutDate!: string;
+
+  @ApiPropertyOptional({
+    example: 2,
+    minimum: 1,
+    default: 1,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  adults = 1;
+
+  @ApiPropertyOptional({
+    example: 0,
+    minimum: 0,
+    default: 0,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  children = 0;
+
