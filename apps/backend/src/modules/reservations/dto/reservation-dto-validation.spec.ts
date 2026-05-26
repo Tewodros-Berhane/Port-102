@@ -92,3 +92,50 @@ describe('reservation DTO validation', () => {
       true,
     );
   });
+
+  it('transforms reservation list query filters and validates filter ranges', async () => {
+    const dto = plainToInstance(GetReservationsQueryDto, {
+      page: '2',
+      limit: '10',
+      guestId: '12',
+      status: ReservationStatus.CONFIRMED,
+      source: ReservationSource.WEBSITE,
+      checkInFrom: '2026-06-30',
+      checkInTo: '2026-06-01',
+    });
+
+    const errors = await validate(dto);
+
+    expect(dto.page).toBe(2);
+    expect(dto.limit).toBe(10);
+    expect(dto.guestId).toBe(12);
+    expect(errors.some((error) => error.property === 'checkInTo')).toBe(true);
+  });
+
+  it('validates availability and calendar date ranges', async () => {
+    const availability = plainToInstance(AvailabilitySearchQueryDto, {
+      checkInDate: '2026-06-10',
+      checkOutDate: '2026-06-12',
+      roomTypeId: '4',
+      adults: '2',
+      children: '0',
+    });
+    const calendar = plainToInstance(BookingCalendarQueryDto, {
+      startDate: '2026-06-30',
+      endDate: '2026-06-01',
+      roomId: '9',
+      status: ReservationStatus.CONFIRMED,
+    });
+
+    await expect(validate(availability)).resolves.toEqual([]);
+
+    const calendarErrors = await validate(calendar);
+
+    expect(availability.roomTypeId).toBe(4);
+    expect(availability.adults).toBe(2);
+    expect(calendar.roomId).toBe(9);
+    expect(calendarErrors.some((error) => error.property === 'endDate')).toBe(
+      true,
+    );
+  });
+});
