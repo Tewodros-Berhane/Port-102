@@ -82,6 +82,33 @@ enum RoomMaintenanceStatus {
   UNDER_MAINTENANCE
 }
 
+enum ReservationStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+  CHECKED_IN
+  CHECKED_OUT
+}
+
+enum ReservationSource {
+  WALK_IN
+  PHONE
+  EMAIL
+  WEBSITE
+  OTA
+  CORPORATE
+  AGENT
+  OTHER
+}
+
+enum ReservationRoomStatus {
+  RESERVED
+  CANCELLED
+  CHECKED_IN
+  CHECKED_OUT
+}
+
 model User {
   id                        Int               @id @default(autoincrement())
   email                     String            @unique
@@ -90,300 +117,3 @@ model User {
   phone                     String?
   status                    UserStatus        @default(ACTIVE)
   tokenVersion              Int               @default(0)
-  lastLoginAt               DateTime?
-  roleId                    Int
-  departmentId              Int?
-  createdAt                 DateTime          @default(now())
-  updatedAt                 DateTime          @updatedAt
-  role                      Role              @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  department                Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  refreshTokens             RefreshToken[]
-  employees                 Employee[]
-  guests                    Guest[]
-  auditLogs                 AuditLog[]        @relation("AuditActor")
-  requestedApprovalRequests ApprovalRequest[] @relation("ApprovalRequester")
-  approvedApprovalRequests  ApprovalRequest[] @relation("ApprovalApprover")
-  roomStatusLogs            RoomStatusLog[]
-
-  @@index([roleId])
-  @@index([departmentId])
-  @@map("users")
-}
-
-/// Singleton hotel profile/settings record. This is not used for tenancy or access control.
-model Hotel {
-  id              Int      @id @default(autoincrement())
-  name            String
-  code            String   @unique
-  timezone        String   @default("Africa/Nairobi")
-  defaultCurrency String   @default("ETB")
-  address         String?
-  phone           String?
-  email           String?
-  logoUrl         String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@map("hotels")
-}
-
-model Role {
-  id          Int              @id @default(autoincrement())
-  key         String           @unique
-  systemKey   RoleKey?         @unique
-  name        String
-  description String?
-  isSystem    Boolean          @default(false)
-  isActive    Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  users       User[]
-  permissions RolePermission[]
-
-  @@index([isActive])
-  @@map("roles")
-}
-
-model Permission {
-  id          Int              @id @default(autoincrement())
-  key         String           @unique
-  name        String
-  category    String
-  description String?
-  isActive    Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  roles       RolePermission[]
-
-  @@index([category])
-  @@map("permissions")
-}
-
-model RolePermission {
-  roleId       Int
-  permissionId Int
-  createdAt    DateTime   @default(now())
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@id([roleId, permissionId])
-  @@map("role_permissions")
-}
-
-model RefreshToken {
-  id          Int                @id @default(autoincrement())
-  userId      Int
-  tokenHash   String             @unique
-  status      RefreshTokenStatus @default(ACTIVE)
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  createdByIp String?
-  revokedByIp String?
-  userAgent   String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, status])
-  @@index([expiresAt])
-  @@map("refresh_tokens")
-}
-
-model Department {
-  id          Int        @id @default(autoincrement())
-  key         String     @unique
-  name        String
-  description String?
-  isActive    Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  users       User[]
-  employees   Employee[]
-
-  @@index([isActive])
-  @@map("departments")
-}
-
-model Floor {
-  id          Int      @id @default(autoincrement())
-  number      Int?
-  name        String
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  rooms       Room[]
-
-  @@unique([name])
-  @@index([isActive])
-  @@map("floors")
-}
-
-model RoomType {
-  id            Int               @id @default(autoincrement())
-  name          String
-  code          String            @unique
-  description   String?
-  baseOccupancy Int               @default(1)
-  maxOccupancy  Int               @default(1)
-  baseRate      Decimal?          @db.Decimal(12, 2)
-  isActive      Boolean           @default(true)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  rooms         Room[]
-  amenities     RoomTypeAmenity[]
-
-  @@index([isActive])
-  @@map("room_types")
-}
-
-model RoomAmenity {
-  id          Int               @id @default(autoincrement())
-  name        String
-  key         String            @unique
-  description String?
-  isActive    Boolean           @default(true)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  roomTypes   RoomTypeAmenity[]
-
-  @@index([isActive])
-  @@map("room_amenities")
-}
-
-model RoomTypeAmenity {
-  roomTypeId Int
-  amenityId  Int
-  createdAt  DateTime    @default(now())
-  roomType   RoomType    @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
-  amenity    RoomAmenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
-
-  @@id([roomTypeId, amenityId])
-  @@map("room_type_amenities")
-}
-
-model Room {
-  id                Int                   @id @default(autoincrement())
-  roomNumber        String                @unique
-  displayName       String?
-  floorId           Int?
-  roomTypeId        Int
-  occupancyStatus   RoomOccupancyStatus   @default(VACANT)
-  cleaningStatus    RoomCleaningStatus    @default(CLEAN)
-  maintenanceStatus RoomMaintenanceStatus @default(AVAILABLE)
-  notes             String?
-  isActive          Boolean               @default(true)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  floor             Floor?                @relation(fields: [floorId], references: [id], onDelete: SetNull)
-  roomType          RoomType              @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
-  statusLogs        RoomStatusLog[]
-
-  @@index([floorId])
-  @@index([roomTypeId])
-  @@index([isActive])
-  @@index([occupancyStatus])
-  @@index([cleaningStatus])
-  @@index([maintenanceStatus])
-  @@map("rooms")
-}
-
-model RoomStatusLog {
-  id          Int      @id @default(autoincrement())
-  roomId      Int
-  actorUserId Int?
-  field       String
-  oldValue    String?
-  newValue    String?
-  reason      String?
-  createdAt   DateTime @default(now())
-  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  actorUser   User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
-
-  @@index([roomId, createdAt])
-  @@index([actorUserId])
-  @@map("room_status_logs")
-}
-
-model Employee {
-  id             Int            @id @default(autoincrement())
-  departmentId   Int?
-  userId         Int?           @unique
-  employeeNumber String?        @unique
-  firstName      String
-  lastName       String
-  email          String?
-  phone          String?
-  jobTitle       String?
-  status         EmployeeStatus @default(ACTIVE)
-  hireDate       DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  department     Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([status])
-  @@index([departmentId])
-  @@map("employees")
-}
-
-model Guest {
-  id             Int         @id @default(autoincrement())
-  userId         Int?        @unique
-  firstName      String
-  lastName       String
-  email          String?
-  phone          String?
-  nationality    String?
-  documentNumber String?
-  status         GuestStatus @default(ACTIVE)
-  preferences    Json?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([status])
-  @@index([lastName])
-  @@map("guests")
-}
-
-model AuditLog {
-  id          Int      @id @default(autoincrement())
-  actorUserId Int?
-  action      String
-  entityType  String?
-  entityId    String?
-  ipAddress   String?
-  userAgent   String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  actorUser   User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
-
-  @@index([actorUserId])
-  @@index([action])
-  @@index([createdAt])
-  @@map("audit_logs")
-}
-
-model ApprovalRequest {
-  id                Int                 @id @default(autoincrement())
-  requestedByUserId Int
-  decidedByUserId   Int?
-  type              ApprovalRequestType
-  status            ApprovalStatus      @default(PENDING)
-  title             String
-  reason            String?
-  payload           Json?
-  decisionNote      String?
-  decidedAt         DateTime?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  requestedByUser   User                @relation("ApprovalRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
-  decidedByUser     User?               @relation("ApprovalApprover", fields: [decidedByUserId], references: [id], onDelete: SetNull)
-
-  @@index([status])
-  @@index([requestedByUserId])
-  @@index([decidedByUserId])
-  @@index([type])
-  @@map("approval_requests")
-}
