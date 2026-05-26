@@ -62,3 +62,67 @@ const reservationSelect = {
   guest: {
     select: {
       id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      status: true,
+    },
+  },
+  createdBy: {
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+    },
+  },
+  cancelledBy: {
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+    },
+  },
+  rooms: {
+    select: reservationRoomSelect,
+    orderBy: {
+      id: 'asc',
+    },
+  },
+} as const;
+
+export type ReservationRecord = Prisma.ReservationGetPayload<{
+  select: typeof reservationSelect;
+}>;
+
+type ReservationClient = Pick<
+  PrismaService | Prisma.TransactionClient,
+  'reservation'
+>;
+
+@Injectable()
+export class ReservationsRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  runInTransaction<T>(
+    operation: (client: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return this.prisma.$transaction(operation);
+  }
+
+  createReservation(
+    data: Prisma.ReservationCreateInput,
+    client: ReservationClient = this.prisma,
+  ) {
+    return client.reservation.create({
+      data,
+      select: reservationSelect,
+    });
+  }
+
+  findReservation(reservationId: number) {
+    return this.prisma.reservation.findUnique({
+      where: {
+        id: reservationId,
+      },
+      select: reservationSelect,
