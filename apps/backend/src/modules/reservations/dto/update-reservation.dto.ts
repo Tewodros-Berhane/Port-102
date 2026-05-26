@@ -28,3 +28,33 @@ export class UpdateReservationDto {
   @ApiPropertyOptional({
     example: '2026-06-10',
     description: 'Reservation arrival date as an ISO date string.',
+  })
+  @IsDateString()
+  @IsOptional()
+  checkInDate?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-06-12',
+    description: 'Reservation departure date as an ISO date string.',
+  })
+  @IsDateString()
+  @IsAfterDateProperty('checkInDate')
+  @IsOptional()
+  checkOutDate?: string;
+
+  @ApiPropertyOptional({
+    example: 2,
+    minimum: 1,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  adults?: number;
+
+  @ApiPropertyOptional({
+    example: 0,
+    minimum: 0,
+  })
+  @Type(() => Number)
+  @IsInt()
