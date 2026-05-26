@@ -25,3 +25,29 @@ export function IsAfterDateProperty(
           const relatedValue = getRecordValue(args.object, relatedProperty);
 
           if (
+            value === undefined ||
+            value === null ||
+            relatedValue === undefined ||
+            relatedValue === null
+          ) {
+            return true;
+          }
+
+          const timestamp = Date.parse(String(value));
+          const relatedTimestamp = Date.parse(String(relatedValue));
+
+          if (Number.isNaN(timestamp) || Number.isNaN(relatedTimestamp)) {
+            return true;
+          }
+
+          return timestamp > relatedTimestamp;
+        },
+        defaultMessage(args: ValidationArguments) {
+          const [relatedProperty] = args.constraints as [string];
+
+          return `${args.property} must be after ${relatedProperty}.`;
+        },
+      },
+    });
+  };
+}
