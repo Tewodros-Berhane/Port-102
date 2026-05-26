@@ -72,3 +72,40 @@ export class GetReservationsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @IsOptional()
+  guestId?: number;
+
+  @ApiPropertyOptional({
+    example: '2026-06-01',
+    description: 'Filter reservations arriving on or after this date.',
+  })
+  @IsDateString()
+  @IsOptional()
+  checkInFrom?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-06-30',
+    description: 'Filter reservations arriving on or before this date.',
+  })
+  @IsDateString()
+  @IsAfterDateProperty('checkInFrom')
+  @IsOptional()
+  checkInTo?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-06-01',
+    description: 'Filter reservations departing on or after this date.',
+  })
+  @IsDateString()
+  @IsOptional()
+  checkOutFrom?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-06-30',
+    description: 'Filter reservations departing on or before this date.',
+  })
+  @IsDateString()
+  @IsAfterDateProperty('checkOutFrom')
+  @IsOptional()
+  checkOutTo?: string;
+}
