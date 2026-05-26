@@ -24,3 +24,28 @@ export class BookingCalendarQueryDto {
   @ApiPropertyOptional({
     example: 101,
     minimum: 1,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  roomId?: number;
+
+  @ApiPropertyOptional({
+    example: 2,
+    minimum: 1,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  roomTypeId?: number;
+
+  @ApiPropertyOptional({
+    enum: ReservationStatus,
+    example: ReservationStatus.CONFIRMED,
+  })
+  @IsEnum(ReservationStatus)
+  @IsOptional()
+  status?: ReservationStatus;
+}
