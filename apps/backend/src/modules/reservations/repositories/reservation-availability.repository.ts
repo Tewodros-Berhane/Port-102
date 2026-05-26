@@ -124,3 +124,65 @@ export class ReservationAvailabilityRepository {
           }),
         },
       },
+      select: availabilityRoomSelect,
+      orderBy: [{ roomNumber: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  private physicalAvailabilityWhere(roomTypeId: number): Prisma.RoomWhereInput {
+    return {
+      roomTypeId,
+      isActive: true,
+      maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+    };
+  }
+
+  private overlappingReservationRoomWhere({
+    roomId,
+    roomTypeId,
+    checkInDate,
+    checkOutDate,
+    excludeReservationId,
+    excludeReservationRoomId,
+  }: {
+    roomId?: number;
+    roomTypeId?: number;
+    checkInDate: Date;
+    checkOutDate: Date;
+    excludeReservationId?: number;
+    excludeReservationRoomId?: number;
+  }): Prisma.ReservationRoomWhereInput {
+    return {
+      ...(roomId === undefined ? {} : { roomId }),
+      ...(roomTypeId === undefined ? {} : { roomTypeId }),
+      ...(excludeReservationRoomId === undefined
+        ? {}
+        : {
+            id: {
+              not: excludeReservationRoomId,
+            },
+          }),
+      status: {
+        not: ReservationRoomStatus.CANCELLED,
+      },
+      reservation: {
+        ...(excludeReservationId === undefined
+          ? {}
+          : {
+              id: {
+                not: excludeReservationId,
+              },
+            }),
+        status: {
+          notIn: [ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW],
+        },
+        checkInDate: {
+          lt: checkOutDate,
+        },
+        checkOutDate: {
+          gt: checkInDate,
+        },
+      },
+    };
+  }
+}
