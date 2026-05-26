@@ -60,3 +60,33 @@ CREATE INDEX "reservations_checkInDate_checkOutDate_idx" ON "reservations"("chec
 
 -- CreateIndex
 CREATE INDEX "reservations_source_idx" ON "reservations"("source");
+
+-- CreateIndex
+CREATE INDEX "reservation_rooms_reservationId_idx" ON "reservation_rooms"("reservationId");
+
+-- CreateIndex
+CREATE INDEX "reservation_rooms_roomTypeId_idx" ON "reservation_rooms"("roomTypeId");
+
+-- CreateIndex
+CREATE INDEX "reservation_rooms_roomId_idx" ON "reservation_rooms"("roomId");
+
+-- CreateIndex
+CREATE INDEX "reservation_rooms_status_idx" ON "reservation_rooms"("status");
+
+-- AddForeignKey
+ALTER TABLE "reservations" ADD CONSTRAINT "reservations_guestId_fkey" FOREIGN KEY ("guestId") REFERENCES "guests"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reservations" ADD CONSTRAINT "reservations_createdByUserId_fkey" FOREIGN KEY ("createdByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reservations" ADD CONSTRAINT "reservations_cancelledByUserId_fkey" FOREIGN KEY ("cancelledByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reservation_rooms" ADD CONSTRAINT "reservation_rooms_reservationId_fkey" FOREIGN KEY ("reservationId") REFERENCES "reservations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reservation_rooms" ADD CONSTRAINT "reservation_rooms_roomTypeId_fkey" FOREIGN KEY ("roomTypeId") REFERENCES "room_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reservation_rooms" ADD CONSTRAINT "reservation_rooms_roomId_fkey" FOREIGN KEY ("roomId") REFERENCES "rooms"("id") ON DELETE SET NULL ON UPDATE CASCADE;
