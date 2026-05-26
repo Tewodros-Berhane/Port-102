@@ -126,3 +126,67 @@ export class ReservationsRepository {
         id: reservationId,
       },
       select: reservationSelect,
+    });
+  }
+
+  findByReservationNumber(reservationNumber: string) {
+    return this.prisma.reservation.findUnique({
+      where: {
+        reservationNumber,
+      },
+      select: reservationSelect,
+    });
+  }
+
+  listReservations({
+    skip,
+    take,
+    search,
+    status,
+    source,
+    guestId,
+    checkInFrom,
+    checkInTo,
+    checkOutFrom,
+    checkOutTo,
+  }: {
+    skip: number;
+    take: number;
+    search?: string;
+    status?: ReservationStatus;
+    source?: ReservationSource;
+    guestId?: number;
+    checkInFrom?: Date;
+    checkInTo?: Date;
+    checkOutFrom?: Date;
+    checkOutTo?: Date;
+  }) {
+    const where: Prisma.ReservationWhereInput = {
+      ...(status ? { status } : {}),
+      ...(source ? { source } : {}),
+      ...(guestId === undefined ? {} : { guestId }),
+      ...(checkInFrom || checkInTo
+        ? {
+            checkInDate: {
+              ...(checkInFrom ? { gte: checkInFrom } : {}),
+              ...(checkInTo ? { lte: checkInTo } : {}),
+            },
+          }
+        : {}),
+      ...(checkOutFrom || checkOutTo
+        ? {
+            checkOutDate: {
+              ...(checkOutFrom ? { gte: checkOutFrom } : {}),
+              ...(checkOutTo ? { lte: checkOutTo } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                reservationNumber: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
