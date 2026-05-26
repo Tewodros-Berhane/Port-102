@@ -61,3 +61,66 @@ export class ReservationAvailabilityRepository {
     roomTypeId: number;
     checkInDate: Date;
     checkOutDate: Date;
+    excludeReservationId?: number;
+    excludeReservationRoomId?: number;
+  }) {
+    return this.prisma.reservationRoom.count({
+      where: this.overlappingReservationRoomWhere({
+        roomTypeId,
+        checkInDate,
+        checkOutDate,
+        excludeReservationId,
+        excludeReservationRoomId,
+      }),
+    });
+  }
+
+  countOverlappingRoomReservations({
+    roomId,
+    checkInDate,
+    checkOutDate,
+    excludeReservationId,
+    excludeReservationRoomId,
+  }: {
+    roomId: number;
+    checkInDate: Date;
+    checkOutDate: Date;
+    excludeReservationId?: number;
+    excludeReservationRoomId?: number;
+  }) {
+    return this.prisma.reservationRoom.count({
+      where: this.overlappingReservationRoomWhere({
+        roomId,
+        checkInDate,
+        checkOutDate,
+        excludeReservationId,
+        excludeReservationRoomId,
+      }),
+    });
+  }
+
+  listAvailableRooms({
+    roomTypeId,
+    checkInDate,
+    checkOutDate,
+    excludeReservationId,
+    excludeReservationRoomId,
+  }: {
+    roomTypeId: number;
+    checkInDate: Date;
+    checkOutDate: Date;
+    excludeReservationId?: number;
+    excludeReservationRoomId?: number;
+  }) {
+    return this.prisma.room.findMany({
+      where: {
+        ...this.physicalAvailabilityWhere(roomTypeId),
+        reservationRooms: {
+          none: this.overlappingReservationRoomWhere({
+            checkInDate,
+            checkOutDate,
+            excludeReservationId,
+            excludeReservationRoomId,
+          }),
+        },
+      },
