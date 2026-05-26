@@ -29,3 +29,34 @@ CREATE TABLE "reservations" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "reservations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "reservation_rooms" (
+    "id" SERIAL NOT NULL,
+    "reservationId" INTEGER NOT NULL,
+    "roomTypeId" INTEGER NOT NULL,
+    "roomId" INTEGER,
+    "status" "ReservationRoomStatus" NOT NULL DEFAULT 'RESERVED',
+    "rate" DECIMAL(12,2),
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "reservation_rooms_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "reservations_reservationNumber_key" ON "reservations"("reservationNumber");
+
+-- CreateIndex
+CREATE INDEX "reservations_guestId_idx" ON "reservations"("guestId");
+
+-- CreateIndex
+CREATE INDEX "reservations_status_idx" ON "reservations"("status");
+
+-- CreateIndex
+CREATE INDEX "reservations_checkInDate_checkOutDate_idx" ON "reservations"("checkInDate", "checkOutDate");
+
+-- CreateIndex
+CREATE INDEX "reservations_source_idx" ON "reservations"("source");
