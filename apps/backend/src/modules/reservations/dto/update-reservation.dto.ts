@@ -58,3 +58,33 @@ export class UpdateReservationDto {
   })
   @Type(() => Number)
   @IsInt()
+  @Min(0)
+  @IsOptional()
+  children?: number;
+
+  @ApiPropertyOptional({
+    enum: ReservationSource,
+    example: ReservationSource.PHONE,
+  })
+  @IsEnum(ReservationSource)
+  @IsOptional()
+  source?: ReservationSource;
+
+  @ApiPropertyOptional({
+    example: 'Guest requested a quiet room.',
+    nullable: true,
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsOptional()
+  specialRequests?: string | null;
+
+  @ApiPropertyOptional({
+    example: 'VIP guest, verify ID on arrival.',
+    nullable: true,
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsOptional()
+  internalNotes?: string | null;
+}
