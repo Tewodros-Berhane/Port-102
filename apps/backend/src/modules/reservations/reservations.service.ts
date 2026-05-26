@@ -228,3 +228,80 @@ export class ReservationsService {
           checkInDate,
           checkOutDate,
         },
+      );
+
+    if (overlappingReservations > 0) {
+      throw new ConflictException(
+        'Selected room is already reserved for the requested dates.',
+      );
+    }
+  }
+
+  private async ensureRoomTypeCapacity(
+    demand: RoomTypeDemand[],
+    checkInDate: Date,
+    checkOutDate: Date,
+  ) {
+    for (const item of demand) {
+      const [physicalRooms, reservedRooms] = await Promise.all([
+        this.reservationAvailabilityRepository.countPhysicalRooms(
+          item.roomTypeId,
+        ),
+        this.reservationAvailabilityRepository.countReservedRooms({
+          roomTypeId: item.roomTypeId,
+          checkInDate,
+          checkOutDate,
+        }),
+      ]);
+
+      const availableRooms = physicalRooms - reservedRooms;
+
+      if (availableRooms < item.requestedCount) {
+        throw new ConflictException(
+          'Not enough rooms are available for the requested dates.',
+        );
+      }
+    }
+  }
+
+  private buildReservationRoomCreateData(
+    room: AddReservationRoomDto,
+  ): ReservationRoomCreateData {
+    return {
+      roomType: {
+        connect: {
+          id: room.roomTypeId,
+        },
+      },
+      ...(room.roomId === undefined || room.roomId === null
+        ? {}
+        : {
+            room: {
+              connect: {
+                id: room.roomId,
+              },
+            },
+          }),
+      rate:
+        room.rate === undefined || room.rate === null
+          ? null
+          : room.rate.toString(),
+      notes: this.normalizeOptionalString(room.notes),
+    };
+  }
+
+  private async generateReservationNumber() {
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const sequence = `${Date.now().toString().slice(-6)}${attempt}`.slice(-6);
+      const reservationNumber = `RES-${datePart}-${sequence}`;
+      const existingReservation =
+        await this.reservationsRepository.findByReservationNumber(
+          reservationNumber,
+        );
+
+      if (!existingReservation) {
+        return reservationNumber;
+      }
+    }
