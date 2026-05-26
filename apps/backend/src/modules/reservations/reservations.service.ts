@@ -152,3 +152,79 @@ export class ReservationsService {
       requestedByRoomType.set(
         room.roomTypeId,
         (requestedByRoomType.get(room.roomTypeId) ?? 0) + 1,
+      );
+
+      if (room.roomId !== undefined && room.roomId !== null) {
+        if (requestedRoomIds.has(room.roomId)) {
+          throw new ConflictException(
+            'The same room cannot be assigned more than once.',
+          );
+        }
+
+        requestedRoomIds.add(room.roomId);
+        await this.ensureSpecificRoomIsAvailable(
+          room,
+          checkInDate,
+          checkOutDate,
+        );
+      }
+    }
+
+    await this.ensureRoomTypeCapacity(
+      [...requestedByRoomType.entries()].map(
+        ([roomTypeId, requestedCount]) => ({
+          roomTypeId,
+          requestedCount,
+        }),
+      ),
+      checkInDate,
+      checkOutDate,
+    );
+  }
+
+  private async ensureActiveRoomType(roomTypeId: number) {
+    const roomType = await this.roomTypesRepository.findRoomType(roomTypeId);
+
+    if (!roomType) {
+      throw new NotFoundException('Room type was not found.');
+    }
+
+    if (!roomType.isActive) {
+      throw new BadRequestException('Cannot reserve an inactive room type.');
+    }
+  }
+
+  private async ensureSpecificRoomIsAvailable(
+    requestedRoom: AddReservationRoomDto,
+    checkInDate: Date,
+    checkOutDate: Date,
+  ) {
+    const room = await this.roomsRepository.findRoom(
+      Number(requestedRoom.roomId),
+    );
+
+    if (!room) {
+      throw new NotFoundException('Room was not found.');
+    }
+
+    if (!room.isActive) {
+      throw new BadRequestException('Cannot reserve an inactive room.');
+    }
+
+    if (room.roomTypeId !== requestedRoom.roomTypeId) {
+      throw new BadRequestException(
+        'Selected room does not belong to the requested room type.',
+      );
+    }
+
+    if (room.maintenanceStatus !== RoomMaintenanceStatus.AVAILABLE) {
+      throw new ConflictException('Selected room is not available for sale.');
+    }
+
+    const overlappingReservations =
+      await this.reservationAvailabilityRepository.countOverlappingRoomReservations(
+        {
+          roomId: room.id,
+          checkInDate,
+          checkOutDate,
+        },
