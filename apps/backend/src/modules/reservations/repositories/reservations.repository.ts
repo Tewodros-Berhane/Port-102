@@ -190,3 +190,66 @@ export class ReservationsRepository {
                   mode: 'insensitive',
                 },
               },
+              {
+                guest: {
+                  firstName: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+              {
+                guest: {
+                  lastName: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+              {
+                guest: {
+                  email: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+              {
+                guest: {
+                  phone: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    return Promise.all([
+      this.prisma.reservation.count({ where }),
+      this.prisma.reservation.findMany({
+        where,
+        skip,
+        take,
+        select: reservationSelect,
+        orderBy: [{ checkInDate: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
+  }
+
+  updateReservation(
+    reservationId: number,
+    data: Prisma.ReservationUncheckedUpdateInput,
+    client: ReservationClient = this.prisma,
+  ) {
+    return client.reservation.update({
+      where: {
+        id: reservationId,
+      },
+      data,
+      select: reservationSelect,
+    });
+  }
+}
