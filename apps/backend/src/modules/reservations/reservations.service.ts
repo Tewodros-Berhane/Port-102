@@ -75,3 +75,80 @@ export class ReservationsService {
       (client) =>
         this.reservationsRepository.createReservation(
           {
+            reservationNumber,
+            guest: {
+              connect: {
+                id: createReservationDto.guestId,
+              },
+            },
+            source: createReservationDto.source ?? ReservationSource.WALK_IN,
+            checkInDate,
+            checkOutDate,
+            adults: createReservationDto.adults ?? 1,
+            children: createReservationDto.children ?? 0,
+            specialRequests: this.normalizeOptionalString(
+              createReservationDto.specialRequests,
+            ),
+            internalNotes: this.normalizeOptionalString(
+              createReservationDto.internalNotes,
+            ),
+            createdBy: {
+              connect: {
+                id: currentUser.sub,
+              },
+            },
+            rooms: {
+              create: createReservationDto.rooms.map((room) =>
+                this.buildReservationRoomCreateData(room),
+              ),
+            },
+          },
+          client,
+        ),
+    );
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'reservations.created',
+      entityType: 'Reservation',
+      entityId: String(reservation.id),
+      metadata: {
+        reservationNumber: reservation.reservationNumber,
+        guestId: reservation.guestId,
+        checkInDate: reservation.checkInDate.toISOString(),
+        checkOutDate: reservation.checkOutDate.toISOString(),
+        roomCount: reservation.rooms.length,
+      },
+    });
+
+    return this.serializeReservation(reservation);
+  }
+
+  private async ensureActiveGuest(guestId: number) {
+    const guest = await this.guestsRepository.findGuestProfile(guestId);
+
+    if (!guest) {
+      throw new NotFoundException('Guest was not found.');
+    }
+
+    if (guest.status !== GuestStatus.ACTIVE) {
+      throw new BadRequestException(
+        'Cannot create reservation for inactive guest.',
+      );
+    }
+  }
+
+  private async ensureReservationRoomsAreAvailable(
+    rooms: AddReservationRoomDto[],
+    checkInDate: Date,
+    checkOutDate: Date,
+  ) {
+    const requestedRoomIds = new Set<number>();
+    const requestedByRoomType = new Map<number, number>();
+
+    for (const room of rooms) {
+      await this.ensureActiveRoomType(room.roomTypeId);
+
+      requestedByRoomType.set(
+        room.roomTypeId,
+        (requestedByRoomType.get(room.roomTypeId) ?? 0) + 1,
