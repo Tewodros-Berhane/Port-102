@@ -27,3 +27,32 @@ export class AddReservationRoomDto {
     minimum: 1,
     nullable: true,
   })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  roomId?: number | null;
+
+  @ApiPropertyOptional({
+    example: 125.5,
+    description: 'Optional nightly rate override for this reserved room.',
+    minimum: 0,
+    nullable: true,
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  rate?: number | null;
+
+  @ApiPropertyOptional({
+    example: 'Guest prefers this room near the elevator.',
+    nullable: true,
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsOptional()
+  notes?: string | null;
+}
