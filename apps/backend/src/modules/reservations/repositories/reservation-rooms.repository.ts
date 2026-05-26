@@ -88,3 +88,48 @@ export class ReservationRoomsRepository {
     data: Prisma.ReservationRoomUncheckedUpdateInput,
     client: ReservationRoomClient = this.prisma,
   ) {
+    return client.reservationRoom.update({
+      where: {
+        id: reservationRoomId,
+      },
+      data,
+      select: reservationRoomSelect,
+    });
+  }
+
+  updateRoomsForReservation(
+    reservationId: number,
+    data: Prisma.ReservationRoomUncheckedUpdateManyInput,
+    client: ReservationRoomClient = this.prisma,
+  ) {
+    return client.reservationRoom.updateMany({
+      where: {
+        reservationId,
+      },
+      data,
+    });
+  }
+
+  removeReservationRoom(
+    reservationRoomId: number,
+    client: ReservationRoomClient = this.prisma,
+  ) {
+    return client.reservationRoom.delete({
+      where: {
+        id: reservationRoomId,
+      },
+      select: reservationRoomSelect,
+    });
+  }
+
+  countActiveRooms(reservationId: number) {
+    return this.prisma.reservationRoom.count({
+      where: {
+        reservationId,
+        status: {
+          not: ReservationRoomStatus.CANCELLED,
+        },
+      },
+    });
+  }
+}
