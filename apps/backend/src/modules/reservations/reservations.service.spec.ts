@@ -107,3 +107,111 @@ describe('ReservationsService', () => {
     status: ReservationStatus.CONFIRMED,
     source: ReservationSource.PHONE,
     checkInDate: new Date('2026-06-10T00:00:00.000Z'),
+    checkOutDate: new Date('2026-06-12T00:00:00.000Z'),
+    adults: 2,
+    children: 1,
+    specialRequests: 'Quiet room',
+    internalNotes: 'VIP guest',
+    cancellationReason: null,
+    cancelledAt: null,
+    noShowAt: null,
+    createdByUserId: 1,
+    cancelledByUserId: null,
+    createdAt: now,
+    updatedAt: now,
+    guest,
+    createdBy: {
+      id: 1,
+      email: 'admin@demo-hotel.com',
+      fullName: 'Hotel Admin',
+    },
+    cancelledBy: null,
+    rooms: [
+      {
+        id: 30,
+        reservationId: 20,
+        roomTypeId: 4,
+        roomId: 9,
+        status: 'RESERVED',
+        rate: { toString: () => '140' },
+        notes: 'Near elevator',
+        createdAt: now,
+        updatedAt: now,
+        roomType: {
+          id: 4,
+          name: 'Deluxe King',
+          code: 'DLX-KING',
+          baseOccupancy: 2,
+          maxOccupancy: 3,
+          baseRate: { toString: () => '125.50' },
+          isActive: true,
+        },
+        room: {
+          id: 9,
+          roomNumber: '101',
+          displayName: 'Deluxe 101',
+          roomTypeId: 4,
+          maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+          isActive: true,
+        },
+      },
+    ],
+  };
+
+  beforeEach(async () => {
+    reservationsRepository = {
+      runInTransaction: jest.fn(async (operation) => operation({})),
+      createReservation: jest.fn().mockResolvedValue(reservation),
+      findByReservationNumber: jest.fn().mockResolvedValue(null),
+    };
+    reservationAvailabilityRepository = {
+      countPhysicalRooms: jest.fn().mockResolvedValue(5),
+      countReservedRooms: jest.fn().mockResolvedValue(1),
+      countOverlappingRoomReservations: jest.fn().mockResolvedValue(0),
+    };
+    guestsRepository = {
+      findGuestProfile: jest.fn().mockResolvedValue(guest),
+    };
+    roomTypesRepository = {
+      findRoomType: jest.fn().mockResolvedValue(roomType),
+    };
+    roomsRepository = {
+      findRoom: jest.fn().mockResolvedValue(room),
+    };
+    auditLogsService = {
+      record: jest.fn(),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ReservationsService,
+        {
+          provide: ReservationsRepository,
+          useValue: reservationsRepository,
+        },
+        {
+          provide: ReservationAvailabilityRepository,
+          useValue: reservationAvailabilityRepository,
+        },
+        {
+          provide: GuestsRepository,
+          useValue: guestsRepository,
+        },
+        {
+          provide: RoomTypesRepository,
+          useValue: roomTypesRepository,
+        },
+        {
+          provide: RoomsRepository,
+          useValue: roomsRepository,
+        },
+        {
+          provide: AuditLogsService,
+          useValue: auditLogsService,
+        },
+      ],
+    }).compile();
+
+    service = module.get<ReservationsService>(ReservationsService);
+  });
+
