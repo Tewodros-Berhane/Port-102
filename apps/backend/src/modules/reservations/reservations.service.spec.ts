@@ -324,3 +324,111 @@ describe('ReservationsService', () => {
       }),
     ).rejects.toThrow('Check-out date must be after check-in date.');
 
+    expect(guestsRepository.findGuestProfile).not.toHaveBeenCalled();
+  });
+
+  it('rejects inactive guests', async () => {
+    guestsRepository.findGuestProfile.mockResolvedValue({
+      ...guest,
+      status: GuestStatus.INACTIVE,
+    });
+
+    await expect(
+      service.create(currentUser, {
+        guestId: 12,
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        rooms: [
+          {
+            roomTypeId: 4,
+          },
+        ],
+      }),
+    ).rejects.toThrow('Cannot create reservation for inactive guest.');
+  });
+
+  it('rejects inactive room types', async () => {
+    roomTypesRepository.findRoomType.mockResolvedValue({
+      ...roomType,
+      isActive: false,
+    });
+
+    await expect(
+      service.create(currentUser, {
+        guestId: 12,
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        rooms: [
+          {
+            roomTypeId: 4,
+          },
+        ],
+      }),
+    ).rejects.toThrow('Cannot reserve an inactive room type.');
+  });
+
+  it('rejects selected room type mismatches', async () => {
+    roomsRepository.findRoom.mockResolvedValue({
+      ...room,
+      roomTypeId: 5,
+    });
+
+    await expect(
+      service.create(currentUser, {
+        guestId: 12,
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        rooms: [
+          {
+            roomTypeId: 4,
+            roomId: 9,
+          },
+        ],
+      }),
+    ).rejects.toThrow(
+      'Selected room does not belong to the requested room type.',
+    );
+  });
+
+  it('rejects overlapping selected room reservations', async () => {
+    reservationAvailabilityRepository.countOverlappingRoomReservations.mockResolvedValue(
+      1,
+    );
+
+    await expect(
+      service.create(currentUser, {
+        guestId: 12,
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        rooms: [
+          {
+            roomTypeId: 4,
+            roomId: 9,
+          },
+        ],
+      }),
+    ).rejects.toThrow(
+      'Selected room is already reserved for the requested dates.',
+    );
+  });
+
+  it('rejects room type reservations when there is no remaining capacity', async () => {
+    reservationAvailabilityRepository.countPhysicalRooms.mockResolvedValue(2);
+    reservationAvailabilityRepository.countReservedRooms.mockResolvedValue(2);
+
+    await expect(
+      service.create(currentUser, {
+        guestId: 12,
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        rooms: [
+          {
+            roomTypeId: 4,
+          },
+        ],
+      }),
+    ).rejects.toThrow(
+      'Not enough rooms are available for the requested dates.',
+    );
+  });
+});
