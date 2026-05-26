@@ -43,3 +43,48 @@ export type ReservationRoomRecord = Prisma.ReservationRoomGetPayload<{
   select: typeof reservationRoomSelect;
 }>;
 
+type ReservationRoomClient = Pick<
+  PrismaService | Prisma.TransactionClient,
+  'reservationRoom'
+>;
+
+@Injectable()
+export class ReservationRoomsRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  createReservationRoom(
+    data: Prisma.ReservationRoomUncheckedCreateInput,
+    client: ReservationRoomClient = this.prisma,
+  ) {
+    return client.reservationRoom.create({
+      data,
+      select: reservationRoomSelect,
+    });
+  }
+
+  findReservationRoom(reservationRoomId: number) {
+    return this.prisma.reservationRoom.findUnique({
+      where: {
+        id: reservationRoomId,
+      },
+      select: reservationRoomSelect,
+    });
+  }
+
+  listReservationRooms(reservationId: number) {
+    return this.prisma.reservationRoom.findMany({
+      where: {
+        reservationId,
+      },
+      select: reservationRoomSelect,
+      orderBy: {
+        id: 'asc',
+      },
+    });
+  }
+
+  updateReservationRoom(
+    reservationRoomId: number,
+    data: Prisma.ReservationRoomUncheckedUpdateInput,
+    client: ReservationRoomClient = this.prisma,
+  ) {
