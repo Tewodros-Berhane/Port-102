@@ -76,3 +76,42 @@ describe('ReservationsRepository', () => {
                 id: 9,
               },
             },
+            rate: '140',
+          },
+        ],
+      },
+    });
+
+    expect(prisma.reservation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reservationNumber: 'RES-20260527-000001',
+          guest: {
+            connect: {
+              id: 12,
+            },
+          },
+          rooms: {
+            create: [
+              expect.objectContaining({
+                rate: '140',
+              }),
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
+  it('finds reservation numbers for uniqueness checks', async () => {
+    await repository.findByReservationNumber('RES-20260527-000001');
+
+    expect(prisma.reservation.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          reservationNumber: 'RES-20260527-000001',
+        },
+      }),
+    );
+  });
+});
