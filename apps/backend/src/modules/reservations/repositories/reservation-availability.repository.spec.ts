@@ -38,3 +38,43 @@ describe('ReservationAvailabilityRepository', () => {
           provide: PrismaService,
           useValue: prisma,
         },
+      ],
+    }).compile();
+
+    repository = module.get<ReservationAvailabilityRepository>(
+      ReservationAvailabilityRepository,
+    );
+  });
+
+  it('counts physically available rooms for a room type', async () => {
+    await repository.countPhysicalRooms(4);
+
+    expect(prisma.room.count).toHaveBeenCalledWith({
+      where: {
+        roomTypeId: 4,
+        isActive: true,
+        maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+      },
+    });
+  });
+
+  it('counts overlapping reserved inventory by room type', async () => {
+    await repository.countReservedRooms({
+      roomTypeId: 4,
+      checkInDate: new Date('2026-06-10T00:00:00.000Z'),
+      checkOutDate: new Date('2026-06-12T00:00:00.000Z'),
+    });
+
+    expect(prisma.reservationRoom.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        roomTypeId: 4,
+        status: {
+          not: ReservationRoomStatus.CANCELLED,
+        },
+        reservation: expect.objectContaining({
+          status: {
+            notIn: [ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW],
+          },
+          checkInDate: {
+            lt: new Date('2026-06-12T00:00:00.000Z'),
+          },
