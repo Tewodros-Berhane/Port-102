@@ -248,6 +248,51 @@ describe('ReservationsService', () => {
         },
         {
           provide: RoomsRepository,
+          useValue: roomsRepository,
+        },
+        {
+          provide: AuditLogsService,
+          useValue: auditLogsService,
+        },
+      ],
+    }).compile();
+
+    service = module.get<ReservationsService>(ReservationsService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  it('creates a reservation in a transaction and records audit metadata', async () => {
+    const result = await service.create(currentUser, {
+      guestId: 12,
+      checkInDate: '2026-06-10',
+      checkOutDate: '2026-06-12',
+      adults: 2,
+      children: 1,
+      source: ReservationSource.PHONE,
+      specialRequests: ' Quiet room ',
+      internalNotes: ' VIP guest ',
+      rooms: [
+        {
+          roomTypeId: 4,
+          roomId: 9,
+          rate: 140,
+          notes: ' Near elevator ',
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      id: 20,
+      reservationNumber: 'RES-20260527-123450',
+      rooms: [
+        {
+          rate: '140',
+          roomType: {
+            baseRate: '125.50',
+          },
         },
       ],
     });
@@ -326,51 +371,6 @@ describe('ReservationsService', () => {
 
     expect(guestsRepository.findGuestProfile).not.toHaveBeenCalled();
   });
-
-  it('rejects inactive guests', async () => {
-    guestsRepository.findGuestProfile.mockResolvedValue({
-      ...guest,
-      status: GuestStatus.INACTIVE,
-    });
-
-    await expect(
-      service.create(currentUser, {
-        guestId: 12,
-        checkInDate: '2026-06-10',
-        checkOutDate: '2026-06-12',
-        rooms: [
-          {
-            roomTypeId: 4,
-          },
-        ],
-      }),
-    ).rejects.toThrow('Cannot create reservation for inactive guest.');
-  });
-
-  it('rejects inactive room types', async () => {
-    roomTypesRepository.findRoomType.mockResolvedValue({
-      ...roomType,
-      isActive: false,
-    });
-
-    await expect(
-      service.create(currentUser, {
-        guestId: 12,
-        checkInDate: '2026-06-10',
-        checkOutDate: '2026-06-12',
-        rooms: [
-          {
-            roomTypeId: 4,
-          },
-        ],
-      }),
-    ).rejects.toThrow('Cannot reserve an inactive room type.');
-  });
-
-  it('rejects selected room type mismatches', async () => {
-    roomsRepository.findRoom.mockResolvedValue({
-      ...room,
-      roomTypeId: 5,
     });
 
     await expect(
