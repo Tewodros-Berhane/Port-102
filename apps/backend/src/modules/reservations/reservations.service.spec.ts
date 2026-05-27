@@ -494,3 +494,125 @@ describe('ReservationsService', () => {
       take: 10,
       search: 'Marta',
       status: ReservationStatus.CONFIRMED,
+      source: ReservationSource.PHONE,
+      guestId: 12,
+      checkInFrom: new Date('2026-06-01T00:00:00.000Z'),
+      checkInTo: new Date('2026-06-30T00:00:00.000Z'),
+      checkOutFrom: undefined,
+      checkOutTo: undefined,
+    });
+    expect(result).toMatchObject({
+      items: [
+        {
+          id: 20,
+          rooms: [
+            {
+              rate: '140',
+            },
+          ],
+        },
+      ],
+      pagination: {
+        page: 2,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+  });
+
+  it('returns reservation details by id', async () => {
+    const result = await service.getById(currentUser, 20);
+
+    expect(reservationsRepository.findReservation).toHaveBeenCalledWith(20);
+    expect(result).toMatchObject({
+      id: 20,
+      reservationNumber: 'RES-20260527-123450',
+    });
+  });
+
+  it('throws when a reservation detail does not exist', async () => {
+    reservationsRepository.findReservation.mockResolvedValue(null);
+
+    await expect(service.getById(currentUser, 999)).rejects.toThrow(
+      'Reservation was not found.',
+    );
+  });
+
+  it('searches availability for fitting room types with remaining inventory', async () => {
+    const result = await service.searchAvailability(currentUser, {
+      checkInDate: '2026-06-10',
+      checkOutDate: '2026-06-12',
+      adults: 2,
+      children: 1,
+    });
+
+    expect(
+      reservationAvailabilityRepository.listRoomTypesForAvailability,
+    ).toHaveBeenCalledWith({
+      roomTypeId: undefined,
+      minOccupancy: 3,
+    });
+    expect(result).toMatchObject({
+      nights: 2,
+      adults: 2,
+      children: 1,
+      roomTypes: [
+        {
+          totalRooms: 5,
+          reservedRooms: 1,
+          availableRooms: 4,
+          requestedOccupancy: 3,
+          fitsRequestedOccupancy: true,
+          isAvailable: true,
+          roomType: {
+            id: 4,
+            baseRate: '125.50',
+          },
+        },
+      ],
+    });
+  });
+
+  it('returns room type availability even when requested occupancy does not fit', async () => {
+    const result = await service.getAvailabilityByRoomType(currentUser, {
+      checkInDate: '2026-06-10',
+      checkOutDate: '2026-06-12',
+      adults: 4,
+      children: 0,
+      roomTypeId: 4,
+    });
+
+    expect(
+      reservationAvailabilityRepository.listRoomTypesForAvailability,
+    ).toHaveBeenCalledWith({
+      roomTypeId: 4,
+    });
+    expect(result).toMatchObject({
+      roomTypeId: 4,
+      roomTypes: [
+        {
+          availableRooms: 0,
+          fitsRequestedOccupancy: false,
+        },
+      ],
+    });
+  });
+
+  it('lists available specific rooms for a date range', async () => {
+    const result = await service.listAvailableRooms(currentUser, {
+      checkInDate: '2026-06-10',
+      checkOutDate: '2026-06-12',
+      roomTypeId: 4,
+    });
+
+    expect(roomTypesRepository.findRoomType).toHaveBeenCalledWith(4);
+    expect(
+      reservationAvailabilityRepository.listAvailableRooms,
+    ).toHaveBeenCalledWith({
+      roomTypeId: 4,
+      checkInDate: new Date('2026-06-10T00:00:00.000Z'),
+      checkOutDate: new Date('2026-06-12T00:00:00.000Z'),
+    });
+    expect(result).toMatchObject({
+      nights: 2,
