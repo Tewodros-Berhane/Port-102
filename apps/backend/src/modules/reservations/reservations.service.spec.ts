@@ -862,3 +862,125 @@ describe('ReservationsService', () => {
       service.markNoShow(currentUser, 20, {
         reason: 'Not ready',
       }),
+    ).rejects.toThrow('Only confirmed reservations can be marked no-show.');
+
+    expect(
+      reservationRoomsRepository.updateRoomsForReservation,
+    ).not.toHaveBeenCalled();
+    expect(reservationsRepository.updateReservation).not.toHaveBeenCalled();
+  });
+
+  it('adds rooms to editable reservations after checking the full room set', async () => {
+    await service.addRoom(currentUser, 20, {
+      roomTypeId: 4,
+      rate: 150,
+      notes: ' Extra room ',
+    });
+
+    expect(
+      reservationAvailabilityRepository.countReservedRooms,
+    ).toHaveBeenCalledWith({
+      roomTypeId: 4,
+      checkInDate: new Date('2026-06-10T00:00:00.000Z'),
+      checkOutDate: new Date('2026-06-12T00:00:00.000Z'),
+      excludeReservationId: 20,
+    });
+    expect(
+      reservationRoomsRepository.createReservationRoom,
+    ).toHaveBeenCalledWith({
+      reservationId: 20,
+      roomTypeId: 4,
+      roomId: null,
+      rate: '150',
+      notes: 'Extra room',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'reservations.room_added',
+      }),
+    );
+  });
+
+  it('updates reservation room assignments after availability checks', async () => {
+    await service.updateRoom(currentUser, 20, 30, {
+      roomId: null,
+      rate: 145,
+      notes: ' Cleared exact assignment ',
+    });
+
+    expect(reservationRoomsRepository.findReservationRoom).toHaveBeenCalledWith(
+      30,
+    );
+    expect(
+      reservationRoomsRepository.updateReservationRoom,
+    ).toHaveBeenCalledWith(30, {
+      roomId: null,
+      rate: '145',
+      notes: 'Cleared exact assignment',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'reservations.room_updated',
+      }),
+    );
+  });
+
+  it('rejects reservation room updates for rooms outside the reservation', async () => {
+    reservationRoomsRepository.findReservationRoom.mockResolvedValue({
+      ...reservation.rooms[0],
+      reservationId: 999,
+    });
+
+    await expect(
+      service.updateRoom(currentUser, 20, 30, {
+        roomId: null,
+      }),
+    ).rejects.toThrow('Reservation room was not found.');
+
+    expect(
+      reservationRoomsRepository.updateReservationRoom,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('rejects updates to cancelled reservation rooms', async () => {
+    reservationRoomsRepository.findReservationRoom.mockResolvedValue({
+      ...reservation.rooms[0],
+      status: ReservationRoomStatus.CANCELLED,
+    });
+
+    await expect(
+      service.updateRoom(currentUser, 20, 30, {
+        roomId: null,
+      }),
+    ).rejects.toThrow('Cancelled reservation rooms cannot be updated.');
+
+    expect(
+      reservationRoomsRepository.updateReservationRoom,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('blocks removing the last active room from an active reservation', async () => {
+    reservationRoomsRepository.countActiveRooms.mockResolvedValue(1);
+
+    await expect(service.removeRoom(currentUser, 20, 30)).rejects.toThrow(
+      'Cannot remove the last active room from a reservation.',
+    );
+
+    expect(
+      reservationRoomsRepository.removeReservationRoom,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('removes reservation rooms and records audit metadata', async () => {
+    await service.removeRoom(currentUser, 20, 30);
+
+    expect(
+      reservationRoomsRepository.removeReservationRoom,
+    ).toHaveBeenCalledWith(30);
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'reservations.room_removed',
+      }),
+    );
+  });
+});
