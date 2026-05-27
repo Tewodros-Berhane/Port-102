@@ -106,3 +106,57 @@ export class ReservationsController {
   @ApiBadRequestResponse({ description: 'Invalid availability date range.' })
   @ApiUnauthorizedResponse({ description: 'Authentication required.' })
   @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room type was not found.' })
+  listAvailableRooms(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: AvailabilitySearchQueryDto,
+  ) {
+    return this.reservationsService.listAvailableRooms(currentUser, query);
+  }
+
+  @Get('calendar')
+  @Permissions('booking_calendar.read')
+  @ApiOperation({ summary: 'Get reservation booking calendar' })
+  @ApiOkResponse({ description: 'Booking calendar returned.' })
+  @ApiBadRequestResponse({ description: 'Invalid calendar date range.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  getBookingCalendar(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: BookingCalendarQueryDto,
+  ) {
+    return this.reservationsService.getBookingCalendar(currentUser, query);
+  }
+
+  @Get()
+  @Permissions('reservations.read')
+  @ApiOperation({ summary: 'List reservations' })
+  @ApiOkResponse({ description: 'Reservations returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  list(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: GetReservationsQueryDto,
+  ) {
+    return this.reservationsService.list(currentUser, query);
+  }
+
+  @Get(':id')
+  @Permissions('reservations.read')
+  @ApiOperation({ summary: 'Get one reservation' })
+  @ApiOkResponse({ description: 'Reservation returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Reservation was not found.' })
+  getById(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) reservationId: number,
+  ) {
+    return this.reservationsService.getById(currentUser, reservationId);
+  }
+
+  @Patch(':id')
+  @Permissions('reservations.update')
+  @ApiOperation({ summary: 'Update one reservation' })
+  @ApiOkResponse({ description: 'Reservation updated successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid reservation payload.' })
