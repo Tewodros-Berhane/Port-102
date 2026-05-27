@@ -15,6 +15,9 @@ describe('ReservationAvailabilityRepository', () => {
       count: jest.Mock;
       findMany: jest.Mock;
     };
+    roomType: {
+      findMany: jest.Mock;
+    };
     reservationRoom: {
       count: jest.Mock;
     };
@@ -24,6 +27,9 @@ describe('ReservationAvailabilityRepository', () => {
     prisma = {
       room: {
         count: jest.fn(),
+        findMany: jest.fn(),
+      },
+      roomType: {
         findMany: jest.fn(),
       },
       reservationRoom: {
@@ -56,6 +62,26 @@ describe('ReservationAvailabilityRepository', () => {
         maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
       },
     });
+  });
+
+  it('lists active room types for availability searches', async () => {
+    await repository.listRoomTypesForAvailability({
+      roomTypeId: 4,
+      minOccupancy: 2,
+    });
+
+    expect(prisma.roomType.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          isActive: true,
+          id: 4,
+          maxOccupancy: {
+            gte: 2,
+          },
+        },
+        orderBy: [{ name: 'asc' }, { code: 'asc' }, { id: 'asc' }],
+      }),
+    );
   });
 
   it('counts overlapping reserved inventory by room type', async () => {
