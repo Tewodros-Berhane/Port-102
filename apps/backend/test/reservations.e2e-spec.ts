@@ -256,3 +256,261 @@ describe('Reservations read and availability API (e2e)', () => {
       startDate: '2026-06-01T00:00:00.000Z',
       endDate: '2026-06-30T00:00:00.000Z',
       roomId: null,
+      roomTypeId: 4,
+      status: null,
+      items: [reservation],
+    });
+    reservationsService.update.mockResolvedValue({
+      ...reservation,
+      internalNotes: 'Updated note',
+    });
+    reservationsService.confirm.mockResolvedValue(reservation);
+    reservationsService.cancel.mockResolvedValue({
+      ...reservation,
+      status: ReservationStatus.CANCELLED,
+      cancellationReason: 'Guest cancelled',
+    });
+    reservationsService.markNoShow.mockResolvedValue({
+      ...reservation,
+      status: ReservationStatus.NO_SHOW,
+    });
+    reservationsService.addRoom.mockResolvedValue({
+      ...reservation,
+      rooms: [
+        ...reservation.rooms,
+        {
+          ...reservation.rooms[0],
+          id: 31,
+          roomId: null,
+        },
+      ],
+    });
+    reservationsService.updateRoom.mockResolvedValue({
+      ...reservation,
+      rooms: [
+        {
+          ...reservation.rooms[0],
+          roomId: null,
+        },
+      ],
+    });
+    reservationsService.removeRoom.mockResolvedValue({
+      ...reservation,
+      rooms: [],
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('rejects unauthenticated reservation read requests', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/reservations')
+      .expect(401);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 401,
+      message: 'Authentication required.',
+    });
+    expect(reservationsService.list).not.toHaveBeenCalled();
+  });
+
+  it('rejects users without the required reservation availability permission', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/reservations/calendar')
+      .query({
+        startDate: '2026-06-01',
+        endDate: '2026-06-30',
+      })
+      .set('Authorization', 'Bearer limited-token')
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 403,
+      message: 'Missing required permission.',
+    });
+    expect(reservationsService.getBookingCalendar).not.toHaveBeenCalled();
+  });
+
+  it('allows a permitted hotel admin to create a reservation', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/reservations')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        guestId: 12,
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        adults: 2,
+        children: 1,
+        source: ReservationSource.PHONE,
+        rooms: [
+          {
+            roomTypeId: 4,
+            roomId: 9,
+            rate: 125.5,
+          },
+        ],
+      })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      statusCode: 201,
+      data: {
+        id: 20,
+        reservationNumber: 'RES-20260527-123450',
+      },
+    });
+    expect(reservationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      expect.objectContaining({
+        guestId: 12,
+        adults: 2,
+        children: 1,
+        source: ReservationSource.PHONE,
+        rooms: [
+          expect.objectContaining({
+            roomTypeId: 4,
+            roomId: 9,
+            rate: 125.5,
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('returns conflict when an overlapping booking is rejected', async () => {
+    reservationsService.create.mockRejectedValueOnce(
+      new ConflictException(
+        'Selected room is already reserved for the requested dates.',
+      ),
+    );
+
+    const response = await request(app.getHttpServer())
+      .post('/api/reservations')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        guestId: 12,
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        rooms: [
+          {
+            roomTypeId: 4,
+            roomId: 9,
+          },
+        ],
+      })
+      .expect(409);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 409,
+      message: 'Selected room is already reserved for the requested dates.',
+    });
+  });
+
+  it('allows a back-to-back reservation request', async () => {
+    reservationsService.create.mockResolvedValueOnce({
+      ...reservation,
+      id: 21,
+      reservationNumber: 'RES-20260527-123451',
+      checkInDate: '2026-06-12T00:00:00.000Z',
+      checkOutDate: '2026-06-14T00:00:00.000Z',
+    });
+
+    const response = await request(app.getHttpServer())
+      .post('/api/reservations')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        guestId: 12,
+        checkInDate: '2026-06-12',
+        checkOutDate: '2026-06-14',
+        rooms: [
+          {
+            roomTypeId: 4,
+            roomId: 9,
+          },
+        ],
+      })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: 21,
+        checkInDate: '2026-06-12T00:00:00.000Z',
+      },
+    });
+    expect(reservationsService.create).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        checkInDate: '2026-06-12',
+        checkOutDate: '2026-06-14',
+      }),
+    );
+  });
+
+  it('lists reservations with transformed query values', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/reservations')
+      .query({
+        page: '2',
+        limit: '1',
+        status: ReservationStatus.CONFIRMED,
+        guestId: '12',
+      })
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      statusCode: 200,
+      data: {
+        items: [
+          {
+            id: 20,
+            reservationNumber: 'RES-20260527-123450',
+          },
+        ],
+        pagination: {
+          page: 2,
+          limit: 1,
+          total: 3,
+          totalPages: 3,
+        },
+      },
+    });
+    expect(reservationsService.list).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      expect.objectContaining({
+        page: 2,
+        limit: 1,
+        status: ReservationStatus.CONFIRMED,
+        guestId: 12,
+      }),
+    );
+  });
+
+  it('returns reservation detail', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/reservations/20')
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: 20,
+        rooms: [
+          {
+            roomId: 9,
+          },
+        ],
+      },
