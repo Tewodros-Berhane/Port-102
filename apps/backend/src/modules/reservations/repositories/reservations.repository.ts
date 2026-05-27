@@ -152,6 +152,7 @@ export class ReservationsRepository {
     checkOutTo,
   }: {
     skip: number;
+    take: number;
     search?: string;
     status?: ReservationStatus;
     source?: ReservationSource;
@@ -237,6 +238,52 @@ export class ReservationsRepository {
         orderBy: [{ checkInDate: 'asc' }, { id: 'asc' }],
       }),
     ]);
+  }
+
+  listCalendarReservations({
+    startDate,
+    endDate,
+    roomId,
+    roomTypeId,
+    status,
+  }: {
+    startDate: Date;
+    endDate: Date;
+    roomId?: number;
+    roomTypeId?: number;
+    status?: ReservationStatus;
+  }) {
+    const activeRoomWhere: Prisma.ReservationRoomWhereInput = {
+      status: {
+        not: ReservationRoomStatus.CANCELLED,
+      },
+      ...(roomId === undefined ? {} : { roomId }),
+      ...(roomTypeId === undefined ? {} : { roomTypeId }),
+    };
+    const where: Prisma.ReservationWhereInput = {
+      ...(status
+        ? { status }
+        : {
+            status: {
+              notIn: [ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW],
+            },
+          }),
+      checkInDate: {
+        lt: endDate,
+      },
+      checkOutDate: {
+        gt: startDate,
+      },
+      rooms: {
+        some: activeRoomWhere,
+      },
+    };
+
+    return this.prisma.reservation.findMany({
+      where,
+      select: reservationSelect,
+      orderBy: [{ checkInDate: 'asc' }, { id: 'asc' }],
+    });
   }
 
   updateReservation(
