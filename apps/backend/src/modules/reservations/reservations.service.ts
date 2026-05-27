@@ -909,3 +909,115 @@ export class ReservationsService {
           checkOutDate,
           excludeReservationId: options.excludeReservationId,
         }),
+      ]);
+
+      const availableRooms = physicalRooms - reservedRooms;
+
+      if (availableRooms < item.requestedCount) {
+        throw new ConflictException(
+          'Not enough rooms are available for the requested dates.',
+        );
+      }
+    }
+  }
+
+  private ensureAvailabilityRoomTypesFound(
+    roomTypes: AvailabilityRoomTypeRecord[],
+    roomTypeId?: number,
+  ) {
+    if (roomTypeId !== undefined && roomTypes.length === 0) {
+      throw new NotFoundException('Room type was not found.');
+    }
+  }
+
+  private async buildAvailabilitySummaries({
+    roomTypes,
+    checkInDate,
+    checkOutDate,
+    requestedOccupancy,
+  }: {
+    roomTypes: AvailabilityRoomTypeRecord[];
+    checkInDate: Date;
+    checkOutDate: Date;
+    requestedOccupancy: number;
+  }): Promise<AvailabilitySummary[]> {
+    return Promise.all(
+      roomTypes.map(async (roomType) => {
+        const [totalRooms, reservedRooms] = await Promise.all([
+          this.reservationAvailabilityRepository.countPhysicalRooms(
+            roomType.id,
+          ),
+          this.reservationAvailabilityRepository.countReservedRooms({
+            roomTypeId: roomType.id,
+            checkInDate,
+            checkOutDate,
+          }),
+        ]);
+        const fitsRequestedOccupancy =
+          roomType.maxOccupancy >= requestedOccupancy;
+        const rawAvailableRooms = Math.max(totalRooms - reservedRooms, 0);
+
+        return {
+          roomType,
+          totalRooms,
+          reservedRooms,
+          availableRooms: fitsRequestedOccupancy ? rawAvailableRooms : 0,
+          requestedOccupancy,
+          fitsRequestedOccupancy,
+        };
+      }),
+    );
+  }
+
+  private activeReservationRoomsToAvailabilityInput(
+    reservation: ReservationRecord,
+    replacementRoom?: ReservationRoomAvailabilityInput & { id: number },
+  ): ReservationRoomAvailabilityInput[] {
+    return reservation.rooms
+      .filter((room) => room.status !== ReservationRoomStatus.CANCELLED)
+      .map((room) => {
+        if (replacementRoom && room.id === replacementRoom.id) {
+          return {
+            roomTypeId: replacementRoom.roomTypeId,
+            roomId: replacementRoom.roomId ?? null,
+          };
+        }
+
+        return {
+          roomTypeId: room.roomTypeId,
+          roomId: room.roomId,
+        };
+      });
+  }
+
+  private mergeReservationRoomUpdate(
+    reservationRoom: ReservationRoomRecord,
+    updateReservationRoomDto: UpdateReservationRoomDto,
+  ): ReservationRoomAvailabilityInput & { id: number } {
+    return {
+      id: reservationRoom.id,
+      roomTypeId:
+        updateReservationRoomDto.roomTypeId ?? reservationRoom.roomTypeId,
+      roomId:
+        updateReservationRoomDto.roomId === undefined
+          ? reservationRoom.roomId
+          : updateReservationRoomDto.roomId,
+    };
+  }
+
+  private buildReservationRoomUpdateData(
+    updateReservationRoomDto: UpdateReservationRoomDto,
+  ): Prisma.ReservationRoomUncheckedUpdateInput {
+    const data: Prisma.ReservationRoomUncheckedUpdateInput = {};
+
+    if (updateReservationRoomDto.roomTypeId !== undefined) {
+      data.roomTypeId = updateReservationRoomDto.roomTypeId;
+    }
+
+    if (updateReservationRoomDto.roomId !== undefined) {
+      data.roomId = updateReservationRoomDto.roomId;
+    }
+
+    if (updateReservationRoomDto.rate !== undefined) {
+      data.rate =
+        updateReservationRoomDto.rate === null
