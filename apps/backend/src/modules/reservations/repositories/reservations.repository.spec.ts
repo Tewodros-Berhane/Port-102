@@ -94,6 +94,10 @@ describe('ReservationsRepository', () => {
             connect: {
               id: 12,
             },
+          },
+          rooms: {
+            create: [
+              expect.objectContaining({
                 rate: '140',
               }),
             ],
@@ -111,6 +115,73 @@ describe('ReservationsRepository', () => {
         where: {
           reservationNumber: 'RES-20260527-000001',
         },
+      }),
+    );
+  });
+
+  it('lists reservations with filters and pagination', async () => {
+    await repository.listReservations({
+      skip: 10,
+      take: 5,
+      search: 'marta',
+      status: ReservationStatus.CONFIRMED,
+      source: ReservationSource.PHONE,
+      guestId: 12,
+      checkInFrom: new Date('2026-06-01T00:00:00.000Z'),
+      checkInTo: new Date('2026-06-30T00:00:00.000Z'),
+    });
+
+    expect(prisma.reservation.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        status: ReservationStatus.CONFIRMED,
+        source: ReservationSource.PHONE,
+        guestId: 12,
+        checkInDate: {
+          gte: new Date('2026-06-01T00:00:00.000Z'),
+          lte: new Date('2026-06-30T00:00:00.000Z'),
+        },
+      }),
+    });
+    expect(prisma.reservation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 10,
+        take: 5,
+        orderBy: [{ checkInDate: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
+  it('lists calendar reservations with date overlap and room filters', async () => {
+    await repository.listCalendarReservations({
+      startDate: new Date('2026-06-01T00:00:00.000Z'),
+      endDate: new Date('2026-06-30T00:00:00.000Z'),
+      roomId: 9,
+      roomTypeId: 4,
+    });
+
+    expect(prisma.reservation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: {
+            notIn: [ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW],
+          },
+          checkInDate: {
+            lt: new Date('2026-06-30T00:00:00.000Z'),
+          },
+          checkOutDate: {
+            gt: new Date('2026-06-01T00:00:00.000Z'),
+          },
+          rooms: {
+            some: {
+              status: {
+                not: ReservationRoomStatus.CANCELLED,
+              },
+              roomId: 9,
+              roomTypeId: 4,
+            },
+          },
+        },
+        orderBy: [{ checkInDate: 'asc' }, { id: 'asc' }],
       }),
     );
   });
