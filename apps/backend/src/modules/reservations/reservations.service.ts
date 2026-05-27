@@ -346,38 +346,116 @@ export class ReservationsService {
           {
             status: ReservationRoomStatus.CANCELLED,
           },
-          baseRate: this.serializeDecimal(room.roomType.baseRate),
-        },
-        room: room.room,
-      })),
-    };
+          client,
+        );
+
+        return this.reservationsRepository.updateReservation(
+          reservation.id,
+          {
+            status: ReservationStatus.CANCELLED,
+            cancellationReason,
+            cancelledAt,
+            cancelledByUserId: currentUser.sub,
+          },
+          client,
+        );
+      });
+
+    await this.recordReservationAudit(
+      currentUser,
+      'reservations.cancelled',
+      updatedReservation,
+      {
+        previousStatus: reservation.status,
+        cancellationReason,
+        cancelledAt: cancelledAt.toISOString(),
+      },
+    );
+
+    return this.serializeReservation(updatedReservation);
   }
 
-  private parseDate(value: string) {
-    const date = new Date(value);
+  async markNoShow(
+    currentUser: CurrentUserPayload,
+    reservationId: number,
+    markNoShowDto: MarkNoShowDto,
+  ) {
+    const reservation = await this.findRequiredReservation(reservationId);
 
-    if (Number.isNaN(date.getTime())) {
-      throw new BadRequestException('Invalid reservation date.');
+    if (reservation.status === ReservationStatus.NO_SHOW) {
+      return this.serializeReservation(reservation);
     }
 
-    return date;
-  }
-
-  private ensureValidDateRange(checkInDate: Date, checkOutDate: Date) {
-    if (checkOutDate <= checkInDate) {
-      throw new BadRequestException(
-        'Check-out date must be after check-in date.',
+    if (reservation.status !== ReservationStatus.CONFIRMED) {
+      throw new ConflictException(
+        'Only confirmed reservations can be marked no-show.',
       );
     }
+
+    const reason = this.normalizeOptionalString(markNoShowDto.reason);
+    const noShowAt = new Date();
+    const updatedReservation =
+      await this.reservationsRepository.runInTransaction(async (client) => {
+        await this.reservationRoomsRepository.updateRoomsForReservation(
+          reservation.id,
+          {
+            status: ReservationRoomStatus.CANCELLED,
+          },
+          client,
+        );
+
+        return this.reservationsRepository.updateReservation(
+          reservation.id,
+          {
+            status: ReservationStatus.NO_SHOW,
+            noShowAt,
+          },
+          client,
+        );
+      });
+
+    await this.recordReservationAudit(
+      currentUser,
+      'reservations.no_show_marked',
+      updatedReservation,
+      {
+        previousStatus: reservation.status,
+        status: updatedReservation.status,
+        noShowAt: noShowAt.toISOString(),
+        reason,
+      },
+    );
+
+    return this.serializeReservation(updatedReservation);
   }
 
-  private serializeDecimal(value: Prisma.Decimal | null) {
-    return value?.toString() ?? null;
-  }
+  async addRoom(
+    currentUser: CurrentUserPayload,
+    reservationId: number,
+    addReservationRoomDto: AddReservationRoomDto,
+  ) {
+    const reservation = await this.findRequiredReservation(reservationId);
 
-  private normalizeOptionalString(value?: string | null) {
-    const normalized = value?.trim();
+    this.ensureReservationCanBeModified(reservation);
 
-    return normalized || null;
-  }
-}
+    await this.ensureReservationRoomsAreAvailable(
+      [
+        ...this.activeReservationRoomsToAvailabilityInput(reservation),
+        addReservationRoomDto,
+      ],
+      reservation.checkInDate,
+      reservation.checkOutDate,
+      {
+        excludeReservationId: reservation.id,
+      },
+    );
+
+    const reservationRoom =
+      await this.reservationRoomsRepository.createReservationRoom({
+        reservationId: reservation.id,
+        roomTypeId: addReservationRoomDto.roomTypeId,
+        roomId: addReservationRoomDto.roomId ?? null,
+        rate:
+          addReservationRoomDto.rate === undefined ||
+          addReservationRoomDto.rate === null
+            ? null
