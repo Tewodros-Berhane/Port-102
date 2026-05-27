@@ -1134,3 +1134,115 @@ export class ReservationsService {
     if (data.source !== undefined) {
       changes.source = data.source as string;
     }
+
+    if (data.checkInDate instanceof Date) {
+      changes.checkInDate = data.checkInDate.toISOString();
+    }
+
+    if (data.checkOutDate instanceof Date) {
+      changes.checkOutDate = data.checkOutDate.toISOString();
+    }
+
+    if (data.adults !== undefined) {
+      changes.adults = data.adults as number;
+    }
+
+    if (data.children !== undefined) {
+      changes.children = data.children as number;
+    }
+
+    if (data.specialRequests !== undefined) {
+      changes.specialRequests = data.specialRequests as string | null;
+    }
+
+    if (data.internalNotes !== undefined) {
+      changes.internalNotes = data.internalNotes as string | null;
+    }
+
+    if (data.cancellationReason !== undefined) {
+      changes.cancellationReason = data.cancellationReason as string | null;
+    }
+
+    if (data.cancelledAt instanceof Date) {
+      changes.cancelledAt = data.cancelledAt.toISOString();
+    }
+
+    if (data.cancelledByUserId !== undefined) {
+      changes.cancelledByUserId = data.cancelledByUserId as number | null;
+    }
+
+    if (data.noShowAt instanceof Date) {
+      changes.noShowAt = data.noShowAt.toISOString();
+    }
+
+    return changes as Prisma.InputJsonObject;
+  }
+
+  private serializeReservationRoomUpdateAuditData(
+    data: Prisma.ReservationRoomUncheckedUpdateInput,
+  ): Prisma.InputJsonObject {
+    const changes: Record<string, Prisma.InputJsonValue | null> = {};
+
+    if (data.roomTypeId !== undefined) {
+      changes.roomTypeId = data.roomTypeId as number;
+    }
+
+    if (data.roomId !== undefined) {
+      changes.roomId = data.roomId as number | null;
+    }
+
+    if (data.status !== undefined) {
+      changes.status = data.status as string;
+    }
+
+    if (data.rate !== undefined) {
+      changes.rate = data.rate === null ? null : data.rate.toString();
+    }
+
+    if (data.notes !== undefined) {
+      changes.notes = data.notes as string | null;
+    }
+
+    return changes as Prisma.InputJsonObject;
+  }
+
+  private serializeReservation(reservation: ReservationRecord) {
+    return {
+      id: reservation.id,
+      reservationNumber: reservation.reservationNumber,
+      guestId: reservation.guestId,
+      status: reservation.status,
+      source: reservation.source,
+      checkInDate: reservation.checkInDate,
+      checkOutDate: reservation.checkOutDate,
+      adults: reservation.adults,
+      children: reservation.children,
+      specialRequests: reservation.specialRequests,
+      internalNotes: reservation.internalNotes,
+      cancellationReason: reservation.cancellationReason,
+      cancelledAt: reservation.cancelledAt,
+      noShowAt: reservation.noShowAt,
+      createdByUserId: reservation.createdByUserId,
+      cancelledByUserId: reservation.cancelledByUserId,
+      createdAt: reservation.createdAt,
+      updatedAt: reservation.updatedAt,
+      guest: reservation.guest,
+      createdBy: reservation.createdBy,
+      cancelledBy: reservation.cancelledBy,
+      rooms: reservation.rooms.map((room) => ({
+        id: room.id,
+        reservationId: room.reservationId,
+        roomTypeId: room.roomTypeId,
+        roomId: room.roomId,
+        status: room.status,
+        rate: this.serializeDecimal(room.rate),
+        notes: room.notes,
+        createdAt: room.createdAt,
+        updatedAt: room.updatedAt,
+        roomType: {
+          ...room.roomType,
+          baseRate: this.serializeDecimal(room.roomType.baseRate),
+        },
+        room: room.room,
+      })),
+    };
