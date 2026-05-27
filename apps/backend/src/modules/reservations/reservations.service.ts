@@ -234,118 +234,118 @@ export class ReservationsService {
           excludeReservationId: reservation.id,
         },
       );
+      data.checkInDate = checkInDate;
+      data.checkOutDate = checkOutDate;
     }
-  }
 
-  private async ensureRoomTypeCapacity(
-    demand: RoomTypeDemand[],
-    checkInDate: Date,
-    checkOutDate: Date,
-  ) {
-    for (const item of demand) {
-      const [physicalRooms, reservedRooms] = await Promise.all([
-        this.reservationAvailabilityRepository.countPhysicalRooms(
-          item.roomTypeId,
-        ),
-        this.reservationAvailabilityRepository.countReservedRooms({
-          roomTypeId: item.roomTypeId,
-          checkInDate,
-          checkOutDate,
-        }),
-      ]);
-
-      const availableRooms = physicalRooms - reservedRooms;
-
-      if (availableRooms < item.requestedCount) {
-        throw new ConflictException(
-          'Not enough rooms are available for the requested dates.',
-        );
-      }
+    if (updateReservationDto.adults !== undefined) {
+      data.adults = updateReservationDto.adults;
     }
-  }
 
-  private buildReservationRoomCreateData(
-    room: AddReservationRoomDto,
-  ): ReservationRoomCreateData {
-    return {
-      roomType: {
-        connect: {
-          id: room.roomTypeId,
-        },
+    if (updateReservationDto.children !== undefined) {
+      data.children = updateReservationDto.children;
+    }
+
+    if (updateReservationDto.source !== undefined) {
+      data.source = updateReservationDto.source;
+    }
+
+    if (updateReservationDto.specialRequests !== undefined) {
+      data.specialRequests = this.normalizeOptionalString(
+        updateReservationDto.specialRequests,
+      );
+    }
+
+    if (updateReservationDto.internalNotes !== undefined) {
+      data.internalNotes = this.normalizeOptionalString(
+        updateReservationDto.internalNotes,
+      );
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.serializeReservation(reservation);
+    }
+
+    const updatedReservation =
+      await this.reservationsRepository.updateReservation(reservation.id, data);
+
+    await this.recordReservationAudit(
+      currentUser,
+      'reservations.updated',
+      updatedReservation,
+      {
+        previous: this.reservationAuditSnapshot(reservation),
+        changes: this.serializeReservationUpdateAuditData(data),
       },
-      ...(room.roomId === undefined || room.roomId === null
-        ? {}
-        : {
-            room: {
-              connect: {
-                id: room.roomId,
-              },
-            },
-          }),
-      rate:
-        room.rate === undefined || room.rate === null
-          ? null
-          : room.rate.toString(),
-      notes: this.normalizeOptionalString(room.notes),
-    };
+    );
+
+    return this.serializeReservation(updatedReservation);
   }
 
-  private async generateReservationNumber() {
-    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  async confirm(currentUser: CurrentUserPayload, reservationId: number) {
+    const reservation = await this.findRequiredReservation(reservationId);
 
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const sequence = `${Date.now().toString().slice(-6)}${attempt}`.slice(-6);
-      const reservationNumber = `RES-${datePart}-${sequence}`;
-      const existingReservation =
-        await this.reservationsRepository.findByReservationNumber(
-          reservationNumber,
-        );
-
-      if (!existingReservation) {
-        return reservationNumber;
-      }
+    if (reservation.status === ReservationStatus.CONFIRMED) {
+      return this.serializeReservation(reservation);
     }
 
-    throw new ConflictException(
-      'Could not generate a unique reservation number.',
+    if (reservation.status !== ReservationStatus.DRAFT) {
+      throw new ConflictException('Only draft reservations can be confirmed.');
+    }
+
+    const updatedReservation =
+      await this.reservationsRepository.updateReservation(reservation.id, {
+        status: ReservationStatus.CONFIRMED,
+      });
+
+    await this.recordReservationAudit(
+      currentUser,
+      'reservations.confirmed',
+      updatedReservation,
+      {
+        previousStatus: reservation.status,
+        status: updatedReservation.status,
+      },
     );
+
+    return this.serializeReservation(updatedReservation);
   }
 
-  private serializeReservation(reservation: ReservationRecord) {
-    return {
-      id: reservation.id,
-      reservationNumber: reservation.reservationNumber,
-      guestId: reservation.guestId,
-      status: reservation.status,
-      source: reservation.source,
-      checkInDate: reservation.checkInDate,
-      checkOutDate: reservation.checkOutDate,
-      adults: reservation.adults,
-      children: reservation.children,
-      specialRequests: reservation.specialRequests,
-      internalNotes: reservation.internalNotes,
-      cancellationReason: reservation.cancellationReason,
-      cancelledAt: reservation.cancelledAt,
-      noShowAt: reservation.noShowAt,
-      createdByUserId: reservation.createdByUserId,
-      cancelledByUserId: reservation.cancelledByUserId,
-      createdAt: reservation.createdAt,
-      updatedAt: reservation.updatedAt,
-      guest: reservation.guest,
-      createdBy: reservation.createdBy,
-      cancelledBy: reservation.cancelledBy,
-      rooms: reservation.rooms.map((room) => ({
-        id: room.id,
-        reservationId: room.reservationId,
-        roomTypeId: room.roomTypeId,
-        roomId: room.roomId,
-        status: room.status,
-        rate: this.serializeDecimal(room.rate),
-        notes: room.notes,
-        createdAt: room.createdAt,
-        updatedAt: room.updatedAt,
-        roomType: {
-          ...room.roomType,
+  async cancel(
+    currentUser: CurrentUserPayload,
+    reservationId: number,
+    cancelReservationDto: CancelReservationDto,
+  ) {
+    const reservation = await this.findRequiredReservation(reservationId);
+    const cancellationReason = this.normalizeRequiredString(
+      cancelReservationDto.cancellationReason,
+      'Cancellation reason is required.',
+    );
+
+    if (reservation.status === ReservationStatus.CANCELLED) {
+      return this.serializeReservation(reservation);
+    }
+
+    const nonCancellableStatuses: ReservationStatus[] = [
+      ReservationStatus.CHECKED_IN,
+      ReservationStatus.CHECKED_OUT,
+      ReservationStatus.NO_SHOW,
+    ];
+
+    if (nonCancellableStatuses.includes(reservation.status)) {
+      throw new ConflictException(
+        'Reservation cannot be cancelled in its current status.',
+      );
+    }
+
+    const cancelledAt = new Date();
+    const updatedReservation =
+      await this.reservationsRepository.runInTransaction(async (client) => {
+        await this.reservationRoomsRepository.updateRoomsForReservation(
+          reservation.id,
+          {
+            status: ReservationRoomStatus.CANCELLED,
+          },
           baseRate: this.serializeDecimal(room.roomType.baseRate),
         },
         room: room.room,
