@@ -616,3 +616,126 @@ describe('ReservationsService', () => {
     });
     expect(result).toMatchObject({
       nights: 2,
+      roomTypeId: 4,
+      rooms: [
+        {
+          id: 9,
+          roomType: {
+            baseRate: '125.50',
+          },
+        },
+      ],
+    });
+  });
+
+  it('returns booking calendar reservations for overlapping stays', async () => {
+    const result = await service.getBookingCalendar(currentUser, {
+      startDate: '2026-06-01',
+      endDate: '2026-06-30',
+      roomTypeId: 4,
+      status: ReservationStatus.CONFIRMED,
+    });
+
+    expect(
+      reservationsRepository.listCalendarReservations,
+    ).toHaveBeenCalledWith({
+      startDate: new Date('2026-06-01T00:00:00.000Z'),
+      endDate: new Date('2026-06-30T00:00:00.000Z'),
+      roomId: undefined,
+      roomTypeId: 4,
+      status: ReservationStatus.CONFIRMED,
+    });
+    expect(result).toMatchObject({
+      roomTypeId: 4,
+      status: ReservationStatus.CONFIRMED,
+      items: [
+        {
+          id: 20,
+          rooms: [
+            {
+              rate: '140',
+              roomType: {
+                baseRate: '125.50',
+              },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('updates editable reservations and rechecks availability when dates change', async () => {
+    const updatedReservation = {
+      ...reservation,
+      checkInDate: new Date('2026-06-11T00:00:00.000Z'),
+      checkOutDate: new Date('2026-06-13T00:00:00.000Z'),
+      internalNotes: 'Updated note',
+    };
+    reservationsRepository.updateReservation.mockResolvedValue(
+      updatedReservation,
+    );
+
+    const result = await service.update(currentUser, 20, {
+      checkInDate: '2026-06-11',
+      checkOutDate: '2026-06-13',
+      internalNotes: ' Updated note ',
+    });
+
+    expect(
+      reservationAvailabilityRepository.countOverlappingRoomReservations,
+    ).toHaveBeenCalledWith({
+      roomId: 9,
+      checkInDate: new Date('2026-06-11T00:00:00.000Z'),
+      checkOutDate: new Date('2026-06-13T00:00:00.000Z'),
+      excludeReservationId: 20,
+    });
+    expect(reservationsRepository.updateReservation).toHaveBeenCalledWith(20, {
+      checkInDate: new Date('2026-06-11T00:00:00.000Z'),
+      checkOutDate: new Date('2026-06-13T00:00:00.000Z'),
+      internalNotes: 'Updated note',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'reservations.updated',
+        entityId: '20',
+      }),
+    );
+    expect(result).toMatchObject({
+      checkInDate: updatedReservation.checkInDate,
+      checkOutDate: updatedReservation.checkOutDate,
+      internalNotes: 'Updated note',
+    });
+  });
+
+  it('blocks updates to terminal reservations', async () => {
+    reservationsRepository.findReservation.mockResolvedValue({
+      ...reservation,
+      status: ReservationStatus.CANCELLED,
+    });
+
+    await expect(
+      service.update(currentUser, 20, {
+        internalNotes: 'Late note',
+      }),
+    ).rejects.toThrow('Reservation cannot be modified in its current status.');
+
+    expect(reservationsRepository.updateReservation).not.toHaveBeenCalled();
+  });
+
+  it('confirms draft reservations and leaves already confirmed reservations unchanged', async () => {
+    reservationsRepository.findReservation.mockResolvedValueOnce({
+      ...reservation,
+      status: ReservationStatus.DRAFT,
+    });
+    reservationsRepository.updateReservation.mockResolvedValueOnce(reservation);
+
+    const result = await service.confirm(currentUser, 20);
+
+    expect(reservationsRepository.updateReservation).toHaveBeenCalledWith(20, {
+      status: ReservationStatus.CONFIRMED,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'reservations.confirmed',
+      }),
+    );
