@@ -739,3 +739,126 @@ describe('ReservationsService', () => {
         action: 'reservations.confirmed',
       }),
     );
+    expect(result).toMatchObject({
+      status: ReservationStatus.CONFIRMED,
+    });
+
+    jest.clearAllMocks();
+    reservationsRepository.findReservation.mockResolvedValueOnce(reservation);
+
+    await service.confirm(currentUser, 20);
+
+    expect(reservationsRepository.updateReservation).not.toHaveBeenCalled();
+  });
+
+  it('cancels reservations in a transaction and releases reservation rooms', async () => {
+    reservationsRepository.updateReservation.mockResolvedValue({
+      ...reservation,
+      status: ReservationStatus.CANCELLED,
+      cancellationReason: 'Guest changed plans',
+      cancelledAt: new Date('2026-06-01T00:00:00.000Z'),
+      cancelledByUserId: 1,
+      rooms: reservation.rooms.map((room) => ({
+        ...room,
+        status: ReservationRoomStatus.CANCELLED,
+      })),
+    });
+
+    await service.cancel(currentUser, 20, {
+      cancellationReason: ' Guest changed plans ',
+    });
+
+    expect(reservationsRepository.runInTransaction).toHaveBeenCalled();
+    expect(
+      reservationRoomsRepository.updateRoomsForReservation,
+    ).toHaveBeenCalledWith(
+      20,
+      {
+        status: ReservationRoomStatus.CANCELLED,
+      },
+      {},
+    );
+    expect(reservationsRepository.updateReservation).toHaveBeenCalledWith(
+      20,
+      expect.objectContaining({
+        status: ReservationStatus.CANCELLED,
+        cancellationReason: 'Guest changed plans',
+        cancelledByUserId: 1,
+        cancelledAt: expect.any(Date),
+      }),
+      {},
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'reservations.cancelled',
+      }),
+    );
+  });
+
+  it('rejects cancellation for checked-out reservations', async () => {
+    reservationsRepository.findReservation.mockResolvedValue({
+      ...reservation,
+      status: ReservationStatus.CHECKED_OUT,
+    });
+
+    await expect(
+      service.cancel(currentUser, 20, {
+        cancellationReason: 'Too late to cancel',
+      }),
+    ).rejects.toThrow('Reservation cannot be cancelled in its current status.');
+
+    expect(
+      reservationRoomsRepository.updateRoomsForReservation,
+    ).not.toHaveBeenCalled();
+    expect(reservationsRepository.updateReservation).not.toHaveBeenCalled();
+  });
+
+  it('marks confirmed reservations no-show and releases reservation rooms', async () => {
+    reservationsRepository.updateReservation.mockResolvedValue({
+      ...reservation,
+      status: ReservationStatus.NO_SHOW,
+      noShowAt: new Date('2026-06-01T01:00:00.000Z'),
+      rooms: reservation.rooms.map((room) => ({
+        ...room,
+        status: ReservationRoomStatus.CANCELLED,
+      })),
+    });
+
+    await service.markNoShow(currentUser, 20, {
+      reason: 'Guest did not arrive',
+    });
+
+    expect(
+      reservationRoomsRepository.updateRoomsForReservation,
+    ).toHaveBeenCalledWith(
+      20,
+      {
+        status: ReservationRoomStatus.CANCELLED,
+      },
+      {},
+    );
+    expect(reservationsRepository.updateReservation).toHaveBeenCalledWith(
+      20,
+      expect.objectContaining({
+        status: ReservationStatus.NO_SHOW,
+        noShowAt: expect.any(Date),
+      }),
+      {},
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'reservations.no_show_marked',
+      }),
+    );
+  });
+
+  it('rejects no-show marking for non-confirmed reservations', async () => {
+    reservationsRepository.findReservation.mockResolvedValue({
+      ...reservation,
+      status: ReservationStatus.DRAFT,
+    });
+
+    await expect(
+      service.markNoShow(currentUser, 20, {
+        reason: 'Not ready',
+      }),
