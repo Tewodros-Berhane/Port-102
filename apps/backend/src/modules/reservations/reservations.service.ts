@@ -571,3 +571,116 @@ export class ReservationsService {
     const removedReservationRoom =
       await this.reservationRoomsRepository.removeReservationRoom(
         reservationRoom.id,
+      );
+    const updatedReservation = await this.findRequiredReservation(
+      reservation.id,
+    );
+
+    await this.recordReservationAudit(
+      currentUser,
+      'reservations.room_removed',
+      updatedReservation,
+      {
+        reservationRoomId: removedReservationRoom.id,
+        previous: this.reservationRoomAuditSnapshot(reservationRoom),
+      },
+    );
+
+    return this.serializeReservation(updatedReservation);
+  }
+
+  async searchAvailability(
+    _currentUser: CurrentUserPayload,
+    query: AvailabilitySearchQueryDto,
+  ) {
+    const checkInDate = this.parseDate(query.checkInDate);
+    const checkOutDate = this.parseDate(query.checkOutDate);
+    const adults = query.adults ?? 1;
+    const children = query.children ?? 0;
+    const requestedOccupancy = adults + children;
+
+    this.ensureValidDateRange(checkInDate, checkOutDate);
+
+    const roomTypes =
+      await this.reservationAvailabilityRepository.listRoomTypesForAvailability(
+        {
+          roomTypeId: query.roomTypeId,
+          minOccupancy:
+            query.roomTypeId === undefined ? requestedOccupancy : undefined,
+        },
+      );
+
+    this.ensureAvailabilityRoomTypesFound(roomTypes, query.roomTypeId);
+
+    const summaries = await this.buildAvailabilitySummaries({
+      roomTypes,
+      checkInDate,
+      checkOutDate,
+      requestedOccupancy,
+    });
+
+    return {
+      checkInDate,
+      checkOutDate,
+      nights: this.calculateNights(checkInDate, checkOutDate),
+      adults,
+      children,
+      roomTypeId: query.roomTypeId ?? null,
+      roomTypes: summaries
+        .filter((summary) => summary.availableRooms > 0)
+        .map((summary) => this.serializeAvailabilitySummary(summary)),
+    };
+  }
+
+  async getAvailabilityByRoomType(
+    _currentUser: CurrentUserPayload,
+    query: AvailabilitySearchQueryDto,
+  ) {
+    const checkInDate = this.parseDate(query.checkInDate);
+    const checkOutDate = this.parseDate(query.checkOutDate);
+    const adults = query.adults ?? 1;
+    const children = query.children ?? 0;
+    const requestedOccupancy = adults + children;
+
+    this.ensureValidDateRange(checkInDate, checkOutDate);
+
+    const roomTypes =
+      await this.reservationAvailabilityRepository.listRoomTypesForAvailability(
+        {
+          roomTypeId: query.roomTypeId,
+        },
+      );
+
+    this.ensureAvailabilityRoomTypesFound(roomTypes, query.roomTypeId);
+
+    const summaries = await this.buildAvailabilitySummaries({
+      roomTypes,
+      checkInDate,
+      checkOutDate,
+      requestedOccupancy,
+    });
+
+    return {
+      checkInDate,
+      checkOutDate,
+      nights: this.calculateNights(checkInDate, checkOutDate),
+      adults,
+      children,
+      roomTypeId: query.roomTypeId ?? null,
+      roomTypes: summaries.map((summary) =>
+        this.serializeAvailabilitySummary(summary),
+      ),
+    };
+  }
+
+  async listAvailableRooms(
+    _currentUser: CurrentUserPayload,
+    query: AvailabilitySearchQueryDto,
+  ) {
+    const checkInDate = this.parseDate(query.checkInDate);
+    const checkOutDate = this.parseDate(query.checkOutDate);
+
+    this.ensureValidDateRange(checkInDate, checkOutDate);
+
+    if (query.roomTypeId !== undefined) {
+      await this.ensureActiveRoomType(query.roomTypeId);
