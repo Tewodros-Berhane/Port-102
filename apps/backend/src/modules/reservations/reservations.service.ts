@@ -1021,3 +1021,116 @@ export class ReservationsService {
     if (updateReservationRoomDto.rate !== undefined) {
       data.rate =
         updateReservationRoomDto.rate === null
+          ? null
+          : updateReservationRoomDto.rate.toString();
+    }
+
+    if (updateReservationRoomDto.notes !== undefined) {
+      data.notes = this.normalizeOptionalString(updateReservationRoomDto.notes);
+    }
+
+    return data;
+  }
+
+  private buildReservationRoomCreateData(
+    room: AddReservationRoomDto,
+  ): ReservationRoomCreateData {
+    return {
+      roomType: {
+        connect: {
+          id: room.roomTypeId,
+        },
+      },
+      ...(room.roomId === undefined || room.roomId === null
+        ? {}
+        : {
+            room: {
+              connect: {
+                id: room.roomId,
+              },
+            },
+          }),
+      rate:
+        room.rate === undefined || room.rate === null
+          ? null
+          : room.rate.toString(),
+      notes: this.normalizeOptionalString(room.notes),
+    };
+  }
+
+  private async generateReservationNumber() {
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const sequence = `${Date.now().toString().slice(-6)}${attempt}`.slice(-6);
+      const reservationNumber = `RES-${datePart}-${sequence}`;
+      const existingReservation =
+        await this.reservationsRepository.findByReservationNumber(
+          reservationNumber,
+        );
+
+      if (!existingReservation) {
+        return reservationNumber;
+      }
+    }
+
+    throw new ConflictException(
+      'Could not generate a unique reservation number.',
+    );
+  }
+
+  private recordReservationAudit(
+    currentUser: CurrentUserPayload,
+    action: string,
+    reservation: ReservationRecord,
+    metadata: Prisma.InputJsonValue,
+  ) {
+    return this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action,
+      entityType: 'Reservation',
+      entityId: String(reservation.id),
+      metadata,
+    });
+  }
+
+  private reservationAuditSnapshot(reservation: ReservationRecord) {
+    return {
+      guestId: reservation.guestId,
+      status: reservation.status,
+      source: reservation.source,
+      checkInDate: reservation.checkInDate.toISOString(),
+      checkOutDate: reservation.checkOutDate.toISOString(),
+      adults: reservation.adults,
+      children: reservation.children,
+      specialRequests: reservation.specialRequests,
+      internalNotes: reservation.internalNotes,
+    };
+  }
+
+  private reservationRoomAuditSnapshot(reservationRoom: ReservationRoomRecord) {
+    return {
+      roomTypeId: reservationRoom.roomTypeId,
+      roomId: reservationRoom.roomId,
+      status: reservationRoom.status,
+      rate: this.serializeDecimal(reservationRoom.rate),
+      notes: reservationRoom.notes,
+    };
+  }
+
+  private serializeReservationUpdateAuditData(
+    data: Prisma.ReservationUncheckedUpdateInput,
+  ): Prisma.InputJsonObject {
+    const changes: Record<string, Prisma.InputJsonValue | null> = {};
+
+    if (data.guestId !== undefined) {
+      changes.guestId = data.guestId as number;
+    }
+
+    if (data.status !== undefined) {
+      changes.status = data.status as string;
+    }
+
+    if (data.source !== undefined) {
+      changes.source = data.source as string;
+    }
