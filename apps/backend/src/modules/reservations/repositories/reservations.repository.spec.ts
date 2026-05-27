@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
-import { ReservationSource } from '../../../generated/prisma/client';
+import {
+  ReservationRoomStatus,
+  ReservationSource,
+  ReservationStatus,
+} from '../../../generated/prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ReservationsRepository } from './reservations.repository';
 
@@ -90,10 +94,6 @@ describe('ReservationsRepository', () => {
             connect: {
               id: 12,
             },
-          },
-          rooms: {
-            create: [
-              expect.objectContaining({
                 rate: '140',
               }),
             ],
