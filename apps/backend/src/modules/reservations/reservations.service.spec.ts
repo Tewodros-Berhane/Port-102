@@ -125,6 +125,31 @@ describe('ReservationsService', () => {
       isActive: true,
     },
   };
+  const reservation = {
+    id: 20,
+    reservationNumber: 'RES-20260527-123450',
+    guestId: 12,
+    status: ReservationStatus.CONFIRMED,
+    source: ReservationSource.PHONE,
+    checkInDate: new Date('2026-06-10T00:00:00.000Z'),
+    checkOutDate: new Date('2026-06-12T00:00:00.000Z'),
+    adults: 2,
+    children: 1,
+    specialRequests: 'Quiet room',
+    internalNotes: 'VIP guest',
+    cancellationReason: null,
+    cancelledAt: null,
+    noShowAt: null,
+    createdByUserId: 1,
+    cancelledByUserId: null,
+    createdAt: now,
+    updatedAt: now,
+    guest,
+    createdBy: {
+      id: 1,
+      email: 'admin@demo-hotel.com',
+      fullName: 'Hotel Admin',
+    },
     cancelledBy: null,
     rooms: [
       {
@@ -163,11 +188,27 @@ describe('ReservationsService', () => {
       runInTransaction: jest.fn(async (operation) => operation({})),
       createReservation: jest.fn().mockResolvedValue(reservation),
       findByReservationNumber: jest.fn().mockResolvedValue(null),
+      listReservations: jest.fn().mockResolvedValue([1, [reservation]]),
+      findReservation: jest.fn().mockResolvedValue(reservation),
+      listCalendarReservations: jest.fn().mockResolvedValue([reservation]),
+      updateReservation: jest.fn().mockResolvedValue(reservation),
+    };
+    reservationRoomsRepository = {
+      createReservationRoom: jest.fn().mockResolvedValue(reservation.rooms[0]),
+      findReservationRoom: jest.fn().mockResolvedValue(reservation.rooms[0]),
+      updateReservationRoom: jest.fn().mockResolvedValue(reservation.rooms[0]),
+      updateRoomsForReservation: jest.fn().mockResolvedValue({ count: 1 }),
+      removeReservationRoom: jest.fn().mockResolvedValue(reservation.rooms[0]),
+      countActiveRooms: jest.fn().mockResolvedValue(2),
     };
     reservationAvailabilityRepository = {
       countPhysicalRooms: jest.fn().mockResolvedValue(5),
       countReservedRooms: jest.fn().mockResolvedValue(1),
       countOverlappingRoomReservations: jest.fn().mockResolvedValue(0),
+      listRoomTypesForAvailability: jest
+        .fn()
+        .mockResolvedValue([availabilityRoomType]),
+      listAvailableRooms: jest.fn().mockResolvedValue([room]),
     };
     guestsRepository = {
       findGuestProfile: jest.fn().mockResolvedValue(guest),
@@ -190,6 +231,10 @@ describe('ReservationsService', () => {
           useValue: reservationsRepository,
         },
         {
+          provide: ReservationRoomsRepository,
+          useValue: reservationRoomsRepository,
+        },
+        {
           provide: ReservationAvailabilityRepository,
           useValue: reservationAvailabilityRepository,
         },
@@ -203,51 +248,6 @@ describe('ReservationsService', () => {
         },
         {
           provide: RoomsRepository,
-          useValue: roomsRepository,
-        },
-        {
-          provide: AuditLogsService,
-          useValue: auditLogsService,
-        },
-      ],
-    }).compile();
-
-    service = module.get<ReservationsService>(ReservationsService);
-  });
-
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('creates a reservation in a transaction and records audit metadata', async () => {
-    const result = await service.create(currentUser, {
-      guestId: 12,
-      checkInDate: '2026-06-10',
-      checkOutDate: '2026-06-12',
-      adults: 2,
-      children: 1,
-      source: ReservationSource.PHONE,
-      specialRequests: ' Quiet room ',
-      internalNotes: ' VIP guest ',
-      rooms: [
-        {
-          roomTypeId: 4,
-          roomId: 9,
-          rate: 140,
-          notes: ' Near elevator ',
-        },
-      ],
-    });
-
-    expect(result).toMatchObject({
-      id: 20,
-      reservationNumber: 'RES-20260527-123450',
-      rooms: [
-        {
-          rate: '140',
-          roomType: {
-            baseRate: '125.50',
-          },
         },
       ],
     });
