@@ -1246,3 +1246,115 @@ export class ReservationsService {
         room: room.room,
       })),
     };
+  }
+
+  private serializeAvailabilitySummary(summary: AvailabilitySummary) {
+    return {
+      roomType: {
+        ...summary.roomType,
+        baseRate: this.serializeDecimal(summary.roomType.baseRate),
+      },
+      totalRooms: summary.totalRooms,
+      reservedRooms: summary.reservedRooms,
+      availableRooms: summary.availableRooms,
+      requestedOccupancy: summary.requestedOccupancy,
+      fitsRequestedOccupancy: summary.fitsRequestedOccupancy,
+      isAvailable: summary.availableRooms > 0,
+    };
+  }
+
+  private serializeAvailabilityRoom(room: AvailabilityRoomRecord) {
+    return {
+      id: room.id,
+      roomNumber: room.roomNumber,
+      displayName: room.displayName,
+      floorId: room.floorId,
+      roomTypeId: room.roomTypeId,
+      occupancyStatus: room.occupancyStatus,
+      cleaningStatus: room.cleaningStatus,
+      maintenanceStatus: room.maintenanceStatus,
+      isActive: room.isActive,
+      floor: room.floor,
+      roomType: {
+        ...room.roomType,
+        baseRate: this.serializeDecimal(room.roomType.baseRate),
+      },
+    };
+  }
+
+  private serializeCalendarReservation(reservation: ReservationRecord) {
+    return {
+      id: reservation.id,
+      reservationNumber: reservation.reservationNumber,
+      status: reservation.status,
+      source: reservation.source,
+      checkInDate: reservation.checkInDate,
+      checkOutDate: reservation.checkOutDate,
+      adults: reservation.adults,
+      children: reservation.children,
+      guest: reservation.guest,
+      rooms: reservation.rooms.map((room) => ({
+        id: room.id,
+        roomTypeId: room.roomTypeId,
+        roomId: room.roomId,
+        status: room.status,
+        rate: this.serializeDecimal(room.rate),
+        roomType: {
+          ...room.roomType,
+          baseRate: this.serializeDecimal(room.roomType.baseRate),
+        },
+        room: room.room,
+      })),
+    };
+  }
+
+  private parseDate(value: string) {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException('Invalid reservation date.');
+    }
+
+    return date;
+  }
+
+  private parseOptionalDate(value?: string) {
+    return value === undefined ? undefined : this.parseDate(value);
+  }
+
+  private ensureValidDateRange(checkInDate: Date, checkOutDate: Date) {
+    if (checkOutDate <= checkInDate) {
+      throw new BadRequestException(
+        'Check-out date must be after check-in date.',
+      );
+    }
+  }
+
+  private serializeDecimal(value: Prisma.Decimal | null) {
+    return value?.toString() ?? null;
+  }
+
+  private calculateNights(checkInDate: Date, checkOutDate: Date) {
+    const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
+    return Math.ceil(
+      (checkOutDate.getTime() - checkInDate.getTime()) / millisecondsPerDay,
+    );
+  }
+
+  private normalizeRequiredString(value: string, message: string) {
+    const normalized = value.trim();
+
+    if (!normalized) {
+      throw new BadRequestException(message);
+    }
+
+    return normalized;
+  }
+
+  private normalizeOptionalString(value?: string | null) {
+    const normalized = value?.trim();
+
+    return normalized || null;
+  }
+}
