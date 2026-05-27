@@ -371,6 +371,51 @@ describe('ReservationsService', () => {
 
     expect(guestsRepository.findGuestProfile).not.toHaveBeenCalled();
   });
+
+  it('rejects inactive guests', async () => {
+    guestsRepository.findGuestProfile.mockResolvedValue({
+      ...guest,
+      status: GuestStatus.INACTIVE,
+    });
+
+    await expect(
+      service.create(currentUser, {
+        guestId: 12,
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        rooms: [
+          {
+            roomTypeId: 4,
+          },
+        ],
+      }),
+    ).rejects.toThrow('Cannot create reservation for inactive guest.');
+  });
+
+  it('rejects inactive room types', async () => {
+    roomTypesRepository.findRoomType.mockResolvedValue({
+      ...roomType,
+      isActive: false,
+    });
+
+    await expect(
+      service.create(currentUser, {
+        guestId: 12,
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        rooms: [
+          {
+            roomTypeId: 4,
+          },
+        ],
+      }),
+    ).rejects.toThrow('Cannot reserve an inactive room type.');
+  });
+
+  it('rejects selected room type mismatches', async () => {
+    roomsRepository.findRoom.mockResolvedValue({
+      ...room,
+      roomTypeId: 5,
     });
 
     await expect(
@@ -431,4 +476,21 @@ describe('ReservationsService', () => {
       'Not enough rooms are available for the requested dates.',
     );
   });
-});
+
+  it('lists reservations with pagination and normalized filters', async () => {
+    const result = await service.list(currentUser, {
+      page: 2,
+      limit: 10,
+      search: ' Marta ',
+      status: ReservationStatus.CONFIRMED,
+      source: ReservationSource.PHONE,
+      guestId: 12,
+      checkInFrom: '2026-06-01',
+      checkInTo: '2026-06-30',
+    });
+
+    expect(reservationsRepository.listReservations).toHaveBeenCalledWith({
+      skip: 10,
+      take: 10,
+      search: 'Marta',
+      status: ReservationStatus.CONFIRMED,
