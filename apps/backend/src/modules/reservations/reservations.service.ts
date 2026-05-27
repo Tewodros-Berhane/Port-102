@@ -684,3 +684,115 @@ export class ReservationsService {
 
     if (query.roomTypeId !== undefined) {
       await this.ensureActiveRoomType(query.roomTypeId);
+    }
+
+    const rooms =
+      await this.reservationAvailabilityRepository.listAvailableRooms({
+        roomTypeId: query.roomTypeId,
+        checkInDate,
+        checkOutDate,
+      });
+
+    return {
+      checkInDate,
+      checkOutDate,
+      nights: this.calculateNights(checkInDate, checkOutDate),
+      roomTypeId: query.roomTypeId ?? null,
+      rooms: rooms.map((room) => this.serializeAvailabilityRoom(room)),
+    };
+  }
+
+  async getBookingCalendar(
+    _currentUser: CurrentUserPayload,
+    query: BookingCalendarQueryDto,
+  ) {
+    const startDate = this.parseDate(query.startDate);
+    const endDate = this.parseDate(query.endDate);
+
+    this.ensureValidDateRange(startDate, endDate);
+
+    const reservations =
+      await this.reservationsRepository.listCalendarReservations({
+        startDate,
+        endDate,
+        roomId: query.roomId,
+        roomTypeId: query.roomTypeId,
+        status: query.status,
+      });
+
+    return {
+      startDate,
+      endDate,
+      roomId: query.roomId ?? null,
+      roomTypeId: query.roomTypeId ?? null,
+      status: query.status ?? null,
+      items: reservations.map((reservation) =>
+        this.serializeCalendarReservation(reservation),
+      ),
+    };
+  }
+
+  private async findRequiredReservation(reservationId: number) {
+    const reservation =
+      await this.reservationsRepository.findReservation(reservationId);
+
+    if (!reservation) {
+      throw new NotFoundException('Reservation was not found.');
+    }
+
+    return reservation;
+  }
+
+  private async findRequiredReservationRoom(
+    reservationId: number,
+    reservationRoomId: number,
+  ) {
+    const reservationRoom =
+      await this.reservationRoomsRepository.findReservationRoom(
+        reservationRoomId,
+      );
+
+    if (!reservationRoom || reservationRoom.reservationId !== reservationId) {
+      throw new NotFoundException('Reservation room was not found.');
+    }
+
+    return reservationRoom;
+  }
+
+  private ensureReservationCanBeModified(reservation: ReservationRecord) {
+    const nonModifiableStatuses: ReservationStatus[] = [
+      ReservationStatus.CANCELLED,
+      ReservationStatus.NO_SHOW,
+      ReservationStatus.CHECKED_IN,
+      ReservationStatus.CHECKED_OUT,
+    ];
+
+    if (nonModifiableStatuses.includes(reservation.status)) {
+      throw new ConflictException(
+        'Reservation cannot be modified in its current status.',
+      );
+    }
+  }
+
+  private async ensureActiveGuest(guestId: number) {
+    const guest = await this.guestsRepository.findGuestProfile(guestId);
+
+    if (!guest) {
+      throw new NotFoundException('Guest was not found.');
+    }
+
+    if (guest.status !== GuestStatus.ACTIVE) {
+      throw new BadRequestException(
+        'Cannot create reservation for inactive guest.',
+      );
+    }
+  }
+
+  private async ensureReservationRoomsAreAvailable(
+    rooms: ReservationRoomAvailabilityInput[],
+    checkInDate: Date,
+    checkOutDate: Date,
+    options: ReservationAvailabilityOptions = {},
+  ) {
+    const requestedRoomIds = new Set<number>();
+    const requestedByRoomType = new Map<number, number>();
