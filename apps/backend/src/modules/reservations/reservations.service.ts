@@ -459,3 +459,115 @@ export class ReservationsService {
           addReservationRoomDto.rate === undefined ||
           addReservationRoomDto.rate === null
             ? null
+            : addReservationRoomDto.rate.toString(),
+        notes: this.normalizeOptionalString(addReservationRoomDto.notes),
+      });
+    const updatedReservation = await this.findRequiredReservation(
+      reservation.id,
+    );
+
+    await this.recordReservationAudit(
+      currentUser,
+      'reservations.room_added',
+      updatedReservation,
+      {
+        reservationRoomId: reservationRoom.id,
+        roomTypeId: reservationRoom.roomTypeId,
+        roomId: reservationRoom.roomId,
+      },
+    );
+
+    return this.serializeReservation(updatedReservation);
+  }
+
+  async updateRoom(
+    currentUser: CurrentUserPayload,
+    reservationId: number,
+    reservationRoomId: number,
+    updateReservationRoomDto: UpdateReservationRoomDto,
+  ) {
+    const reservation = await this.findRequiredReservation(reservationId);
+    const reservationRoom = await this.findRequiredReservationRoom(
+      reservation.id,
+      reservationRoomId,
+    );
+
+    this.ensureReservationCanBeModified(reservation);
+
+    if (reservationRoom.status === ReservationRoomStatus.CANCELLED) {
+      throw new ConflictException(
+        'Cancelled reservation rooms cannot be updated.',
+      );
+    }
+
+    const data = this.buildReservationRoomUpdateData(updateReservationRoomDto);
+
+    if (Object.keys(data).length === 0) {
+      return this.serializeReservation(reservation);
+    }
+
+    await this.ensureReservationRoomsAreAvailable(
+      this.activeReservationRoomsToAvailabilityInput(
+        reservation,
+        this.mergeReservationRoomUpdate(
+          reservationRoom,
+          updateReservationRoomDto,
+        ),
+      ),
+      reservation.checkInDate,
+      reservation.checkOutDate,
+      {
+        excludeReservationId: reservation.id,
+      },
+    );
+
+    const updatedReservationRoom =
+      await this.reservationRoomsRepository.updateReservationRoom(
+        reservationRoom.id,
+        data,
+      );
+    const updatedReservation = await this.findRequiredReservation(
+      reservation.id,
+    );
+
+    await this.recordReservationAudit(
+      currentUser,
+      'reservations.room_updated',
+      updatedReservation,
+      {
+        reservationRoomId: updatedReservationRoom.id,
+        previous: this.reservationRoomAuditSnapshot(reservationRoom),
+        changes: this.serializeReservationRoomUpdateAuditData(data),
+      },
+    );
+
+    return this.serializeReservation(updatedReservation);
+  }
+
+  async removeRoom(
+    currentUser: CurrentUserPayload,
+    reservationId: number,
+    reservationRoomId: number,
+  ) {
+    const reservation = await this.findRequiredReservation(reservationId);
+    const reservationRoom = await this.findRequiredReservationRoom(
+      reservation.id,
+      reservationRoomId,
+    );
+
+    this.ensureReservationCanBeModified(reservation);
+
+    if (reservationRoom.status !== ReservationRoomStatus.CANCELLED) {
+      const activeRoomCount =
+        await this.reservationRoomsRepository.countActiveRooms(reservation.id);
+
+      if (activeRoomCount <= 1) {
+        throw new ConflictException(
+          'Cannot remove the last active room from a reservation.',
+        );
+      }
+    }
+
+    const removedReservationRoom =
+      await this.reservationRoomsRepository.removeReservationRoom(
+        reservationRoom.id,
