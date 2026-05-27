@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import {
   GuestStatus,
+  ReservationRoomStatus,
   ReservationSource,
   ReservationStatus,
   RoomCleaningStatus,
@@ -13,6 +14,7 @@ import { GuestsRepository } from '../guests/repositories/guests.repository';
 import { RoomTypesRepository } from '../room-types/repositories/room-types.repository';
 import { RoomsRepository } from '../rooms/repositories/rooms.repository';
 import { ReservationAvailabilityRepository } from './repositories/reservation-availability.repository';
+import { ReservationRoomsRepository } from './repositories/reservation-rooms.repository';
 import { ReservationsRepository } from './repositories/reservations.repository';
 import { ReservationsService } from './reservations.service';
 
@@ -22,11 +24,25 @@ describe('ReservationsService', () => {
     runInTransaction: jest.Mock;
     createReservation: jest.Mock;
     findByReservationNumber: jest.Mock;
+    listReservations: jest.Mock;
+    findReservation: jest.Mock;
+    listCalendarReservations: jest.Mock;
+    updateReservation: jest.Mock;
+  };
+  let reservationRoomsRepository: {
+    createReservationRoom: jest.Mock;
+    findReservationRoom: jest.Mock;
+    updateReservationRoom: jest.Mock;
+    updateRoomsForReservation: jest.Mock;
+    removeReservationRoom: jest.Mock;
+    countActiveRooms: jest.Mock;
   };
   let reservationAvailabilityRepository: {
     countPhysicalRooms: jest.Mock;
     countReservedRooms: jest.Mock;
     countOverlappingRoomReservations: jest.Mock;
+    listRoomTypesForAvailability: jest.Mock;
+    listAvailableRooms: jest.Mock;
   };
   let guestsRepository: {
     findGuestProfile: jest.Mock;
@@ -71,6 +87,15 @@ describe('ReservationsService', () => {
     updatedAt: now,
     amenities: [],
   };
+  const availabilityRoomType = {
+    id: 4,
+    name: 'Deluxe King',
+    code: 'DLX-KING',
+    baseOccupancy: 2,
+    maxOccupancy: 3,
+    baseRate: { toString: () => '125.50' },
+    isActive: true,
+  };
   const room = {
     id: 9,
     roomNumber: '101',
@@ -100,31 +125,6 @@ describe('ReservationsService', () => {
       isActive: true,
     },
   };
-  const reservation = {
-    id: 20,
-    reservationNumber: 'RES-20260527-123450',
-    guestId: 12,
-    status: ReservationStatus.CONFIRMED,
-    source: ReservationSource.PHONE,
-    checkInDate: new Date('2026-06-10T00:00:00.000Z'),
-    checkOutDate: new Date('2026-06-12T00:00:00.000Z'),
-    adults: 2,
-    children: 1,
-    specialRequests: 'Quiet room',
-    internalNotes: 'VIP guest',
-    cancellationReason: null,
-    cancelledAt: null,
-    noShowAt: null,
-    createdByUserId: 1,
-    cancelledByUserId: null,
-    createdAt: now,
-    updatedAt: now,
-    guest,
-    createdBy: {
-      id: 1,
-      email: 'admin@demo-hotel.com',
-      fullName: 'Hotel Admin',
-    },
     cancelledBy: null,
     rooms: [
       {
