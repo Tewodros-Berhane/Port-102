@@ -514,3 +514,260 @@ describe('Reservations read and availability API (e2e)', () => {
           },
         ],
       },
+    });
+    expect(reservationsService.getById).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      20,
+    );
+  });
+
+  it('searches date-based availability without hitting the id route', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/reservations/availability/search')
+      .query({
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        adults: '2',
+        children: '1',
+      })
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        nights: 2,
+        roomTypes: [
+          {
+            availableRooms: 4,
+          },
+        ],
+      },
+    });
+    expect(reservationsService.searchAvailability).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      expect.objectContaining({
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        adults: 2,
+        children: 1,
+      }),
+    );
+    expect(reservationsService.getById).not.toHaveBeenCalled();
+  });
+
+  it('returns room type and room-level availability', async () => {
+    await request(app.getHttpServer())
+      .get('/api/reservations/availability/by-room-type')
+      .query({
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        roomTypeId: '4',
+      })
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    expect(reservationsService.getAvailabilityByRoomType).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      expect.objectContaining({
+        roomTypeId: 4,
+      }),
+    );
+
+    await request(app.getHttpServer())
+      .get('/api/reservations/availability/rooms')
+      .query({
+        checkInDate: '2026-06-10',
+        checkOutDate: '2026-06-12',
+        roomTypeId: '4',
+      })
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    expect(reservationsService.listAvailableRooms).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      expect.objectContaining({
+        roomTypeId: 4,
+      }),
+    );
+  });
+
+  it('returns booking calendar entries', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/reservations/calendar')
+      .query({
+        startDate: '2026-06-01',
+        endDate: '2026-06-30',
+        roomTypeId: '4',
+      })
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        roomTypeId: 4,
+        items: [
+          {
+            id: 20,
+          },
+        ],
+      },
+    });
+    expect(reservationsService.getBookingCalendar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      expect.objectContaining({
+        startDate: '2026-06-01',
+        endDate: '2026-06-30',
+        roomTypeId: 4,
+      }),
+    );
+  });
+
+  it('updates and confirms reservations through lifecycle routes', async () => {
+    const updateResponse = await request(app.getHttpServer())
+      .patch('/api/reservations/20')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        internalNotes: 'Updated note',
+      })
+      .expect(200);
+
+    expect(updateResponse.body).toMatchObject({
+      success: true,
+      data: {
+        id: 20,
+        internalNotes: 'Updated note',
+      },
+    });
+    expect(reservationsService.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      20,
+      {
+        internalNotes: 'Updated note',
+      },
+    );
+
+    await request(app.getHttpServer())
+      .patch('/api/reservations/20/confirm')
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    expect(reservationsService.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      20,
+    );
+  });
+
+  it('cancels and marks no-show reservations through lifecycle routes', async () => {
+    const cancelResponse = await request(app.getHttpServer())
+      .patch('/api/reservations/20/cancel')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        cancellationReason: 'Guest cancelled',
+      })
+      .expect(200);
+
+    expect(cancelResponse.body).toMatchObject({
+      success: true,
+      data: {
+        status: ReservationStatus.CANCELLED,
+      },
+    });
+    expect(reservationsService.cancel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      20,
+      {
+        cancellationReason: 'Guest cancelled',
+      },
+    );
+
+    await request(app.getHttpServer())
+      .patch('/api/reservations/20/no-show')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        reason: 'Guest did not arrive',
+      })
+      .expect(200);
+
+    expect(reservationsService.markNoShow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      20,
+      {
+        reason: 'Guest did not arrive',
+      },
+    );
+  });
+
+  it('adds, updates, and removes reservation rooms through nested routes', async () => {
+    await request(app.getHttpServer())
+      .post('/api/reservations/20/rooms')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        roomTypeId: 4,
+        rate: 150,
+      })
+      .expect(201);
+
+    expect(reservationsService.addRoom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      20,
+      {
+        roomTypeId: 4,
+        rate: 150,
+      },
+    );
+
+    await request(app.getHttpServer())
+      .patch('/api/reservations/20/rooms/30')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        roomId: null,
+      })
+      .expect(200);
+
+    expect(reservationsService.updateRoom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      20,
+      30,
+      {
+        roomId: null,
+      },
+    );
+
+    await request(app.getHttpServer())
+      .delete('/api/reservations/20/rooms/30')
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    expect(reservationsService.removeRoom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      20,
+      30,
+    );
+  });
+});
