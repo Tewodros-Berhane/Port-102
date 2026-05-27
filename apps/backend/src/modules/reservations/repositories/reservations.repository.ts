@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import {
   Prisma,
+  ReservationRoomStatus,
   ReservationSource,
   ReservationStatus,
 } from '../../../generated/prisma/client';
@@ -151,7 +152,6 @@ export class ReservationsRepository {
     checkOutTo,
   }: {
     skip: number;
-    take: number;
     search?: string;
     status?: ReservationStatus;
     source?: ReservationSource;
