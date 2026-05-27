@@ -70,3 +70,65 @@ describe('ReservationsController', () => {
 
     controller = module.get<ReservationsController>(ReservationsController);
   });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+
+  it('delegates reservation creation', () => {
+    const dto = {
+      guestId: 12,
+      checkInDate: '2026-06-10',
+      checkOutDate: '2026-06-12',
+      rooms: [
+        {
+          roomTypeId: 4,
+        },
+      ],
+    };
+
+    controller.create(currentUser, dto);
+
+    expect(reservationsService.create).toHaveBeenCalledWith(currentUser, dto);
+  });
+
+  it('delegates reservation listing', () => {
+    const query = {
+      page: 2,
+      limit: 10,
+      search: 'marta',
+    };
+
+    controller.list(currentUser, query);
+
+    expect(reservationsService.list).toHaveBeenCalledWith(currentUser, query);
+  });
+
+  it('delegates reservation detail lookup', () => {
+    controller.getById(currentUser, 20);
+
+    expect(reservationsService.getById).toHaveBeenCalledWith(currentUser, 20);
+  });
+
+  it('delegates availability search', () => {
+    const query = {
+      checkInDate: '2026-06-10',
+      checkOutDate: '2026-06-12',
+    };
+
+    controller.searchAvailability(currentUser, query);
+
+    expect(reservationsService.searchAvailability).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+
+  it('delegates availability by room type lookup', () => {
+    const query = {
+      checkInDate: '2026-06-10',
+      checkOutDate: '2026-06-12',
+      roomTypeId: 4,
+    };
+
+    controller.getAvailabilityByRoomType(currentUser, query);
