@@ -37,15 +37,53 @@ const availabilityRoomSelect = {
   },
 } as const;
 
+const availabilityRoomTypeSelect = {
+  id: true,
+  name: true,
+  code: true,
+  baseOccupancy: true,
+  maxOccupancy: true,
+  baseRate: true,
+  isActive: true,
+} as const;
+
 export type AvailabilityRoomRecord = Prisma.RoomGetPayload<{
   select: typeof availabilityRoomSelect;
+}>;
+
+export type AvailabilityRoomTypeRecord = Prisma.RoomTypeGetPayload<{
+  select: typeof availabilityRoomTypeSelect;
 }>;
 
 @Injectable()
 export class ReservationAvailabilityRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  countPhysicalRooms(roomTypeId: number) {
+  listRoomTypesForAvailability({
+    roomTypeId,
+    minOccupancy,
+  }: {
+    roomTypeId?: number;
+    minOccupancy?: number;
+  }) {
+    return this.prisma.roomType.findMany({
+      where: {
+        isActive: true,
+        ...(roomTypeId === undefined ? {} : { id: roomTypeId }),
+        ...(minOccupancy === undefined
+          ? {}
+          : {
+              maxOccupancy: {
+                gte: minOccupancy,
+              },
+            }),
+      },
+      select: availabilityRoomTypeSelect,
+      orderBy: [{ name: 'asc' }, { code: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  countPhysicalRooms(roomTypeId?: number) {
     return this.prisma.room.count({
       where: this.physicalAvailabilityWhere(roomTypeId),
     });
@@ -94,44 +132,6 @@ export class ReservationAvailabilityRepository {
         checkInDate,
         checkOutDate,
         excludeReservationId,
-        excludeReservationRoomId,
-      }),
-    });
-  }
-
-  listAvailableRooms({
-    roomTypeId,
-    checkInDate,
-    checkOutDate,
-    excludeReservationId,
-    excludeReservationRoomId,
-  }: {
-    roomTypeId: number;
-    checkInDate: Date;
-    checkOutDate: Date;
-    excludeReservationId?: number;
-    excludeReservationRoomId?: number;
-  }) {
-    return this.prisma.room.findMany({
-      where: {
-        ...this.physicalAvailabilityWhere(roomTypeId),
-        reservationRooms: {
-          none: this.overlappingReservationRoomWhere({
-            checkInDate,
-            checkOutDate,
-            excludeReservationId,
-            excludeReservationRoomId,
-          }),
-        },
-      },
-      select: availabilityRoomSelect,
-      orderBy: [{ roomNumber: 'asc' }, { id: 'asc' }],
-    });
-  }
-
-  private physicalAvailabilityWhere(roomTypeId: number): Prisma.RoomWhereInput {
-    return {
-      roomTypeId,
       isActive: true,
       maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
     };
