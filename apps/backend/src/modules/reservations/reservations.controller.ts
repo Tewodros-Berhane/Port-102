@@ -266,3 +266,57 @@ export class ReservationsController {
       addReservationRoomDto,
     );
   }
+
+  @Patch(':id/rooms/:reservationRoomId')
+  @Permissions('reservations.update')
+  @ApiOperation({ summary: 'Update a room on a reservation' })
+  @ApiOkResponse({ description: 'Reservation room updated successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid reservation room payload.' })
+  @ApiConflictResponse({
+    description: 'Requested room is not available for this reservation.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description:
+      'Reservation, reservation room, room type, or room was not found.',
+  })
+  updateRoom(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) reservationId: number,
+    @Param('reservationRoomId', ParseIntPipe) reservationRoomId: number,
+    @Body() updateReservationRoomDto: UpdateReservationRoomDto,
+  ) {
+    return this.reservationsService.updateRoom(
+      currentUser,
+      reservationId,
+      reservationRoomId,
+      updateReservationRoomDto,
+    );
+  }
+
+  @Delete(':id/rooms/:reservationRoomId')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('reservations.update')
+  @ApiOperation({ summary: 'Remove a room from a reservation' })
+  @ApiOkResponse({ description: 'Reservation room removed successfully.' })
+  @ApiConflictResponse({
+    description: 'Cannot remove the last active room from a reservation.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Reservation or reservation room was not found.',
+  })
+  removeRoom(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) reservationId: number,
+    @Param('reservationRoomId', ParseIntPipe) reservationRoomId: number,
+  ) {
+    return this.reservationsService.removeRoom(
+      currentUser,
+      reservationId,
+      reservationRoomId,
+    );
+  }
+}
