@@ -132,3 +132,65 @@ describe('ReservationsController', () => {
     };
 
     controller.getAvailabilityByRoomType(currentUser, query);
+
+    expect(reservationsService.getAvailabilityByRoomType).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+
+  it('delegates available room lookup', () => {
+    const query = {
+      checkInDate: '2026-06-10',
+      checkOutDate: '2026-06-12',
+      roomTypeId: 4,
+    };
+
+    controller.listAvailableRooms(currentUser, query);
+
+    expect(reservationsService.listAvailableRooms).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+
+  it('delegates booking calendar lookup', () => {
+    const query = {
+      startDate: '2026-06-01',
+      endDate: '2026-06-30',
+    };
+
+    controller.getBookingCalendar(currentUser, query);
+
+    expect(reservationsService.getBookingCalendar).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+
+  it('delegates reservation updates', () => {
+    const dto = {
+      internalNotes: 'Updated',
+    };
+
+    controller.update(currentUser, 20, dto);
+
+    expect(reservationsService.update).toHaveBeenCalledWith(
+      currentUser,
+      20,
+      dto,
+    );
+  });
+
+  it('delegates reservation confirmation', () => {
+    controller.confirm(currentUser, 20);
+
+    expect(reservationsService.confirm).toHaveBeenCalledWith(currentUser, 20);
+  });
+
+  it('delegates reservation cancellation', () => {
+    const dto = {
+      cancellationReason: 'Guest cancelled.',
+    };
+
+    controller.cancel(currentUser, 20, dto);
