@@ -213,3 +213,56 @@ export class ReservationsController {
     @Param('id', ParseIntPipe) reservationId: number,
     @Body() cancelReservationDto: CancelReservationDto,
   ) {
+    return this.reservationsService.cancel(
+      currentUser,
+      reservationId,
+      cancelReservationDto,
+    );
+  }
+
+  @Patch(':id/no-show')
+  @Permissions('reservations.no_show.mark')
+  @ApiOperation({ summary: 'Mark a reservation as no-show' })
+  @ApiOkResponse({ description: 'Reservation marked no-show successfully.' })
+  @ApiConflictResponse({
+    description: 'Reservation cannot be marked no-show in its current status.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Reservation was not found.' })
+  markNoShow(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) reservationId: number,
+    @Body() markNoShowDto: MarkNoShowDto,
+  ) {
+    return this.reservationsService.markNoShow(
+      currentUser,
+      reservationId,
+      markNoShowDto,
+    );
+  }
+
+  @Post(':id/rooms')
+  @Permissions('reservations.update')
+  @ApiOperation({ summary: 'Add a room to a reservation' })
+  @ApiCreatedResponse({ description: 'Reservation room added successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid reservation room payload.' })
+  @ApiConflictResponse({
+    description: 'Requested room is not available for this reservation.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Reservation, room type, or room was not found.',
+  })
+  addRoom(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) reservationId: number,
+    @Body() addReservationRoomDto: AddReservationRoomDto,
+  ) {
+    return this.reservationsService.addRoom(
+      currentUser,
+      reservationId,
+      addReservationRoomDto,
+    );
+  }
