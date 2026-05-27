@@ -8,7 +8,9 @@ import {
 import {
   GuestStatus,
   Prisma,
+  ReservationRoomStatus,
   ReservationSource,
+  ReservationStatus,
   RoomMaintenanceStatus,
 } from '../../generated/prisma/client';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
@@ -17,8 +19,23 @@ import { GuestsRepository } from '../guests/repositories/guests.repository';
 import { RoomTypesRepository } from '../room-types/repositories/room-types.repository';
 import { RoomsRepository } from '../rooms/repositories/rooms.repository';
 import { AddReservationRoomDto } from './dto/add-reservation-room.dto';
+import { AvailabilitySearchQueryDto } from './dto/availability-search-query.dto';
+import { BookingCalendarQueryDto } from './dto/booking-calendar-query.dto';
+import { CancelReservationDto } from './dto/cancel-reservation.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { GetReservationsQueryDto } from './dto/get-reservations-query.dto';
+import { MarkNoShowDto } from './dto/mark-no-show.dto';
+import { UpdateReservationRoomDto } from './dto/update-reservation-room.dto';
+import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ReservationAvailabilityRepository } from './repositories/reservation-availability.repository';
+import type {
+  AvailabilityRoomRecord,
+  AvailabilityRoomTypeRecord,
+} from './repositories/reservation-availability.repository';
+import {
+  ReservationRoomRecord,
+  ReservationRoomsRepository,
+} from './repositories/reservation-rooms.repository';
 import {
   ReservationRecord,
   ReservationsRepository,
@@ -44,10 +61,29 @@ type RoomTypeDemand = {
   requestedCount: number;
 };
 
+type ReservationAvailabilityOptions = {
+  excludeReservationId?: number;
+};
+
+type ReservationRoomAvailabilityInput = {
+  roomTypeId: number;
+  roomId?: number | null;
+};
+
+type AvailabilitySummary = {
+  roomType: AvailabilityRoomTypeRecord;
+  totalRooms: number;
+  reservedRooms: number;
+  availableRooms: number;
+  requestedOccupancy: number;
+  fitsRequestedOccupancy: boolean;
+};
+
 @Injectable()
 export class ReservationsService {
   constructor(
     private readonly reservationsRepository: ReservationsRepository,
+    private readonly reservationRoomsRepository: ReservationRoomsRepository,
     private readonly reservationAvailabilityRepository: ReservationAvailabilityRepository,
     private readonly guestsRepository: GuestsRepository,
     private readonly roomTypesRepository: RoomTypesRepository,
@@ -85,42 +121,6 @@ export class ReservationsService {
             checkInDate,
             checkOutDate,
             adults: createReservationDto.adults ?? 1,
-            children: createReservationDto.children ?? 0,
-            specialRequests: this.normalizeOptionalString(
-              createReservationDto.specialRequests,
-            ),
-            internalNotes: this.normalizeOptionalString(
-              createReservationDto.internalNotes,
-            ),
-            createdBy: {
-              connect: {
-                id: currentUser.sub,
-              },
-            },
-            rooms: {
-              create: createReservationDto.rooms.map((room) =>
-                this.buildReservationRoomCreateData(room),
-              ),
-            },
-          },
-          client,
-        ),
-    );
-
-    await this.auditLogsService.record({
-      actorUserId: currentUser.sub,
-      action: 'reservations.created',
-      entityType: 'Reservation',
-      entityId: String(reservation.id),
-      metadata: {
-        reservationNumber: reservation.reservationNumber,
-        guestId: reservation.guestId,
-        checkInDate: reservation.checkInDate.toISOString(),
-        checkOutDate: reservation.checkOutDate.toISOString(),
-        roomCount: reservation.rooms.length,
-      },
-    });
-
     return this.serializeReservation(reservation);
   }
 
