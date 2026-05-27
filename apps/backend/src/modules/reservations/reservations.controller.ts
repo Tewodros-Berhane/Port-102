@@ -160,3 +160,56 @@ export class ReservationsController {
   @ApiOperation({ summary: 'Update one reservation' })
   @ApiOkResponse({ description: 'Reservation updated successfully.' })
   @ApiBadRequestResponse({ description: 'Invalid reservation payload.' })
+  @ApiConflictResponse({
+    description: 'Reservation cannot be updated in its current status.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Reservation, guest, room type, or room was not found.',
+  })
+  update(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) reservationId: number,
+    @Body() updateReservationDto: UpdateReservationDto,
+  ) {
+    return this.reservationsService.update(
+      currentUser,
+      reservationId,
+      updateReservationDto,
+    );
+  }
+
+  @Patch(':id/confirm')
+  @Permissions('reservations.confirm')
+  @ApiOperation({ summary: 'Confirm a draft reservation' })
+  @ApiOkResponse({ description: 'Reservation confirmed successfully.' })
+  @ApiConflictResponse({
+    description: 'Reservation cannot be confirmed in its current status.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Reservation was not found.' })
+  confirm(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) reservationId: number,
+  ) {
+    return this.reservationsService.confirm(currentUser, reservationId);
+  }
+
+  @Patch(':id/cancel')
+  @Permissions('reservations.cancel')
+  @ApiOperation({ summary: 'Cancel a reservation' })
+  @ApiOkResponse({ description: 'Reservation cancelled successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid cancellation payload.' })
+  @ApiConflictResponse({
+    description: 'Reservation cannot be cancelled in its current status.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Reservation was not found.' })
+  cancel(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) reservationId: number,
+    @Body() cancelReservationDto: CancelReservationDto,
+  ) {
