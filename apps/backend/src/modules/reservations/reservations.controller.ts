@@ -52,3 +52,57 @@ export class ReservationsController {
   @Permissions('reservations.create')
   @ApiOperation({ summary: 'Create a reservation' })
   @ApiCreatedResponse({ description: 'Reservation created successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid reservation payload.' })
+  @ApiConflictResponse({ description: 'Requested room is not available.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Guest, room type, or room was not found.',
+  })
+  create(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Body() createReservationDto: CreateReservationDto,
+  ) {
+    return this.reservationsService.create(currentUser, createReservationDto);
+  }
+
+  @Get('availability/search')
+  @Permissions('availability.read')
+  @ApiOperation({ summary: 'Search date-based availability' })
+  @ApiOkResponse({ description: 'Available room types returned.' })
+  @ApiBadRequestResponse({ description: 'Invalid availability date range.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room type was not found.' })
+  searchAvailability(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: AvailabilitySearchQueryDto,
+  ) {
+    return this.reservationsService.searchAvailability(currentUser, query);
+  }
+
+  @Get('availability/by-room-type')
+  @Permissions('availability.read')
+  @ApiOperation({ summary: 'Get date-based availability by room type' })
+  @ApiOkResponse({ description: 'Room type availability returned.' })
+  @ApiBadRequestResponse({ description: 'Invalid availability date range.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room type was not found.' })
+  getAvailabilityByRoomType(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: AvailabilitySearchQueryDto,
+  ) {
+    return this.reservationsService.getAvailabilityByRoomType(
+      currentUser,
+      query,
+    );
+  }
+
+  @Get('availability/rooms')
+  @Permissions('availability.read')
+  @ApiOperation({ summary: 'List available rooms for a date range' })
+  @ApiOkResponse({ description: 'Available rooms returned.' })
+  @ApiBadRequestResponse({ description: 'Invalid availability date range.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
