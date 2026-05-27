@@ -194,3 +194,65 @@ describe('ReservationsController', () => {
     };
 
     controller.cancel(currentUser, 20, dto);
+
+    expect(reservationsService.cancel).toHaveBeenCalledWith(
+      currentUser,
+      20,
+      dto,
+    );
+  });
+
+  it('delegates no-show marking', () => {
+    const dto = {
+      reason: 'Guest did not arrive.',
+    };
+
+    controller.markNoShow(currentUser, 20, dto);
+
+    expect(reservationsService.markNoShow).toHaveBeenCalledWith(
+      currentUser,
+      20,
+      dto,
+    );
+  });
+
+  it('delegates reservation room additions', () => {
+    const dto = {
+      roomTypeId: 4,
+      roomId: 9,
+    };
+
+    controller.addRoom(currentUser, 20, dto);
+
+    expect(reservationsService.addRoom).toHaveBeenCalledWith(
+      currentUser,
+      20,
+      dto,
+    );
+  });
+
+  it('delegates reservation room updates', () => {
+    const dto = {
+      roomId: null,
+    };
+
+    controller.updateRoom(currentUser, 20, 30, dto);
+
+    expect(reservationsService.updateRoom).toHaveBeenCalledWith(
+      currentUser,
+      20,
+      30,
+      dto,
+    );
+  });
+
+  it('delegates reservation room removal', () => {
+    controller.removeRoom(currentUser, 20, 30);
+
+    expect(reservationsService.removeRoom).toHaveBeenCalledWith(
+      currentUser,
+      20,
+      30,
+    );
+  });
+});
