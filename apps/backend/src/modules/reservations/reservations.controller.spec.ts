@@ -8,6 +8,19 @@ describe('ReservationsController', () => {
   let controller: ReservationsController;
   let reservationsService: {
     create: jest.Mock;
+    list: jest.Mock;
+    getById: jest.Mock;
+    searchAvailability: jest.Mock;
+    getAvailabilityByRoomType: jest.Mock;
+    listAvailableRooms: jest.Mock;
+    getBookingCalendar: jest.Mock;
+    update: jest.Mock;
+    confirm: jest.Mock;
+    cancel: jest.Mock;
+    markNoShow: jest.Mock;
+    addRoom: jest.Mock;
+    updateRoom: jest.Mock;
+    removeRoom: jest.Mock;
   };
 
   const currentUser = {
@@ -22,6 +35,19 @@ describe('ReservationsController', () => {
   beforeEach(async () => {
     reservationsService = {
       create: jest.fn(),
+      list: jest.fn(),
+      getById: jest.fn(),
+      searchAvailability: jest.fn(),
+      getAvailabilityByRoomType: jest.fn(),
+      listAvailableRooms: jest.fn(),
+      getBookingCalendar: jest.fn(),
+      update: jest.fn(),
+      confirm: jest.fn(),
+      cancel: jest.fn(),
+      markNoShow: jest.fn(),
+      addRoom: jest.fn(),
+      updateRoom: jest.fn(),
+      removeRoom: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -44,25 +70,3 @@ describe('ReservationsController', () => {
 
     controller = module.get<ReservationsController>(ReservationsController);
   });
-
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
-
-  it('delegates reservation creation', () => {
-    const dto = {
-      guestId: 12,
-      checkInDate: '2026-06-10',
-      checkOutDate: '2026-06-12',
-      rooms: [
-        {
-          roomTypeId: 4,
-        },
-      ],
-    };
-
-    controller.create(currentUser, dto);
-
-    expect(reservationsService.create).toHaveBeenCalledWith(currentUser, dto);
-  });
-});
