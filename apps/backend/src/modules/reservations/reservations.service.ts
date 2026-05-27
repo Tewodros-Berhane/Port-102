@@ -121,118 +121,118 @@ export class ReservationsService {
             checkInDate,
             checkOutDate,
             adults: createReservationDto.adults ?? 1,
+            children: createReservationDto.children ?? 0,
+            specialRequests: this.normalizeOptionalString(
+              createReservationDto.specialRequests,
+            ),
+            internalNotes: this.normalizeOptionalString(
+              createReservationDto.internalNotes,
+            ),
+            createdBy: {
+              connect: {
+                id: currentUser.sub,
+              },
+            },
+            rooms: {
+              create: createReservationDto.rooms.map((room) =>
+                this.buildReservationRoomCreateData(room),
+              ),
+            },
+          },
+          client,
+        ),
+    );
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'reservations.created',
+      entityType: 'Reservation',
+      entityId: String(reservation.id),
+      metadata: {
+        reservationNumber: reservation.reservationNumber,
+        guestId: reservation.guestId,
+        checkInDate: reservation.checkInDate.toISOString(),
+        checkOutDate: reservation.checkOutDate.toISOString(),
+        roomCount: reservation.rooms.length,
+      },
+    });
+
     return this.serializeReservation(reservation);
   }
 
-  private async ensureActiveGuest(guestId: number) {
-    const guest = await this.guestsRepository.findGuestProfile(guestId);
+  async list(_currentUser: CurrentUserPayload, query: GetReservationsQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const search = this.normalizeOptionalString(query.search);
+    const [total, reservations] =
+      await this.reservationsRepository.listReservations({
+        skip: (page - 1) * limit,
+        take: limit,
+        search: search ?? undefined,
+        status: query.status,
+        source: query.source,
+        guestId: query.guestId,
+        checkInFrom: this.parseOptionalDate(query.checkInFrom),
+        checkInTo: this.parseOptionalDate(query.checkInTo),
+        checkOutFrom: this.parseOptionalDate(query.checkOutFrom),
+        checkOutTo: this.parseOptionalDate(query.checkOutTo),
+      });
 
-    if (!guest) {
-      throw new NotFoundException('Guest was not found.');
-    }
-
-    if (guest.status !== GuestStatus.ACTIVE) {
-      throw new BadRequestException(
-        'Cannot create reservation for inactive guest.',
-      );
-    }
-  }
-
-  private async ensureReservationRoomsAreAvailable(
-    rooms: AddReservationRoomDto[],
-    checkInDate: Date,
-    checkOutDate: Date,
-  ) {
-    const requestedRoomIds = new Set<number>();
-    const requestedByRoomType = new Map<number, number>();
-
-    for (const room of rooms) {
-      await this.ensureActiveRoomType(room.roomTypeId);
-
-      requestedByRoomType.set(
-        room.roomTypeId,
-        (requestedByRoomType.get(room.roomTypeId) ?? 0) + 1,
-      );
-
-      if (room.roomId !== undefined && room.roomId !== null) {
-        if (requestedRoomIds.has(room.roomId)) {
-          throw new ConflictException(
-            'The same room cannot be assigned more than once.',
-          );
-        }
-
-        requestedRoomIds.add(room.roomId);
-        await this.ensureSpecificRoomIsAvailable(
-          room,
-          checkInDate,
-          checkOutDate,
-        );
-      }
-    }
-
-    await this.ensureRoomTypeCapacity(
-      [...requestedByRoomType.entries()].map(
-        ([roomTypeId, requestedCount]) => ({
-          roomTypeId,
-          requestedCount,
-        }),
+    return {
+      items: reservations.map((reservation) =>
+        this.serializeReservation(reservation),
       ),
-      checkInDate,
-      checkOutDate,
-    );
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
-  private async ensureActiveRoomType(roomTypeId: number) {
-    const roomType = await this.roomTypesRepository.findRoomType(roomTypeId);
+  async getById(_currentUser: CurrentUserPayload, reservationId: number) {
+    const reservation = await this.findRequiredReservation(reservationId);
 
-    if (!roomType) {
-      throw new NotFoundException('Room type was not found.');
-    }
-
-    if (!roomType.isActive) {
-      throw new BadRequestException('Cannot reserve an inactive room type.');
-    }
+    return this.serializeReservation(reservation);
   }
 
-  private async ensureSpecificRoomIsAvailable(
-    requestedRoom: AddReservationRoomDto,
-    checkInDate: Date,
-    checkOutDate: Date,
+  async update(
+    currentUser: CurrentUserPayload,
+    reservationId: number,
+    updateReservationDto: UpdateReservationDto,
   ) {
-    const room = await this.roomsRepository.findRoom(
-      Number(requestedRoom.roomId),
-    );
+    const reservation = await this.findRequiredReservation(reservationId);
 
-    if (!room) {
-      throw new NotFoundException('Room was not found.');
+    this.ensureReservationCanBeModified(reservation);
+
+    const checkInDate =
+      updateReservationDto.checkInDate === undefined
+        ? reservation.checkInDate
+        : this.parseDate(updateReservationDto.checkInDate);
+    const checkOutDate =
+      updateReservationDto.checkOutDate === undefined
+        ? reservation.checkOutDate
+        : this.parseDate(updateReservationDto.checkOutDate);
+    const datesChanged =
+      checkInDate.getTime() !== reservation.checkInDate.getTime() ||
+      checkOutDate.getTime() !== reservation.checkOutDate.getTime();
+    const data: Prisma.ReservationUncheckedUpdateInput = {};
+
+    if (updateReservationDto.guestId !== undefined) {
+      await this.ensureActiveGuest(updateReservationDto.guestId);
+      data.guestId = updateReservationDto.guestId;
     }
 
-    if (!room.isActive) {
-      throw new BadRequestException('Cannot reserve an inactive room.');
-    }
-
-    if (room.roomTypeId !== requestedRoom.roomTypeId) {
-      throw new BadRequestException(
-        'Selected room does not belong to the requested room type.',
-      );
-    }
-
-    if (room.maintenanceStatus !== RoomMaintenanceStatus.AVAILABLE) {
-      throw new ConflictException('Selected room is not available for sale.');
-    }
-
-    const overlappingReservations =
-      await this.reservationAvailabilityRepository.countOverlappingRoomReservations(
+    if (datesChanged) {
+      this.ensureValidDateRange(checkInDate, checkOutDate);
+      await this.ensureReservationRoomsAreAvailable(
+        this.activeReservationRoomsToAvailabilityInput(reservation),
+        checkInDate,
+        checkOutDate,
         {
-          roomId: room.id,
-          checkInDate,
-          checkOutDate,
+          excludeReservationId: reservation.id,
         },
-      );
-
-    if (overlappingReservations > 0) {
-      throw new ConflictException(
-        'Selected room is already reserved for the requested dates.',
       );
     }
   }
