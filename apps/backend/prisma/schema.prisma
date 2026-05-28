@@ -109,6 +109,15 @@ enum ReservationRoomStatus {
   CHECKED_OUT
 }
 
+enum StayStatus {
+  ACTIVE
+  CHECKED_OUT
+}
+enum StayRoomAssignmentStatus {
+  ACTIVE
+  RELEASED
+}
+
 model User {
   id                        Int               @id @default(autoincrement())
   email                     String            @unique
