@@ -45,6 +45,7 @@ import { StaysModule } from './modules/stays/stays.module';
     RoomTypesModule,
     RoomsModule,
     ReservationsModule,
+    StaysModule,
   ],
 })
 export class AppModule {}
