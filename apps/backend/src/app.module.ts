@@ -17,6 +17,7 @@ import { RoomsModule } from './modules/rooms/rooms.module';
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
+import { StaysModule } from './modules/stays/stays.module';
 
 @Module({
   imports: [
