@@ -72,6 +72,12 @@ export type RoomStatusLogRecord = Prisma.RoomStatusLogGetPayload<{
   select: typeof roomStatusLogSelect;
 }>;
 
+type RoomClient = Pick<PrismaService | Prisma.TransactionClient, 'room'>;
+type RoomStatusLogClient = Pick<
+  PrismaService | Prisma.TransactionClient,
+  'roomStatusLog'
+>;
+
 @Injectable()
 export class RoomsRepository {
   constructor(private readonly prisma: PrismaService) {}
