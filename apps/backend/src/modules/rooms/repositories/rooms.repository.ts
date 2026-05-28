@@ -215,8 +215,9 @@ export class RoomsRepository {
       notes?: string | null;
       isActive?: boolean;
     },
+    client: RoomClient = this.prisma,
   ) {
-    return this.prisma.room.update({
+    return client.room.update({
       where: {
         id: roomId,
       },
@@ -234,8 +235,9 @@ export class RoomsRepository {
       newValue?: string | null;
       reason?: string | null;
     }[],
+    client: RoomStatusLogClient = this.prisma,
   ) {
-    return this.prisma.roomStatusLog.createMany({
+    return client.roomStatusLog.createMany({
       data: data.map((log) => ({
         roomId: log.roomId,
         actorUserId: log.actorUserId ?? null,
