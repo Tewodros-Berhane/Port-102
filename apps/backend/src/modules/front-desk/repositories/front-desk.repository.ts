@@ -394,3 +394,47 @@ export class FrontDeskRepository {
               guest: {
                 phone: {
                   contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              rooms: {
+                some: {
+                  room: {
+                    roomNumber: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        }
+      : {};
+  }
+
+  private staySearchWhere(search?: string): Prisma.StayWhereInput {
+    return search
+      ? {
+          OR: [
+            {
+              stayNumber: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+            {
+              reservation: {
+                reservationNumber: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              guest: {
+                firstName: {
+                  contains: search,
+                  mode: 'insensitive',
