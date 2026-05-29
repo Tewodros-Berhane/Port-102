@@ -306,3 +306,47 @@ export class FrontDeskRepository {
     startDate: Date;
     endDate: Date;
     search?: string;
+  }) {
+    const where: Prisma.StayWhereInput = {
+      status: StayStatus.ACTIVE,
+      expectedCheckOutDate: {
+        gte: startDate,
+        lt: endDate,
+      },
+      ...this.staySearchWhere(search),
+    };
+
+    return Promise.all([
+      this.prisma.stay.count({ where }),
+      this.prisma.stay.findMany({
+        where,
+        skip,
+        take,
+        select: frontDeskStaySelect,
+        orderBy: [{ expectedCheckOutDate: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
+  }
+
+  listInHouse({
+    skip,
+    take,
+    search,
+  }: {
+    skip: number;
+    take: number;
+    search?: string;
+  }) {
+    const where: Prisma.StayWhereInput = {
+      status: StayStatus.ACTIVE,
+      ...this.staySearchWhere(search),
+    };
+
+    return Promise.all([
+      this.prisma.stay.count({ where }),
+      this.prisma.stay.findMany({
+        where,
+        skip,
+        take,
+        select: frontDeskStaySelect,
+        orderBy: [{ checkedInAt: 'asc' }, { id: 'asc' }],
