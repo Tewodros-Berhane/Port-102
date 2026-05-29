@@ -123,6 +123,24 @@ describe('StaysService', () => {
       isActive: true,
     },
   };
+  const occupiedRoom = {
+    ...room,
+    occupancyStatus: RoomOccupancyStatus.OCCUPIED,
+    cleaningStatus: RoomCleaningStatus.CLEAN,
+  };
+  const destinationRoom = {
+    ...room,
+    id: 10,
+    roomNumber: '102',
+    occupancyStatus: RoomOccupancyStatus.VACANT,
+    cleaningStatus: RoomCleaningStatus.INSPECTED,
+  };
+  const secondReservationRoom = {
+    ...reservation.rooms[0],
+    id: 31,
+    roomId: null,
+    status: ReservationRoomStatus.RESERVED,
+  };
   const checkedInStay = {
     id: 40,
     stayNumber: 'STAY-20260610-123450',
@@ -166,7 +184,7 @@ describe('StaysService', () => {
         assignedByUserId: 1,
         releasedByUserId: null,
         reason: 'Guest arrived.',
-        room,
+        room: occupiedRoom,
         reservationRoom: {
           id: 30,
           reservationId: 20,
@@ -177,6 +195,47 @@ describe('StaysService', () => {
       },
     ],
   };
+  const checkedOutAt = new Date('2026-06-12T08:00:00.000Z');
+  const checkedOutStay = {
+    ...checkedInStay,
+    status: StayStatus.CHECKED_OUT,
+    checkedOutAt,
+    checkedOutByUserId: 1,
+    reservation: {
+      ...checkedInStay.reservation,
+      status: ReservationStatus.CHECKED_OUT,
+    },
+    checkedOutBy: {
+      id: 1,
+      email: 'admin@demo-hotel.com',
+      fullName: 'Admin User',
+    },
+    roomAssignments: [
+      {
+        ...checkedInStay.roomAssignments[0],
+        status: StayRoomAssignmentStatus.RELEASED,
+        releasedAt: checkedOutAt,
+        releasedByUserId: 1,
+        room: {
+          ...occupiedRoom,
+          occupancyStatus: RoomOccupancyStatus.VACANT,
+          cleaningStatus: RoomCleaningStatus.DIRTY,
+        },
+        reservationRoom: {
+          ...checkedInStay.roomAssignments[0].reservationRoom,
+          status: ReservationRoomStatus.CHECKED_OUT,
+        },
+      },
+    ],
+  };
+  const extendedStay = {
+    ...checkedInStay,
+    expectedCheckOutDate: new Date('2026-06-15T00:00:00.000Z'),
+    reservation: {
+      ...checkedInStay.reservation,
+      checkOutDate: new Date('2026-06-15T00:00:00.000Z'),
+    },
+  };
 
   let service: StaysService;
   let staysRepository: {
@@ -186,15 +245,20 @@ describe('StaysService', () => {
     listStays: jest.Mock;
     runInTransaction: jest.Mock;
     createStay: jest.Mock;
+    updateStay: jest.Mock;
   };
   let stayRoomAssignmentsRepository: {
     createAssignment: jest.Mock;
+    findAssignment: jest.Mock;
+    listActiveAssignmentsForStay: jest.Mock;
+    updateAssignment: jest.Mock;
   };
   let reservationsRepository: {
     findReservation: jest.Mock;
     updateReservation: jest.Mock;
   };
   let reservationRoomsRepository: {
+    findReservationRoom: jest.Mock;
     updateReservationRoom: jest.Mock;
   };
   let reservationAvailabilityRepository: {
@@ -219,15 +283,24 @@ describe('StaysService', () => {
         .fn()
         .mockImplementation((operation) => operation({ transaction: true })),
       createStay: jest.fn().mockResolvedValue({ id: checkedInStay.id }),
+      updateStay: jest.fn(),
     };
     stayRoomAssignmentsRepository = {
       createAssignment: jest.fn(),
+      findAssignment: jest
+        .fn()
+        .mockResolvedValue(checkedInStay.roomAssignments[0]),
+      listActiveAssignmentsForStay: jest
+        .fn()
+        .mockResolvedValue(checkedInStay.roomAssignments),
+      updateAssignment: jest.fn(),
     };
     reservationsRepository = {
       findReservation: jest.fn().mockResolvedValue(reservation),
       updateReservation: jest.fn(),
     };
     reservationRoomsRepository = {
+      findReservationRoom: jest.fn().mockResolvedValue(secondReservationRoom),
       updateReservationRoom: jest.fn(),
     };
     reservationAvailabilityRepository = {
@@ -360,7 +433,7 @@ describe('StaysService', () => {
             roomId: 9,
             reservationRoomId: 30,
             assignedAt: checkedInStay.roomAssignments[0].assignedAt,
-            room,
+            room: occupiedRoom,
           },
         ],
       },
@@ -383,6 +456,399 @@ describe('StaysService', () => {
     await expect(service.getById(currentUser, 999)).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('assigns an additional room to an active stay', async () => {
+    roomsRepository.findRoom.mockResolvedValueOnce(destinationRoom);
+
+    await service.assignRoom(currentUser, 40, {
+      reservationRoomId: 31,
+      roomId: 10,
+      reason: ' Additional family room. ',
+    });
+
+    expect(reservationRoomsRepository.findReservationRoom).toHaveBeenCalledWith(
+      31,
+    );
+    expect(
+      reservationAvailabilityRepository.countOverlappingRoomReservations,
+    ).toHaveBeenCalledWith({
+      roomId: 10,
+      checkInDate: checkedInStay.reservation.checkInDate,
+      checkOutDate: checkedInStay.expectedCheckOutDate,
+      excludeReservationId: checkedInStay.reservationId,
+    });
+    expect(stayRoomAssignmentsRepository.createAssignment).toHaveBeenCalledWith(
+      {
+        stayId: 40,
+        roomId: 10,
+        reservationRoomId: 31,
+        assignedByUserId: 1,
+        reason: 'Additional family room.',
+      },
+      { transaction: true },
+    );
+    expect(
+      reservationRoomsRepository.updateReservationRoom,
+    ).toHaveBeenCalledWith(
+      31,
+      {
+        status: ReservationRoomStatus.CHECKED_IN,
+        roomId: 10,
+      },
+      { transaction: true },
+    );
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      10,
+      {
+        occupancyStatus: RoomOccupancyStatus.OCCUPIED,
+      },
+      { transaction: true },
+    );
+    expect(roomsRepository.createStatusLogs).toHaveBeenCalledWith(
+      [
+        {
+          roomId: 10,
+          actorUserId: 1,
+          field: 'occupancyStatus',
+          oldValue: RoomOccupancyStatus.VACANT,
+          newValue: RoomOccupancyStatus.OCCUPIED,
+          reason: 'Stay room assignment',
+        },
+      ],
+      { transaction: true },
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'stays.room_assigned',
+        entityType: 'Stay',
+        entityId: '40',
+      }),
+    );
+  });
+
+  it('rejects assigning a room to an inactive stay', async () => {
+    staysRepository.findStay.mockResolvedValueOnce(checkedOutStay);
+
+    await expect(
+      service.assignRoom(currentUser, 40, {
+        roomId: 10,
+      }),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('updates an active room assignment reason', async () => {
+    await service.updateRoomAssignment(currentUser, 40, 50, {
+      reason: ' Corrected assignment note. ',
+    });
+
+    expect(stayRoomAssignmentsRepository.findAssignment).toHaveBeenCalledWith(
+      50,
+    );
+    expect(stayRoomAssignmentsRepository.updateAssignment).toHaveBeenCalledWith(
+      50,
+      {
+        reason: 'Corrected assignment note.',
+      },
+      { transaction: true },
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'stays.room_assignment_updated',
+        entityType: 'StayRoomAssignment',
+        entityId: '50',
+      }),
+    );
+  });
+
+  it('moves an active stay room to an available room', async () => {
+    roomsRepository.findRoom.mockResolvedValueOnce(destinationRoom);
+
+    await service.moveRoom(currentUser, 40, {
+      fromAssignmentId: 50,
+      toRoomId: 10,
+      reason: ' Guest requested quieter room. ',
+    });
+
+    expect(stayRoomAssignmentsRepository.findAssignment).toHaveBeenCalledWith(
+      50,
+    );
+    expect(stayRoomAssignmentsRepository.updateAssignment).toHaveBeenCalledWith(
+      50,
+      {
+        status: StayRoomAssignmentStatus.RELEASED,
+        releasedAt: expect.any(Date),
+        releasedByUserId: 1,
+        reason: 'Guest requested quieter room.',
+      },
+      { transaction: true },
+    );
+    expect(stayRoomAssignmentsRepository.createAssignment).toHaveBeenCalledWith(
+      {
+        stayId: 40,
+        roomId: 10,
+        reservationRoomId: 30,
+        assignedByUserId: 1,
+        reason: 'Guest requested quieter room.',
+      },
+      { transaction: true },
+    );
+    expect(
+      reservationRoomsRepository.updateReservationRoom,
+    ).toHaveBeenCalledWith(
+      30,
+      {
+        status: ReservationRoomStatus.CHECKED_IN,
+        roomId: 10,
+      },
+      { transaction: true },
+    );
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      9,
+      {
+        occupancyStatus: RoomOccupancyStatus.VACANT,
+        cleaningStatus: RoomCleaningStatus.DIRTY,
+      },
+      { transaction: true },
+    );
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      10,
+      {
+        occupancyStatus: RoomOccupancyStatus.OCCUPIED,
+      },
+      { transaction: true },
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'stays.room_moved',
+        entityType: 'Stay',
+        entityId: '40',
+      }),
+    );
+  });
+
+  it('rejects moving to an unavailable destination room', async () => {
+    roomsRepository.findRoom.mockResolvedValueOnce({
+      ...destinationRoom,
+      maintenanceStatus: RoomMaintenanceStatus.OUT_OF_SERVICE,
+    });
+
+    await expect(
+      service.moveRoom(currentUser, 40, {
+        fromAssignmentId: 50,
+        toRoomId: 10,
+      }),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('extends an active stay when assigned rooms are available', async () => {
+    staysRepository.findStay
+      .mockResolvedValueOnce(checkedInStay)
+      .mockResolvedValueOnce(extendedStay);
+
+    const result = await service.extendStay(currentUser, 40, {
+      newExpectedCheckOutDate: '2026-06-15',
+      reason: ' Guest requested one additional night. ',
+    });
+
+    expect(
+      stayRoomAssignmentsRepository.listActiveAssignmentsForStay,
+    ).toHaveBeenCalledWith(40);
+    expect(
+      reservationAvailabilityRepository.countOverlappingRoomReservations,
+    ).toHaveBeenCalledWith({
+      roomId: 9,
+      checkInDate: checkedInStay.expectedCheckOutDate,
+      checkOutDate: new Date('2026-06-15T00:00:00.000Z'),
+      excludeReservationId: checkedInStay.reservationId,
+      excludeReservationRoomId: 30,
+    });
+    expect(reservationsRepository.updateReservation).toHaveBeenCalledWith(
+      20,
+      {
+        checkOutDate: new Date('2026-06-15T00:00:00.000Z'),
+      },
+      { transaction: true },
+    );
+    expect(staysRepository.updateStay).toHaveBeenCalledWith(
+      40,
+      {
+        expectedCheckOutDate: new Date('2026-06-15T00:00:00.000Z'),
+      },
+      { transaction: true },
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: 1,
+        action: 'stays.extended',
+        entityType: 'Stay',
+        entityId: '40',
+        metadata: expect.objectContaining({
+          previousExpectedCheckOutDate: '2026-06-12T00:00:00.000Z',
+          newExpectedCheckOutDate: '2026-06-15T00:00:00.000Z',
+          activeRoomIds: [9],
+          reason: 'Guest requested one additional night.',
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      id: 40,
+      expectedCheckOutDate: new Date('2026-06-15T00:00:00.000Z'),
+      reservation: {
+        checkOutDate: new Date('2026-06-15T00:00:00.000Z'),
+      },
+    });
+  });
+
+  it('rejects stay extension when the checkout date does not move forward', async () => {
+    await expect(
+      service.extendStay(currentUser, 40, {
+        newExpectedCheckOutDate: '2026-06-12',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(staysRepository.runInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects stay extension when an assigned room has a future overlap', async () => {
+    reservationAvailabilityRepository.countOverlappingRoomReservations.mockResolvedValueOnce(
+      1,
+    );
+
+    await expect(
+      service.extendStay(currentUser, 40, {
+        newExpectedCheckOutDate: '2026-06-15',
+      }),
+    ).rejects.toThrow(ConflictException);
+    expect(staysRepository.runInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('checks out an active stay and marks the room vacant dirty', async () => {
+    staysRepository.findStay
+      .mockResolvedValueOnce(checkedInStay)
+      .mockResolvedValueOnce(checkedOutStay);
+
+    const result = await service.checkOut(currentUser, 40, {
+      notes: ' Guest settled at front desk. ',
+    });
+
+    expect(staysRepository.findStay).toHaveBeenCalledWith(40);
+    expect(
+      stayRoomAssignmentsRepository.listActiveAssignmentsForStay,
+    ).toHaveBeenCalledWith(40);
+    expect(stayRoomAssignmentsRepository.updateAssignment).toHaveBeenCalledWith(
+      50,
+      {
+        status: StayRoomAssignmentStatus.RELEASED,
+        releasedAt: expect.any(Date),
+        releasedByUserId: 1,
+        reason: 'Guest settled at front desk.',
+      },
+      { transaction: true },
+    );
+    expect(
+      reservationRoomsRepository.updateReservationRoom,
+    ).toHaveBeenCalledWith(
+      30,
+      {
+        status: ReservationRoomStatus.CHECKED_OUT,
+      },
+      { transaction: true },
+    );
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      9,
+      {
+        occupancyStatus: RoomOccupancyStatus.VACANT,
+        cleaningStatus: RoomCleaningStatus.DIRTY,
+      },
+      { transaction: true },
+    );
+    expect(roomsRepository.createStatusLogs).toHaveBeenCalledWith(
+      [
+        {
+          roomId: 9,
+          actorUserId: 1,
+          field: 'occupancyStatus',
+          oldValue: RoomOccupancyStatus.OCCUPIED,
+          newValue: RoomOccupancyStatus.VACANT,
+          reason: 'Stay checkout',
+        },
+        {
+          roomId: 9,
+          actorUserId: 1,
+          field: 'cleaningStatus',
+          oldValue: RoomCleaningStatus.CLEAN,
+          newValue: RoomCleaningStatus.DIRTY,
+          reason: 'Stay checkout',
+        },
+      ],
+      { transaction: true },
+    );
+    expect(reservationsRepository.updateReservation).toHaveBeenCalledWith(
+      20,
+      {
+        status: ReservationStatus.CHECKED_OUT,
+      },
+      { transaction: true },
+    );
+    expect(staysRepository.updateStay).toHaveBeenCalledWith(
+      40,
+      {
+        status: StayStatus.CHECKED_OUT,
+        checkedOutAt: expect.any(Date),
+        checkedOutByUserId: 1,
+        notes: 'Guest settled at front desk.',
+      },
+      { transaction: true },
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: 1,
+        action: 'stays.checked_out',
+        entityType: 'Stay',
+        entityId: '40',
+      }),
+    );
+    expect(result).toMatchObject({
+      id: 40,
+      status: StayStatus.CHECKED_OUT,
+      checkedOutByUserId: 1,
+      roomAssignments: [
+        {
+          status: StayRoomAssignmentStatus.RELEASED,
+          room: {
+            occupancyStatus: RoomOccupancyStatus.VACANT,
+            cleaningStatus: RoomCleaningStatus.DIRTY,
+          },
+        },
+      ],
+    });
+  });
+
+  it('rejects checkout for inactive stays', async () => {
+    staysRepository.findStay.mockResolvedValueOnce(checkedOutStay);
+
+    await expect(service.checkOut(currentUser, 40, {})).rejects.toThrow(
+      ConflictException,
+    );
+    expect(staysRepository.runInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects checkout when no active assignments exist', async () => {
+    stayRoomAssignmentsRepository.listActiveAssignmentsForStay.mockResolvedValue(
+      [],
+    );
+
+    await expect(service.checkOut(currentUser, 40, {})).rejects.toThrow(
+      ConflictException,
+    );
+    expect(staysRepository.runInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported force checkout requests', async () => {
+    await expect(
+      service.checkOut(currentUser, 40, { forceCheckout: true }),
+    ).rejects.toThrow(BadRequestException);
+    expect(staysRepository.findStay).not.toHaveBeenCalled();
   });
 
   it('checks in a confirmed reservation with a physical room assignment', async () => {
