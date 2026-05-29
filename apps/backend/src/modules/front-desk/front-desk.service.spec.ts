@@ -162,3 +162,44 @@ describe('FrontDeskService', () => {
     });
   });
 
+  it('lists arrivals with trimmed search and pagination', async () => {
+    const result = await service.listArrivals(currentUser, {
+      date: '2026-06-10',
+      page: 2,
+      limit: 10,
+      search: ' Marta ',
+    });
+
+    expect(frontDeskRepository.listArrivals).toHaveBeenCalledWith({
+      skip: 10,
+      take: 10,
+      startDate: new Date(2026, 5, 10),
+      endDate: new Date(2026, 5, 11),
+      search: 'Marta',
+    });
+    expect(result).toMatchObject({
+      date: '2026-06-10',
+      items: [
+        {
+          id: 20,
+          reservationNumber: 'RES-20260610-123450',
+        },
+      ],
+      pagination: {
+        page: 2,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+  });
+
+  it('lists departures with current room summaries', async () => {
+    const result = await service.listDepartures(currentUser, {
+      date: '2026-06-12',
+    });
+
+    expect(frontDeskRepository.listDepartures).toHaveBeenCalledWith({
+      skip: 0,
+      take: 20,
+      startDate: new Date(2026, 5, 12),
