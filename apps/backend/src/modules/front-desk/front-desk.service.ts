@@ -106,3 +106,30 @@ export class FrontDeskService {
       status: stay.status,
       checkedInAt: stay.checkedInAt,
       expectedCheckOutDate: stay.expectedCheckOutDate,
+      checkedOutAt: stay.checkedOutAt,
+      notes: stay.notes,
+      createdAt: stay.createdAt,
+      updatedAt: stay.updatedAt,
+      guest: stay.guest,
+      reservation: stay.reservation,
+      currentRooms: stay.roomAssignments.map((assignment) => ({
+        assignmentId: assignment.id,
+        roomId: assignment.roomId,
+        reservationRoomId: assignment.reservationRoomId,
+        assignedAt: assignment.assignedAt,
+        room: assignment.room,
+        reservationRoom: assignment.reservationRoom,
+      })),
+    };
+  }
+
+  private resolveListQuery(query: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    return {
+      page,
