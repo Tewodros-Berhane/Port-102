@@ -96,3 +96,52 @@ describe('FrontDeskRepository', () => {
     expect(result).toEqual({
       arrivalsToday: 3,
       departuresToday: 2,
+      inHouseGuests: 8,
+      activeStays: 8,
+      vacantRooms: 12,
+      occupiedRooms: 8,
+      dirtyRooms: 4,
+      outOfOrderRooms: 1,
+      availablePhysicalRooms: 10,
+    });
+  });
+
+  it('lists confirmed arrivals for a date range', async () => {
+    prisma.reservation.count.mockResolvedValue(1);
+    prisma.reservation.findMany.mockResolvedValue([]);
+
+    const startDate = new Date('2026-06-10T00:00:00.000Z');
+    const endDate = new Date('2026-06-11T00:00:00.000Z');
+
+    await repository.listArrivals({
+      skip: 20,
+      take: 10,
+      startDate,
+      endDate,
+      search: 'Marta',
+    });
+
+    expect(prisma.reservation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: ReservationStatus.CONFIRMED,
+          checkInDate: {
+            gte: startDate,
+            lt: endDate,
+          },
+          OR: expect.arrayContaining([
+            {
+              reservationNumber: {
+                contains: 'Marta',
+                mode: 'insensitive',
+              },
+            },
+          ]),
+        }),
+        skip: 20,
+        take: 10,
+        orderBy: [{ checkInDate: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
