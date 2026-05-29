@@ -262,3 +262,47 @@ export class FrontDeskRepository {
 
   listArrivals({
     skip,
+    take,
+    startDate,
+    endDate,
+    search,
+  }: {
+    skip: number;
+    take: number;
+    startDate: Date;
+    endDate: Date;
+    search?: string;
+  }) {
+    const where: Prisma.ReservationWhereInput = {
+      status: ReservationStatus.CONFIRMED,
+      checkInDate: {
+        gte: startDate,
+        lt: endDate,
+      },
+      ...this.reservationSearchWhere(search),
+    };
+
+    return Promise.all([
+      this.prisma.reservation.count({ where }),
+      this.prisma.reservation.findMany({
+        where,
+        skip,
+        take,
+        select: frontDeskReservationSelect,
+        orderBy: [{ checkInDate: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
+  }
+
+  listDepartures({
+    skip,
+    take,
+    startDate,
+    endDate,
+    search,
+  }: {
+    skip: number;
+    take: number;
+    startDate: Date;
+    endDate: Date;
+    search?: string;
