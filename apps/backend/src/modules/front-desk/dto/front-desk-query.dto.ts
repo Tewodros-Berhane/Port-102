@@ -58,3 +58,23 @@ export class FrontDeskDashboardQueryDto {
 export class FrontDeskArrivalsQueryDto extends FrontDeskPaginatedQueryDto {
   @ApiPropertyOptional({
     example: '2026-06-10',
+    description:
+      'Arrival date to list. Defaults to the server-local current date.',
+  })
+  @IsDateString()
+  @IsOptional()
+  date?: string;
+}
+
+export class FrontDeskDeparturesQueryDto extends FrontDeskPaginatedQueryDto {
+  @ApiPropertyOptional({
+    example: '2026-06-10',
+    description:
+      'Departure date to list. Defaults to the server-local current date.',
+  })
+  @IsDateString()
+  @IsOptional()
+  date?: string;
+}
+
+export class FrontDeskInHouseQueryDto extends FrontDeskPaginatedQueryDto {}
