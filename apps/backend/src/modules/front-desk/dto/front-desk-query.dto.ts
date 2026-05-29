@@ -38,3 +38,23 @@ class FrontDeskPaginatedQueryDto {
     example: 'Marta',
     description:
       'Search guest name, guest contact, reservation number, stay number, or room number where applicable.',
+  })
+  @IsString()
+  @IsOptional()
+  search?: string;
+}
+
+export class FrontDeskDashboardQueryDto {
+  @ApiPropertyOptional({
+    example: '2026-06-10',
+    description:
+      'Operational date for dashboard counts. Defaults to the server-local current date.',
+  })
+  @IsDateString()
+  @IsOptional()
+  date?: string;
+}
+
+export class FrontDeskArrivalsQueryDto extends FrontDeskPaginatedQueryDto {
+  @ApiPropertyOptional({
+    example: '2026-06-10',
