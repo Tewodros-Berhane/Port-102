@@ -32,3 +32,20 @@ export class FrontDeskController {
   @Permissions('reservations.read')
   @ApiOperation({ summary: 'Get front desk operational dashboard counts' })
   @ApiOkResponse({ description: 'Front desk dashboard returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  getDashboard(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: FrontDeskDashboardQueryDto,
+  ) {
+    return this.frontDeskService.getDashboard(currentUser, query);
+  }
+
+  @Get('arrivals')
+  @Permissions('arrivals.read')
+  @ApiOperation({ summary: 'List front desk arrivals for a date' })
+  @ApiOkResponse({ description: 'Front desk arrivals returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listArrivals(
+    @CurrentUser() currentUser: CurrentUserPayload,
