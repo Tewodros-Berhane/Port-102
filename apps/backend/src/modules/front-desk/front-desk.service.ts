@@ -160,3 +160,30 @@ export class FrontDeskService {
     const startDate = value
       ? this.parseOperationalDate(value)
       : this.startOfLocalDay(new Date());
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 1);
+
+    return {
+      date: this.formatLocalDate(startDate),
+      startDate,
+      endDate,
+    };
+  }
+
+  private parseOperationalDate(value: string) {
+    const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+    if (dateOnlyMatch) {
+      const [, year, month, day] = dateOnlyMatch;
+      const parsedDate = new Date(Number(year), Number(month) - 1, Number(day));
+
+      if (
+        parsedDate.getFullYear() !== Number(year) ||
+        parsedDate.getMonth() !== Number(month) - 1 ||
+        parsedDate.getDate() !== Number(day)
+      ) {
+        throw new BadRequestException('Invalid front desk date.');
+      }
+
+      return parsedDate;
+    }
