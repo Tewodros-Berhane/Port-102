@@ -79,3 +79,30 @@ export class FrontDeskService {
       pagination: this.buildPagination({ page, limit, total }),
     };
   }
+
+  async listInHouse(
+    _currentUser: CurrentUserPayload,
+    query: FrontDeskInHouseQueryDto,
+  ) {
+    const { page, limit, skip, search } = this.resolveListQuery(query);
+    const [total, stays] = await this.frontDeskRepository.listInHouse({
+      skip,
+      take: limit,
+      search,
+    });
+
+    return {
+      items: stays.map((stay) => this.serializeFrontDeskStay(stay)),
+      pagination: this.buildPagination({ page, limit, total }),
+    };
+  }
+
+  private serializeFrontDeskStay(stay: FrontDeskStayRecord) {
+    return {
+      id: stay.id,
+      stayNumber: stay.stayNumber,
+      reservationId: stay.reservationId,
+      guestId: stay.guestId,
+      status: stay.status,
+      checkedInAt: stay.checkedInAt,
+      expectedCheckOutDate: stay.expectedCheckOutDate,
