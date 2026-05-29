@@ -174,3 +174,47 @@ export class FrontDeskRepository {
       vacantRooms,
       occupiedRooms,
       dirtyRooms,
+      outOfOrderRooms,
+      availablePhysicalRooms,
+    ] = await Promise.all([
+      this.prisma.reservation.count({
+        where: {
+          status: ReservationStatus.CONFIRMED,
+          checkInDate: {
+            gte: startDate,
+            lt: endDate,
+          },
+        },
+      }),
+      this.prisma.stay.count({
+        where: {
+          status: StayStatus.ACTIVE,
+          expectedCheckOutDate: {
+            gte: startDate,
+            lt: endDate,
+          },
+        },
+      }),
+      this.prisma.stay.count({
+        where: {
+          status: StayStatus.ACTIVE,
+        },
+      }),
+      this.prisma.stay.count({
+        where: {
+          status: StayStatus.ACTIVE,
+        },
+      }),
+      this.prisma.room.count({
+        where: {
+          isActive: true,
+          occupancyStatus: RoomOccupancyStatus.VACANT,
+        },
+      }),
+      this.prisma.room.count({
+        where: {
+          isActive: true,
+          occupancyStatus: RoomOccupancyStatus.OCCUPIED,
+        },
+      }),
+      this.prisma.room.count({
