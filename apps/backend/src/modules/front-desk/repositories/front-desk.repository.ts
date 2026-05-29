@@ -42,3 +42,47 @@ const frontDeskReservationSelect = {
       roomTypeId: true,
       roomId: true,
       status: true,
+      rate: true,
+      notes: true,
+      roomType: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          baseOccupancy: true,
+          maxOccupancy: true,
+          baseRate: true,
+        },
+      },
+      room: {
+        select: {
+          id: true,
+          roomNumber: true,
+          displayName: true,
+          roomTypeId: true,
+          occupancyStatus: true,
+          cleaningStatus: true,
+          maintenanceStatus: true,
+          isActive: true,
+        },
+      },
+    },
+    orderBy: {
+      id: 'asc',
+    },
+  },
+} as const;
+
+const frontDeskStayRoomAssignmentsOrderBy: Prisma.StayRoomAssignmentOrderByWithRelationInput[] =
+  [{ assignedAt: 'asc' }, { id: 'asc' }];
+
+const frontDeskStaySelect = {
+  id: true,
+  stayNumber: true,
+  reservationId: true,
+  guestId: true,
+  status: true,
+  checkedInAt: true,
+  expectedCheckOutDate: true,
+  checkedOutAt: true,
+  notes: true,
