@@ -277,3 +277,96 @@ describe('Front desk API (e2e)', () => {
       message: 'Missing required permission.',
     });
     expect(frontDeskService.listArrivals).not.toHaveBeenCalled();
+  });
+
+  it('lists arrivals for permitted users', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/front-desk/arrivals')
+      .query({
+        date: '2026-06-10',
+        page: 1,
+        limit: 20,
+        search: 'Marta',
+      })
+      .set('Authorization', 'Bearer front-desk-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        items: [
+          {
+            reservationNumber: 'RES-20260610-123450',
+          },
+        ],
+      },
+    });
+    expect(frontDeskService.listArrivals).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      {
+        date: '2026-06-10',
+        page: 1,
+        limit: 20,
+        search: 'Marta',
+      },
+    );
+  });
+
+  it('lists departures for permitted users', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/front-desk/departures')
+      .query({
+        date: '2026-06-12',
+      })
+      .set('Authorization', 'Bearer front-desk-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        items: [
+          {
+            stayNumber: 'STAY-20260610-123450',
+            currentRooms: [
+              {
+                roomId: 9,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(frontDeskService.listDepartures).toHaveBeenCalled();
+  });
+
+  it('lists in-house guests for permitted users', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/front-desk/in-house')
+      .query({
+        search: '101',
+      })
+      .set('Authorization', 'Bearer front-desk-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        items: [
+          {
+            id: 40,
+            currentRooms: [
+              {
+                room: {
+                  roomNumber: '101',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(frontDeskService.listInHouse).toHaveBeenCalled();
+  });
+});
