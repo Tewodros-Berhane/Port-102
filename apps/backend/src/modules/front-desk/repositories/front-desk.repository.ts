@@ -438,3 +438,48 @@ export class FrontDeskRepository {
                 firstName: {
                   contains: search,
                   mode: 'insensitive',
+                },
+              },
+            },
+            {
+              guest: {
+                lastName: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              guest: {
+                email: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              guest: {
+                phone: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              roomAssignments: {
+                some: {
+                  status: StayRoomAssignmentStatus.ACTIVE,
+                  room: {
+                    roomNumber: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        }
+      : {};
+  }
+}
