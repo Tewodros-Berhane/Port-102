@@ -80,3 +80,44 @@ describe('FrontDeskService', () => {
         id: 50,
         stayId: 40,
         roomId: 9,
+        reservationRoomId: 30,
+        status: StayRoomAssignmentStatus.ACTIVE,
+        assignedAt: new Date('2026-06-10T08:00:00.000Z'),
+        room: {
+          id: 9,
+          roomNumber: '101',
+          displayName: null,
+          roomTypeId: 4,
+          occupancyStatus: RoomOccupancyStatus.OCCUPIED,
+          cleaningStatus: RoomCleaningStatus.CLEAN,
+          maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+          isActive: true,
+        },
+        reservationRoom: {
+          id: 30,
+          reservationId: 20,
+          roomTypeId: 4,
+          roomId: 9,
+          status: 'CHECKED_IN',
+        },
+      },
+    ],
+  };
+
+  beforeEach(async () => {
+    frontDeskRepository = {
+      getDashboardCounts: jest.fn().mockResolvedValue({
+        arrivalsToday: 3,
+        departuresToday: 2,
+        inHouseGuests: 8,
+        activeStays: 8,
+        vacantRooms: 12,
+        occupiedRooms: 8,
+        dirtyRooms: 4,
+        outOfOrderRooms: 1,
+        availablePhysicalRooms: 10,
+      }),
+      listArrivals: jest.fn().mockResolvedValue([1, [reservation]]),
+      listDepartures: jest.fn().mockResolvedValue([1, [activeStay]]),
+      listInHouse: jest.fn().mockResolvedValue([1, [activeStay]]),
+    };
