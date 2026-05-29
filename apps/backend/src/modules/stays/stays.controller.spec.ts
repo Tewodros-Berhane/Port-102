@@ -12,6 +12,11 @@ describe('StaysController', () => {
     getById: jest.Mock;
     listActive: jest.Mock;
     listInHouseGuests: jest.Mock;
+    checkOut: jest.Mock;
+    assignRoom: jest.Mock;
+    updateRoomAssignment: jest.Mock;
+    moveRoom: jest.Mock;
+    extendStay: jest.Mock;
   };
 
   const currentUser = {
@@ -29,6 +34,11 @@ describe('StaysController', () => {
       getById: jest.fn(),
       listActive: jest.fn(),
       listInHouseGuests: jest.fn(),
+      checkOut: jest.fn(),
+      assignRoom: jest.fn(),
+      updateRoomAssignment: jest.fn(),
+      moveRoom: jest.fn(),
+      extendStay: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -95,5 +105,65 @@ describe('StaysController', () => {
     controller.getById(currentUser, 40);
 
     expect(staysService.getById).toHaveBeenCalledWith(currentUser, 40);
+  });
+
+  it('delegates stay checkout', () => {
+    const dto = {
+      notes: 'Guest settled at front desk.',
+    };
+
+    controller.checkOut(currentUser, 40, dto);
+
+    expect(staysService.checkOut).toHaveBeenCalledWith(currentUser, 40, dto);
+  });
+
+  it('delegates stay room assignment', () => {
+    const dto = {
+      reservationRoomId: 30,
+      roomId: 10,
+      reason: 'Additional room.',
+    };
+
+    controller.assignRoom(currentUser, 40, dto);
+
+    expect(staysService.assignRoom).toHaveBeenCalledWith(currentUser, 40, dto);
+  });
+
+  it('delegates stay room assignment update', () => {
+    const dto = {
+      reason: 'Corrected note.',
+    };
+
+    controller.updateRoomAssignment(currentUser, 40, 50, dto);
+
+    expect(staysService.updateRoomAssignment).toHaveBeenCalledWith(
+      currentUser,
+      40,
+      50,
+      dto,
+    );
+  });
+
+  it('delegates stay room move', () => {
+    const dto = {
+      fromAssignmentId: 50,
+      toRoomId: 10,
+      reason: 'Guest requested quieter room.',
+    };
+
+    controller.moveRoom(currentUser, 40, dto);
+
+    expect(staysService.moveRoom).toHaveBeenCalledWith(currentUser, 40, dto);
+  });
+
+  it('delegates stay extension', () => {
+    const dto = {
+      newExpectedCheckOutDate: '2026-06-15',
+      reason: 'Guest requested one additional night.',
+    };
+
+    controller.extendStay(currentUser, 40, dto);
+
+    expect(staysService.extendStay).toHaveBeenCalledWith(currentUser, 40, dto);
   });
 });
