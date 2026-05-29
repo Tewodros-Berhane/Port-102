@@ -218,3 +218,47 @@ export class FrontDeskRepository {
         },
       }),
       this.prisma.room.count({
+        where: {
+          isActive: true,
+          cleaningStatus: RoomCleaningStatus.DIRTY,
+        },
+      }),
+      this.prisma.room.count({
+        where: {
+          isActive: true,
+          maintenanceStatus: {
+            in: [
+              RoomMaintenanceStatus.OUT_OF_ORDER,
+              RoomMaintenanceStatus.OUT_OF_SERVICE,
+              RoomMaintenanceStatus.UNDER_MAINTENANCE,
+            ],
+          },
+        },
+      }),
+      this.prisma.room.count({
+        where: {
+          isActive: true,
+          occupancyStatus: RoomOccupancyStatus.VACANT,
+          maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+          cleaningStatus: {
+            in: [RoomCleaningStatus.CLEAN, RoomCleaningStatus.INSPECTED],
+          },
+        },
+      }),
+    ]);
+
+    return {
+      arrivalsToday,
+      departuresToday,
+      inHouseGuests,
+      activeStays,
+      vacantRooms,
+      occupiedRooms,
+      dirtyRooms,
+      outOfOrderRooms,
+      availablePhysicalRooms,
+    };
+  }
+
+  listArrivals({
+    skip,
