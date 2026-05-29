@@ -130,3 +130,47 @@ const frontDeskStaySelect = {
           occupancyStatus: true,
           cleaningStatus: true,
           maintenanceStatus: true,
+          isActive: true,
+        },
+      },
+      reservationRoom: {
+        select: {
+          id: true,
+          reservationId: true,
+          roomTypeId: true,
+          roomId: true,
+          status: true,
+        },
+      },
+    },
+    orderBy: frontDeskStayRoomAssignmentsOrderBy,
+  },
+} as const;
+
+export type FrontDeskReservationRecord = Prisma.ReservationGetPayload<{
+  select: typeof frontDeskReservationSelect;
+}>;
+
+export type FrontDeskStayRecord = Prisma.StayGetPayload<{
+  select: typeof frontDeskStaySelect;
+}>;
+
+@Injectable()
+export class FrontDeskRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async getDashboardCounts({
+    startDate,
+    endDate,
+  }: {
+    startDate: Date;
+    endDate: Date;
+  }) {
+    const [
+      arrivalsToday,
+      departuresToday,
+      inHouseGuests,
+      activeStays,
+      vacantRooms,
+      occupiedRooms,
+      dirtyRooms,
