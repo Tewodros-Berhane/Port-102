@@ -52,3 +52,30 @@ export class FrontDeskService {
 
     return {
       date,
+      items: reservations,
+      pagination: this.buildPagination({ page, limit, total }),
+    };
+  }
+
+  async listDepartures(
+    _currentUser: CurrentUserPayload,
+    query: FrontDeskDeparturesQueryDto,
+  ) {
+    const { date, startDate, endDate } = this.resolveOperationalDateRange(
+      query.date,
+    );
+    const { page, limit, skip, search } = this.resolveListQuery(query);
+    const [total, stays] = await this.frontDeskRepository.listDepartures({
+      skip,
+      take: limit,
+      startDate,
+      endDate,
+      search,
+    });
+
+    return {
+      date,
+      items: stays.map((stay) => this.serializeFrontDeskStay(stay)),
+      pagination: this.buildPagination({ page, limit, total }),
+    };
+  }
