@@ -203,3 +203,45 @@ describe('FrontDeskService', () => {
       skip: 0,
       take: 20,
       startDate: new Date(2026, 5, 12),
+      endDate: new Date(2026, 5, 13),
+      search: undefined,
+    });
+    expect(result).toMatchObject({
+      date: '2026-06-12',
+      items: [
+        {
+          id: 40,
+          stayNumber: 'STAY-20260610-123450',
+          currentRooms: [
+            {
+              assignmentId: 50,
+              roomId: 9,
+              reservationRoomId: 30,
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('lists in-house stays without a date filter', async () => {
+    const result = await service.listInHouse(currentUser, {
+      search: '101',
+    });
+
+    expect(frontDeskRepository.listInHouse).toHaveBeenCalledWith({
+      skip: 0,
+      take: 20,
+      search: '101',
+    });
+    expect(result.items).toHaveLength(1);
+  });
+
+  it('rejects invalid operational dates', async () => {
+    await expect(
+      service.listArrivals(currentUser, {
+        date: '2026-02-31',
+      }),
+    ).rejects.toThrow('Invalid front desk date.');
+  });
+});
