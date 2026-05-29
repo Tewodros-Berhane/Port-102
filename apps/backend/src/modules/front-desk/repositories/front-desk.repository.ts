@@ -86,3 +86,47 @@ const frontDeskStaySelect = {
   expectedCheckOutDate: true,
   checkedOutAt: true,
   notes: true,
+  createdAt: true,
+  updatedAt: true,
+  reservation: {
+    select: {
+      id: true,
+      reservationNumber: true,
+      status: true,
+      source: true,
+      checkInDate: true,
+      checkOutDate: true,
+      adults: true,
+      children: true,
+    },
+  },
+  guest: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      status: true,
+    },
+  },
+  roomAssignments: {
+    where: {
+      status: StayRoomAssignmentStatus.ACTIVE,
+    },
+    select: {
+      id: true,
+      stayId: true,
+      roomId: true,
+      reservationRoomId: true,
+      status: true,
+      assignedAt: true,
+      room: {
+        select: {
+          id: true,
+          roomNumber: true,
+          displayName: true,
+          roomTypeId: true,
+          occupancyStatus: true,
+          cleaningStatus: true,
+          maintenanceStatus: true,
