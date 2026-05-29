@@ -66,3 +66,21 @@ export class FrontDeskController {
     @CurrentUser() currentUser: CurrentUserPayload,
     @Query() query: FrontDeskDeparturesQueryDto,
   ) {
+    return this.frontDeskService.listDepartures(currentUser, query);
+  }
+
+  @Get('in-house')
+  @Permissions('in_house_guests.read')
+  @ApiOperation({ summary: 'List front desk in-house guests' })
+  @ApiOkResponse({
+    description: 'Front desk in-house guests returned successfully.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listInHouse(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: FrontDeskInHouseQueryDto,
+  ) {
+    return this.frontDeskService.listInHouse(currentUser, query);
+  }
+}
