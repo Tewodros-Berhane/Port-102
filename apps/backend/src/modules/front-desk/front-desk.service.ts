@@ -187,3 +187,31 @@ export class FrontDeskService {
 
       return parsedDate;
     }
+
+    const parsedDate = new Date(value);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException('Invalid front desk date.');
+    }
+
+    return this.startOfLocalDay(parsedDate);
+  }
+
+  private startOfLocalDay(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  private formatLocalDate(date: Date) {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  private normalizeOptionalString(value?: string | null) {
+    const normalized = value?.trim();
+
+    return normalized || undefined;
+  }
+}
