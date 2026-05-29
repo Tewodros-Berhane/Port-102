@@ -15,3 +15,20 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import {
   FrontDeskArrivalsQueryDto,
+  FrontDeskDashboardQueryDto,
+  FrontDeskDeparturesQueryDto,
+  FrontDeskInHouseQueryDto,
+} from './dto/front-desk-query.dto';
+import { FrontDeskService } from './front-desk.service';
+
+@ApiTags('Front Desk')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@Controller('front-desk')
+export class FrontDeskController {
+  constructor(private readonly frontDeskService: FrontDeskService) {}
+
+  @Get('dashboard')
+  @Permissions('reservations.read')
+  @ApiOperation({ summary: 'Get front desk operational dashboard counts' })
+  @ApiOkResponse({ description: 'Front desk dashboard returned successfully.' })
