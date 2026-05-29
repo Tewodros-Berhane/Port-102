@@ -91,3 +91,96 @@ const activeStay = {
     firstName: 'Marta',
     lastName: 'Tesfaye',
   },
+  reservation: {
+    id: 20,
+    reservationNumber: 'RES-20260610-123450',
+  },
+  currentRooms: [
+    {
+      assignmentId: 50,
+      roomId: 9,
+      reservationRoomId: 30,
+      room: {
+        id: 9,
+        roomNumber: '101',
+      },
+    },
+  ],
+};
+
+function getRequiredPermissions(context: ExecutionContext) {
+  const controllerPermissions =
+    (Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, context.getClass()) as
+      | string[]
+      | undefined) ?? [];
+  const handlerPermissions =
+    (Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, context.getHandler()) as
+      | string[]
+      | undefined) ?? [];
+
+  return [...controllerPermissions, ...handlerPermissions];
+}
+
+describe('Front desk API (e2e)', () => {
+  let app: INestApplication;
+
+  const frontDeskService = {
+    getDashboard: jest.fn(),
+    listArrivals: jest.fn(),
+    listDepartures: jest.fn(),
+    listInHouse: jest.fn(),
+  };
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL ??=
+      'postgresql://postgres:postgres@localhost:5432/port_102?schema=public';
+
+    const moduleFixture = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate(context: ExecutionContext) {
+          const httpRequest = context
+            .switchToHttp()
+            .getRequest<RequestWithTestUser>();
+          const token = httpRequest.headers.authorization?.replace(
+            /^Bearer\s+/i,
+            '',
+          );
+
+          if (!token || !testUsersByToken.has(token)) {
+            throw new UnauthorizedException('Authentication required.');
+          }
+
+          httpRequest.user = testUsersByToken.get(token);
+
+          return true;
+        },
+      })
+      .overrideGuard(PermissionsGuard)
+      .useValue({
+        canActivate(context: ExecutionContext) {
+          const requiredPermissions = getRequiredPermissions(context);
+          const httpRequest = context
+            .switchToHttp()
+            .getRequest<RequestWithTestUser>();
+          const userPermissions = httpRequest.user?.permissions ?? [];
+
+          if (
+            requiredPermissions.every((permission) =>
+              userPermissions.includes(permission),
+            )
+          ) {
+            return true;
+          }
+
+          throw new ForbiddenException('Missing required permission.');
+        },
+      })
+      .overrideProvider(FrontDeskService)
+      .useValue(frontDeskService)
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    configureApplication(app);
