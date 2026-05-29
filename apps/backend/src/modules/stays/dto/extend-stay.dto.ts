@@ -10,7 +10,7 @@ export class ExtendStayDto {
   @ApiProperty({
     example: '2026-06-15',
     description:
-      'New expected checkout date. It must be after the current date.',
+      'New expected checkout date. It must be after the current expected checkout date.',
   })
   @IsDateString()
   newExpectedCheckOutDate!: string;
