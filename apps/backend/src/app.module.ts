@@ -18,6 +18,7 @@ import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { StaysModule } from './modules/stays/stays.module';
+import { FrontDeskModule } from './modules/front-desk/front-desk.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { StaysModule } from './modules/stays/stays.module';
     RoomsModule,
     ReservationsModule,
     StaysModule,
+    FrontDeskModule,
   ],
 })
 export class AppModule {}
