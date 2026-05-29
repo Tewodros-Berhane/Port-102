@@ -184,3 +184,96 @@ describe('Front desk API (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     configureApplication(app);
+    await app.init();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    frontDeskService.getDashboard.mockResolvedValue(dashboard);
+    frontDeskService.listArrivals.mockResolvedValue({
+      date: '2026-06-10',
+      items: [arrival],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+    frontDeskService.listDepartures.mockResolvedValue({
+      date: '2026-06-12',
+      items: [activeStay],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+    frontDeskService.listInHouse.mockResolvedValue({
+      items: [activeStay],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('rejects unauthenticated dashboard requests', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/front-desk/dashboard')
+      .expect(401);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 401,
+      message: 'Authentication required.',
+    });
+    expect(frontDeskService.getDashboard).not.toHaveBeenCalled();
+  });
+
+  it('returns dashboard counts for permitted users', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/front-desk/dashboard')
+      .query({
+        date: '2026-06-10',
+      })
+      .set('Authorization', 'Bearer front-desk-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      statusCode: 200,
+      data: {
+        arrivalsToday: 3,
+        availablePhysicalRooms: 10,
+      },
+    });
+    expect(frontDeskService.getDashboard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      {
+        date: '2026-06-10',
+      },
+    );
+  });
+
+  it('rejects users without arrivals permission', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/front-desk/arrivals')
+      .set('Authorization', 'Bearer limited-token')
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 403,
+      message: 'Missing required permission.',
+    });
+    expect(frontDeskService.listArrivals).not.toHaveBeenCalled();
