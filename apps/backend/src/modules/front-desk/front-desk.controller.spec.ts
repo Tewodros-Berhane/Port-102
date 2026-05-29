@@ -82,3 +82,32 @@ describe('FrontDeskController', () => {
       query,
     );
   });
+
+  it('delegates departures listing', () => {
+    const query = {
+      date: '2026-06-10',
+      page: 1,
+      limit: 20,
+    };
+
+    controller.listDepartures(currentUser, query);
+
+    expect(frontDeskService.listDepartures).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+
+  it('delegates in-house listing', () => {
+    const query = {
+      search: '101',
+    };
+
+    controller.listInHouse(currentUser, query);
+
+    expect(frontDeskService.listInHouse).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+});
