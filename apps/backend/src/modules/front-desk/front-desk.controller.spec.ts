@@ -54,3 +54,31 @@ describe('FrontDeskController', () => {
     expect(controller).toBeDefined();
   });
 
+  it('delegates dashboard lookup', () => {
+    const query = {
+      date: '2026-06-10',
+    };
+
+    controller.getDashboard(currentUser, query);
+
+    expect(frontDeskService.getDashboard).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+
+  it('delegates arrivals listing', () => {
+    const query = {
+      date: '2026-06-10',
+      page: 2,
+      limit: 10,
+      search: 'marta',
+    };
+
+    controller.listArrivals(currentUser, query);
+
+    expect(frontDeskService.listArrivals).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
