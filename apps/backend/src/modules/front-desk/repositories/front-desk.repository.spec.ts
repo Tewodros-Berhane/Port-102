@@ -145,3 +145,52 @@ describe('FrontDeskRepository', () => {
     );
   });
 
+  it('lists active departures for a date range', async () => {
+    prisma.stay.count.mockResolvedValue(1);
+    prisma.stay.findMany.mockResolvedValue([]);
+
+    const startDate = new Date('2026-06-12T00:00:00.000Z');
+    const endDate = new Date('2026-06-13T00:00:00.000Z');
+
+    await repository.listDepartures({
+      skip: 0,
+      take: 20,
+      startDate,
+      endDate,
+    });
+
+    expect(prisma.stay.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: StayStatus.ACTIVE,
+          expectedCheckOutDate: {
+            gte: startDate,
+            lt: endDate,
+          },
+        },
+        orderBy: [{ expectedCheckOutDate: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
+  it('lists active in-house stays with optional search', async () => {
+    prisma.stay.count.mockResolvedValue(1);
+    prisma.stay.findMany.mockResolvedValue([]);
+
+    await repository.listInHouse({
+      skip: 0,
+      take: 20,
+      search: '101',
+    });
+
+    expect(prisma.stay.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: StayStatus.ACTIVE,
+          OR: expect.any(Array),
+        }),
+        orderBy: [{ checkedInAt: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+});
