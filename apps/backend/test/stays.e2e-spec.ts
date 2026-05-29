@@ -40,8 +40,13 @@ const adminUser: TestUser = {
   tokenVersion: 0,
   permissions: [
     'check_in.execute',
+    'check_out.execute',
     'reservations.read',
     'in_house_guests.read',
+    'room_assignment.create',
+    'room_assignment.update',
+    'room_move.execute',
+    'stay_extension.execute',
   ],
 };
 
@@ -81,6 +86,68 @@ const checkedInStay = {
     },
   ],
 };
+const checkedOutStay = {
+  ...checkedInStay,
+  status: StayStatus.CHECKED_OUT,
+  checkedOutAt: '2026-06-12T08:00:00.000Z',
+  checkedOutByUserId: 1,
+  reservation: {
+    ...checkedInStay.reservation,
+    status: ReservationStatus.CHECKED_OUT,
+  },
+  roomAssignments: [
+    {
+      ...checkedInStay.roomAssignments[0],
+      status: StayRoomAssignmentStatus.RELEASED,
+      releasedAt: '2026-06-12T08:00:00.000Z',
+      releasedByUserId: 1,
+      room: {
+        id: 9,
+        occupancyStatus: 'VACANT',
+        cleaningStatus: 'DIRTY',
+      },
+    },
+  ],
+};
+const roomAssignedStay = {
+  ...checkedInStay,
+  roomAssignments: [
+    ...checkedInStay.roomAssignments,
+    {
+      id: 51,
+      stayId: 40,
+      roomId: 10,
+      reservationRoomId: 31,
+      status: StayRoomAssignmentStatus.ACTIVE,
+    },
+  ],
+};
+const roomMovedStay = {
+  ...checkedInStay,
+  roomAssignments: [
+    {
+      ...checkedInStay.roomAssignments[0],
+      status: StayRoomAssignmentStatus.RELEASED,
+      releasedAt: '2026-06-10T11:00:00.000Z',
+      releasedByUserId: 1,
+    },
+    {
+      id: 52,
+      stayId: 40,
+      roomId: 10,
+      reservationRoomId: 30,
+      status: StayRoomAssignmentStatus.ACTIVE,
+    },
+  ],
+};
+const extendedStay = {
+  ...checkedInStay,
+  expectedCheckOutDate: '2026-06-15T00:00:00.000Z',
+  reservation: {
+    ...checkedInStay.reservation,
+    checkOutDate: '2026-06-15T00:00:00.000Z',
+  },
+};
 
 function getRequiredPermissions(context: ExecutionContext) {
   const controllerPermissions =
@@ -104,6 +171,11 @@ describe('Stay lifecycle API (e2e)', () => {
     getById: jest.fn(),
     listActive: jest.fn(),
     listInHouseGuests: jest.fn(),
+    checkOut: jest.fn(),
+    assignRoom: jest.fn(),
+    updateRoomAssignment: jest.fn(),
+    moveRoom: jest.fn(),
+    extendStay: jest.fn(),
   };
 
   beforeAll(async () => {
@@ -165,6 +237,11 @@ describe('Stay lifecycle API (e2e)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     staysService.checkInReservation.mockResolvedValue(checkedInStay);
+    staysService.checkOut.mockResolvedValue(checkedOutStay);
+    staysService.assignRoom.mockResolvedValue(roomAssignedStay);
+    staysService.updateRoomAssignment.mockResolvedValue(roomAssignedStay);
+    staysService.moveRoom.mockResolvedValue(roomMovedStay);
+    staysService.extendStay.mockResolvedValue(extendedStay);
     staysService.list.mockResolvedValue({
       items: [checkedInStay],
       pagination: {
@@ -409,5 +486,255 @@ describe('Stay lifecycle API (e2e)', () => {
       },
     });
     expect(staysService.listInHouseGuests).toHaveBeenCalled();
+  });
+
+  it('rejects users without checkout permission', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/stays/40/check-out')
+      .set('Authorization', 'Bearer limited-token')
+      .send({
+        notes: 'Guest settled at front desk.',
+      })
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 403,
+      message: 'Missing required permission.',
+    });
+    expect(staysService.checkOut).not.toHaveBeenCalled();
+  });
+
+  it('allows permitted front desk users to check out a stay', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/stays/40/check-out')
+      .set('Authorization', 'Bearer front-desk-token')
+      .send({
+        notes: 'Guest settled at front desk.',
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      statusCode: 200,
+      data: {
+        id: 40,
+        status: StayStatus.CHECKED_OUT,
+        checkedOutByUserId: 1,
+        roomAssignments: [
+          {
+            status: StayRoomAssignmentStatus.RELEASED,
+            room: {
+              occupancyStatus: 'VACANT',
+              cleaningStatus: 'DIRTY',
+            },
+          },
+        ],
+      },
+    });
+    expect(staysService.checkOut).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      40,
+      {
+        notes: 'Guest settled at front desk.',
+      },
+    );
+  });
+
+  it('rejects users without room assignment permission', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/stays/40/rooms')
+      .set('Authorization', 'Bearer limited-token')
+      .send({
+        reservationRoomId: 31,
+        roomId: 10,
+        reason: 'Additional room.',
+      })
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 403,
+      message: 'Missing required permission.',
+    });
+    expect(staysService.assignRoom).not.toHaveBeenCalled();
+  });
+
+  it('allows permitted users to assign a room to an active stay', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/stays/40/rooms')
+      .set('Authorization', 'Bearer front-desk-token')
+      .send({
+        reservationRoomId: 31,
+        roomId: 10,
+        reason: 'Additional room.',
+      })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      statusCode: 201,
+      data: {
+        id: 40,
+        roomAssignments: [
+          {
+            roomId: 9,
+          },
+          {
+            roomId: 10,
+            reservationRoomId: 31,
+          },
+        ],
+      },
+    });
+    expect(staysService.assignRoom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      40,
+      {
+        reservationRoomId: 31,
+        roomId: 10,
+        reason: 'Additional room.',
+      },
+    );
+  });
+
+  it('allows permitted users to update a stay room assignment', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/stays/40/rooms/50')
+      .set('Authorization', 'Bearer front-desk-token')
+      .send({
+        reason: 'Corrected assignment note.',
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      statusCode: 200,
+      data: {
+        id: 40,
+      },
+    });
+    expect(staysService.updateRoomAssignment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      40,
+      50,
+      {
+        reason: 'Corrected assignment note.',
+      },
+    );
+  });
+
+  it('rejects users without room move permission', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/stays/40/room-move')
+      .set('Authorization', 'Bearer limited-token')
+      .send({
+        fromAssignmentId: 50,
+        toRoomId: 10,
+        reason: 'Guest requested quieter room.',
+      })
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 403,
+      message: 'Missing required permission.',
+    });
+    expect(staysService.moveRoom).not.toHaveBeenCalled();
+  });
+
+  it('allows permitted users to move an active stay room', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/stays/40/room-move')
+      .set('Authorization', 'Bearer front-desk-token')
+      .send({
+        fromAssignmentId: 50,
+        toRoomId: 10,
+        reason: 'Guest requested quieter room.',
+      })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      statusCode: 201,
+      data: {
+        id: 40,
+        roomAssignments: [
+          {
+            roomId: 9,
+            status: StayRoomAssignmentStatus.RELEASED,
+          },
+          {
+            roomId: 10,
+            status: StayRoomAssignmentStatus.ACTIVE,
+          },
+        ],
+      },
+    });
+    expect(staysService.moveRoom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      40,
+      {
+        fromAssignmentId: 50,
+        toRoomId: 10,
+        reason: 'Guest requested quieter room.',
+      },
+    );
+  });
+
+  it('rejects users without stay extension permission', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/stays/40/extend')
+      .set('Authorization', 'Bearer limited-token')
+      .send({
+        newExpectedCheckOutDate: '2026-06-15',
+        reason: 'Guest requested one additional night.',
+      })
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 403,
+      message: 'Missing required permission.',
+    });
+    expect(staysService.extendStay).not.toHaveBeenCalled();
+  });
+
+  it('allows permitted users to extend an active stay', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/stays/40/extend')
+      .set('Authorization', 'Bearer front-desk-token')
+      .send({
+        newExpectedCheckOutDate: '2026-06-15',
+        reason: 'Guest requested one additional night.',
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      statusCode: 200,
+      data: {
+        id: 40,
+        expectedCheckOutDate: '2026-06-15T00:00:00.000Z',
+      },
+    });
+    expect(staysService.extendStay).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      40,
+      {
+        newExpectedCheckOutDate: '2026-06-15',
+        reason: 'Guest requested one additional night.',
+      },
+    );
   });
 });
