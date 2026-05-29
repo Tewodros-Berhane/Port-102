@@ -133,3 +133,30 @@ export class FrontDeskService {
 
     return {
       page,
+      limit,
+      skip: (page - 1) * limit,
+      search: this.normalizeOptionalString(query.search),
+    };
+  }
+
+  private buildPagination({
+    page,
+    limit,
+    total,
+  }: {
+    page: number;
+    limit: number;
+    total: number;
+  }) {
+    return {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  private resolveOperationalDateRange(value?: string) {
+    const startDate = value
+      ? this.parseOperationalDate(value)
+      : this.startOfLocalDay(new Date());
