@@ -25,3 +25,30 @@ export class FrontDeskService {
     );
     const counts = await this.frontDeskRepository.getDashboardCounts({
       startDate,
+      endDate,
+    });
+
+    return {
+      date,
+      ...counts,
+    };
+  }
+
+  async listArrivals(
+    _currentUser: CurrentUserPayload,
+    query: FrontDeskArrivalsQueryDto,
+  ) {
+    const { date, startDate, endDate } = this.resolveOperationalDateRange(
+      query.date,
+    );
+    const { page, limit, skip, search } = this.resolveListQuery(query);
+    const [total, reservations] = await this.frontDeskRepository.listArrivals({
+      skip,
+      take: limit,
+      startDate,
+      endDate,
+      search,
+    });
+
+    return {
+      date,
