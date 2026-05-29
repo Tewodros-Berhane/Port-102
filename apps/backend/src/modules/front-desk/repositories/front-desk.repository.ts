@@ -350,3 +350,47 @@ export class FrontDeskRepository {
         take,
         select: frontDeskStaySelect,
         orderBy: [{ checkedInAt: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
+  }
+
+  private reservationSearchWhere(
+    search?: string,
+  ): Prisma.ReservationWhereInput {
+    return search
+      ? {
+          OR: [
+            {
+              reservationNumber: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+            {
+              guest: {
+                firstName: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              guest: {
+                lastName: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              guest: {
+                email: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              guest: {
+                phone: {
+                  contains: search,
