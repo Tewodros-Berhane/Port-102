@@ -26,3 +26,31 @@ describe('FrontDeskController', () => {
       getDashboard: jest.fn(),
       listArrivals: jest.fn(),
       listDepartures: jest.fn(),
+      listInHouse: jest.fn(),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [FrontDeskController],
+      providers: [
+        {
+          provide: FrontDeskService,
+          useValue: frontDeskService,
+        },
+        {
+          provide: PrismaService,
+          useValue: {
+            role: {
+              findFirst: jest.fn(),
+            },
+          },
+        },
+      ],
+    }).compile();
+
+    controller = module.get<FrontDeskController>(FrontDeskController);
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+
