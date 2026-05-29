@@ -121,3 +121,44 @@ describe('FrontDeskService', () => {
       listDepartures: jest.fn().mockResolvedValue([1, [activeStay]]),
       listInHouse: jest.fn().mockResolvedValue([1, [activeStay]]),
     };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        FrontDeskService,
+        {
+          provide: FrontDeskRepository,
+          useValue: frontDeskRepository,
+        },
+      ],
+    }).compile();
+
+    service = module.get<FrontDeskService>(FrontDeskService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  it('returns dashboard counts for an operational date', async () => {
+    const result = await service.getDashboard(currentUser, {
+      date: '2026-06-10',
+    });
+
+    expect(frontDeskRepository.getDashboardCounts).toHaveBeenCalledWith({
+      startDate: new Date(2026, 5, 10),
+      endDate: new Date(2026, 5, 11),
+    });
+    expect(result).toEqual({
+      date: '2026-06-10',
+      arrivalsToday: 3,
+      departuresToday: 2,
+      inHouseGuests: 8,
+      activeStays: 8,
+      vacantRooms: 12,
+      occupiedRooms: 8,
+      dirtyRooms: 4,
+      outOfOrderRooms: 1,
+      availablePhysicalRooms: 10,
+    });
+  });
+
