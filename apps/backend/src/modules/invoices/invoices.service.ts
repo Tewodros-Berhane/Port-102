@@ -40,5 +40,8 @@ export class InvoicesService {
   constructor(
     private readonly invoicesRepository: InvoicesRepository,
     private readonly receiptsRepository: ReceiptsRepository,
+    private readonly paymentsRepository: PaymentsRepository,
+    private readonly foliosRepository: FoliosRepository,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 }
