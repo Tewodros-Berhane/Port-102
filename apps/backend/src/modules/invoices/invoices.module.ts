@@ -8,6 +8,7 @@ import { InvoicesController } from './invoices.controller';
 import { InvoicesService } from './invoices.service';
 import { InvoicesRepository } from './repositories/invoices.repository';
 import { ReceiptsRepository } from './repositories/receipts.repository';
+import { ReceiptsController } from './receipts/receipts.controller';
 
 @Module({
   imports: [PrismaModule],
