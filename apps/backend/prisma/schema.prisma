@@ -191,6 +191,12 @@ model User {
   checkedOutStays           Stay[]               @relation("StayCheckedOutBy")
   assignedStayRooms         StayRoomAssignment[] @relation("StayRoomAssignedBy")
   releasedStayRooms         StayRoomAssignment[] @relation("StayRoomReleasedBy")
+  openedFolios              Folio[]              @relation("FolioOpenedBy")
+  closedFolios              Folio[]              @relation("FolioClosedBy")
+  postedFolioLineItems      FolioLineItem[]      @relation("FolioLineItemPostedBy")
+  recordedPayments          Payment[]            @relation("PaymentRecordedBy")
+  issuedInvoices            Invoice[]            @relation("InvoiceIssuedBy")
+  issuedReceipts            Receipt[]            @relation("ReceiptIssuedBy")
 
   @@index([roleId])
   @@index([departmentId])
