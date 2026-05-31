@@ -18,6 +18,7 @@ import {
 } from '../src/generated/prisma/client';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../src/modules/auth/types/current-user-payload.type';
+import { FoliosService } from '../src/modules/folios/folios.service';
 import { StaysService } from '../src/modules/stays/stays.service';
 
 type TestUser = CurrentUserPayload & {
