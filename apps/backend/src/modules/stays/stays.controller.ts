@@ -101,6 +101,22 @@ export class StaysController {
     return this.staysService.getById(currentUser, stayId);
   }
 
+  @Post(':id/open-folio')
+  @Permissions('folios.create')
+  @ApiOperation({ summary: 'Open a folio for an active stay' })
+  @ApiCreatedResponse({ description: 'Folio opened successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid folio request.' })
+  @ApiConflictResponse({ description: 'Stay cannot open a folio.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Stay was not found.' })
+  openFolio(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) stayId: number,
+  ) {
+    return this.foliosService.openForStay(currentUser, stayId);
+  }
+
   @Post(':id/check-out')
   @HttpCode(HttpStatus.OK)
   @Permissions('check_out.execute')
