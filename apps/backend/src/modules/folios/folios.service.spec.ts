@@ -197,6 +197,13 @@ describe('FoliosService', () => {
           });
         }
 
+        if (data.status === FolioStatus.CLOSED) {
+          return Promise.resolve({
+            ...settledFolio,
+            ...data,
+          });
+        }
+
         return Promise.resolve({
           ...chargedFolio,
           ...data,
