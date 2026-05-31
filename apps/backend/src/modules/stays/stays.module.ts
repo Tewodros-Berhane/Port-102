@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
+import { FoliosModule } from '../folios/folios.module';
 import { ReservationsModule } from '../reservations/reservations.module';
 import { RoomsModule } from '../rooms/rooms.module';
 import { StayRoomAssignmentsRepository } from './repositories/stay-room-assignments.repository';
