@@ -13,7 +13,13 @@ import { StaysService } from './stays.service';
 import { ReservationCheckInsController } from './reservation-check-ins.controller';
 
 @Module({
-  imports: [PrismaModule, AuditLogsModule, ReservationsModule, RoomsModule],
+  imports: [
+    PrismaModule,
+    AuditLogsModule,
+    ReservationsModule,
+    RoomsModule,
+    FoliosModule,
+  ],
   controllers: [StaysController, ReservationCheckInsController],
   providers: [
     StaysService,
