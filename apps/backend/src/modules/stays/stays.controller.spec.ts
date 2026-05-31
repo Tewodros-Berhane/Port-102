@@ -44,6 +44,9 @@ describe('StaysController', () => {
       moveRoom: jest.fn(),
       extendStay: jest.fn(),
     };
+    foliosService = {
+      openForStay: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [StaysController],
