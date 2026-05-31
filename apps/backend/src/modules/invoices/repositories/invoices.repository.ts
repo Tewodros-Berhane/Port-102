@@ -84,8 +84,11 @@ export class InvoicesRepository {
     });
   }
 
-  findIssuedInvoiceByFolioId(folioId: number) {
-    return this.prisma.invoice.findFirst({
+  findIssuedInvoiceByFolioId(
+    folioId: number,
+    client: InvoiceClient = this.prisma,
+  ) {
+    return client.invoice.findFirst({
       where: {
         folioId,
         status: InvoiceStatus.ISSUED,
