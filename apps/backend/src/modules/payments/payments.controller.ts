@@ -26,6 +26,10 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
+import { GetPaymentsQueryDto } from './dto/get-payments-query.dto';
+import { RecordPaymentDto } from './dto/record-payment.dto';
+import { VoidPaymentDto } from './dto/void-payment.dto';
 import { PaymentsService } from './payments.service';
 
 @ApiTags('Payments')
