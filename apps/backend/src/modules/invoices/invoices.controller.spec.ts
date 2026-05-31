@@ -7,7 +7,13 @@ import { InvoicesService } from './invoices.service';
 
 describe('InvoicesController', () => {
   let controller: InvoicesController;
-  const invoicesService = {};
+  let invoicesService: {
+    generate: jest.Mock;
+    list: jest.Mock;
+    listByFolio: jest.Mock;
+    getById: jest.Mock;
+    void: jest.Mock;
+  };
   const guard = {
     canActivate: jest.fn(() => true),
   };
