@@ -16,6 +16,7 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { AddFolioLineItemDto } from './dto/add-folio-line-item.dto';
 import { ApplyDiscountDto } from './dto/apply-discount.dto';
+import { CloseFolioDto } from './dto/close-folio.dto';
 import { CreateFolioDto } from './dto/create-folio.dto';
 import { GetFoliosQueryDto } from './dto/get-folios-query.dto';
 import { UpdateFolioDto } from './dto/update-folio.dto';
