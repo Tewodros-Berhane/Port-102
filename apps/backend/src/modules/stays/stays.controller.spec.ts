@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { StayStatus } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { FoliosService } from '../folios/folios.service';
 import { StaysController } from './stays.controller';
 import { StaysService } from './stays.service';
 
