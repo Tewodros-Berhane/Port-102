@@ -545,6 +545,7 @@ model Guest {
   user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   reservations   Reservation[]
   stays          Stay[]
+  folios         Folio[]
 
   @@index([status])
   @@index([lastName])
