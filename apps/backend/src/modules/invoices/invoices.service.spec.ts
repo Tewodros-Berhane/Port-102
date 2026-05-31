@@ -4,6 +4,18 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+
+import {
+  FolioStatus,
+  InvoiceStatus,
+  PaymentMethod,
+  PaymentStatus,
+  Prisma,
+  ReceiptStatus,
+} from '../../generated/prisma/client';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { FoliosRepository } from '../folios/repositories/folios.repository';
+import { PaymentsRepository } from '../payments/repositories/payments.repository';
 import { InvoicesService } from './invoices.service';
 import { InvoicesRepository } from './repositories/invoices.repository';
 import { ReceiptsRepository } from './repositories/receipts.repository';
