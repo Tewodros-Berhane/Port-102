@@ -118,6 +118,12 @@ describe('StaysController', () => {
     expect(staysService.getById).toHaveBeenCalledWith(currentUser, 40);
   });
 
+  it('delegates opening a stay folio', () => {
+    controller.openFolio(currentUser, 40);
+
+    expect(foliosService.openForStay).toHaveBeenCalledWith(currentUser, 40);
+  });
+
   it('delegates stay checkout', () => {
     const dto = {
       notes: 'Guest settled at front desk.',
