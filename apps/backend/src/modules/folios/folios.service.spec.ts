@@ -454,6 +454,56 @@ describe('FoliosService', () => {
     expect(foliosRepository.updateFolio).not.toHaveBeenCalled();
   });
 
+  it('closes a settled open folio', async () => {
+    foliosRepository.findFolio.mockResolvedValueOnce(settledFolio);
+
+    const result = await service.close(currentUser, 70, {
+      notes: ' Settled at checkout. ',
+    });
+
+    expect(foliosRepository.updateFolio).toHaveBeenCalledWith(70, {
+      status: FolioStatus.CLOSED,
+      closedAt: expect.any(Date),
+      closedByUserId: 1,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: 1,
+        action: 'folios.closed',
+        entityType: 'Folio',
+        entityId: '70',
+        metadata: expect.objectContaining({
+          folioNumber: 'FOL-20260610-123450',
+          notes: 'Settled at checkout.',
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      id: 70,
+      status: FolioStatus.CLOSED,
+      closedByUserId: 1,
+      balanceAmount: '0',
+    });
+  });
+
+  it('rejects closing non-open or unsettled folios', async () => {
+    foliosRepository.findFolio.mockResolvedValueOnce({
+      ...settledFolio,
+      status: FolioStatus.CLOSED,
+    });
+
+    await expect(service.close(currentUser, 70, {})).rejects.toThrow(
+      ConflictException,
+    );
+
+    foliosRepository.findFolio.mockResolvedValueOnce(chargedFolio);
+
+    await expect(service.close(currentUser, 70, {})).rejects.toThrow(
+      ConflictException,
+    );
+    expect(foliosRepository.updateFolio).not.toHaveBeenCalled();
+  });
+
   it('rejects status changes for non-open folios', async () => {
     foliosRepository.findFolio.mockResolvedValueOnce({
       ...folio,
