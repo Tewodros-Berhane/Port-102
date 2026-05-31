@@ -19,6 +19,9 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { StaysModule } from './modules/stays/stays.module';
 import { FrontDeskModule } from './modules/front-desk/front-desk.module';
+import { FoliosModule } from './modules/folios/folios.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { InvoicesModule } from './modules/invoices/invoices.module';
 
 @Module({
   imports: [
