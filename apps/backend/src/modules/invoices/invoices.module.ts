@@ -17,6 +17,7 @@ import { ReceiptsController } from './receipts/receipts.controller';
     InvoicesService,
     InvoicesRepository,
     ReceiptsRepository,
+    PaymentsRepository,
     PermissionsGuard,
   ],
   exports: [InvoicesService, InvoicesRepository, ReceiptsRepository],
