@@ -26,6 +26,10 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
+import { GenerateInvoiceDto } from './dto/generate-invoice.dto';
+import { GetInvoicesQueryDto } from './dto/get-invoices-query.dto';
+import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { InvoicesService } from './invoices.service';
 
 @ApiTags('Invoices and Receipts')
