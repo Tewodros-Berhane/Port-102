@@ -362,6 +362,33 @@ export class FoliosService {
     return this.serializeFolioSummary(updatedFolio, lineItems);
   }
 
+  async close(
+    currentUser: CurrentUserPayload,
+    folioId: number,
+    closeFolioDto: CloseFolioDto,
+  ) {
+    const folio = await this.findRequiredFolio(folioId);
+    this.ensureFolioCanBeClosed(folio);
+
+    const notes = this.normalizeOptionalString(closeFolioDto.notes);
+    const closedAt = new Date();
+    const closedFolio = await this.foliosRepository.updateFolio(folio.id, {
+      status: FolioStatus.CLOSED,
+      closedAt,
+      closedByUserId: currentUser.sub,
+    });
+
+    await this.recordFolioAudit(currentUser, 'folios.closed', closedFolio, {
+      folioNumber: closedFolio.folioNumber,
+      stayId: closedFolio.stayId,
+      guestId: closedFolio.guestId,
+      closedAt: closedAt.toISOString(),
+      notes,
+    });
+
+    return this.serializeFolio(closedFolio);
+  }
+
   async voidLineItem(
     currentUser: CurrentUserPayload,
     folioId: number,
