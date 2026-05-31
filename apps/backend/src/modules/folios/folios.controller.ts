@@ -131,6 +131,23 @@ export class FoliosController {
     return this.foliosService.update(currentUser, folioId, updateFolioDto);
   }
 
+  @Patch(':id/close')
+  @Permissions('folios.close')
+  @ApiOperation({ summary: 'Close a settled open folio' })
+  @ApiOkResponse({ description: 'Folio closed successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid close folio payload.' })
+  @ApiConflictResponse({ description: 'Folio cannot be closed.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Folio was not found.' })
+  close(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) folioId: number,
+    @Body() closeFolioDto: CloseFolioDto,
+  ) {
+    return this.foliosService.close(currentUser, folioId, closeFolioDto);
+  }
+
   @Post(':id/line-items')
   @Permissions('folios.manual_charge.create')
   @ApiOperation({ summary: 'Add a charge line item to an open folio' })
