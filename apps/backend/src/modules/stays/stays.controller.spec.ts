@@ -56,6 +56,10 @@ describe('StaysController', () => {
           useValue: staysService,
         },
         {
+          provide: FoliosService,
+          useValue: foliosService,
+        },
+        {
           provide: PrismaService,
           useValue: {
             role: {
