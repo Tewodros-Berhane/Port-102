@@ -29,6 +29,7 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
+import { FoliosService } from '../folios/folios.service';
 import { AssignStayRoomDto } from './dto/assign-stay-room.dto';
 import { CheckOutStayDto } from './dto/check-out-stay.dto';
 import { ExtendStayDto } from './dto/extend-stay.dto';
