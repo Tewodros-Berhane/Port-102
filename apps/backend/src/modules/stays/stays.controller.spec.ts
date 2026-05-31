@@ -19,6 +19,9 @@ describe('StaysController', () => {
     moveRoom: jest.Mock;
     extendStay: jest.Mock;
   };
+  let foliosService: {
+    openForStay: jest.Mock;
+  };
 
   const currentUser = {
     sub: 1,
