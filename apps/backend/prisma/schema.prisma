@@ -119,6 +119,50 @@ enum StayRoomAssignmentStatus {
   RELEASED
 }
 
+enum FolioStatus {
+  OPEN
+  CLOSED
+  VOIDED
+}
+
+enum FolioLineItemType {
+  ROOM_CHARGE
+  MANUAL_CHARGE
+  DISCOUNT
+  TAX
+  SERVICE_CHARGE
+  PAYMENT_ADJUSTMENT
+  POS_CHARGE
+  LAUNDRY_CHARGE
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  MOBILE_MONEY
+  QR_PAYMENT
+  OTHER
+}
+
+enum PaymentStatus {
+  RECORDED
+  VOIDED
+  REFUNDED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  VOIDED
+}
+
+enum ReceiptStatus {
+  ISSUED
+  VOIDED
+}
+
 model User {
   id                        Int                  @id @default(autoincrement())
   email                     String               @unique
