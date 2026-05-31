@@ -175,6 +175,44 @@ describe('InvoicesService', () => {
   };
 
   beforeEach(async () => {
+    invoicesRepository = {
+      runInTransaction: jest
+        .fn()
+        .mockImplementation((operation) => operation({ transaction: true })),
+      createInvoice: jest.fn().mockResolvedValue(invoice),
+      findInvoice: jest.fn().mockResolvedValue(invoice),
+      findByInvoiceNumber: jest.fn().mockResolvedValue(null),
+      findIssuedInvoiceByFolioId: jest.fn().mockResolvedValue(null),
+      listInvoices: jest.fn().mockResolvedValue([1, [invoice]]),
+      updateInvoice: jest.fn().mockResolvedValue({
+        ...invoice,
+        status: InvoiceStatus.VOIDED,
+        voidedAt: new Date('2026-06-10T10:00:00.000Z'),
+        voidReason: 'Invoice regenerated with corrected folio totals.',
+      }),
+    };
+    foliosRepository = {
+      findFolio: jest.fn().mockResolvedValue(folio),
+    };
+    receiptsRepository = {
+      createReceipt: jest.fn().mockResolvedValue(receipt),
+      findReceipt: jest.fn().mockResolvedValue(receipt),
+      findByReceiptNumber: jest.fn().mockResolvedValue(null),
+      listReceipts: jest.fn().mockResolvedValue([1, [receipt]]),
+      updateReceipt: jest.fn().mockResolvedValue({
+        ...receipt,
+        status: ReceiptStatus.VOIDED,
+        voidedAt: new Date('2026-06-10T10:00:00.000Z'),
+        voidReason: 'Receipt issued against the wrong payment.',
+      }),
+    };
+    paymentsRepository = {
+      findPayment: jest.fn().mockResolvedValue(payment),
+    };
+    auditLogsService = {
+      record: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InvoicesService,
