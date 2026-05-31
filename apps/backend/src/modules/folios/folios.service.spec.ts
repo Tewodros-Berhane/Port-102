@@ -94,6 +94,11 @@ describe('FoliosService', () => {
     totalAmount: new Prisma.Decimal(200),
     balanceAmount: new Prisma.Decimal(200),
   };
+  const settledFolio = {
+    ...chargedFolio,
+    paidAmount: new Prisma.Decimal(200),
+    balanceAmount: new Prisma.Decimal(0),
+  };
   const lineItem = {
     id: 80,
     folioId: 70,
