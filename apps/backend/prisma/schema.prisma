@@ -474,6 +474,7 @@ model Stay {
   checkedInBy          User?                @relation("StayCheckedInBy", fields: [checkedInByUserId], references: [id], onDelete: SetNull)
   checkedOutBy         User?                @relation("StayCheckedOutBy", fields: [checkedOutByUserId], references: [id], onDelete: SetNull)
   roomAssignments      StayRoomAssignment[]
+  folio                Folio?
 
   @@index([guestId])
   @@index([status])
