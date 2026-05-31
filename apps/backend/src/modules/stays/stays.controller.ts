@@ -43,7 +43,10 @@ import { StaysService } from './stays.service';
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('stays')
 export class StaysController {
-  constructor(private readonly staysService: StaysService) {}
+  constructor(
+    private readonly staysService: StaysService,
+    private readonly foliosService: FoliosService,
+  ) {}
 
   @Get('active/list')
   @Permissions('reservations.read')
