@@ -224,6 +224,18 @@ describe('InvoicesService', () => {
           provide: ReceiptsRepository,
           useValue: receiptsRepository,
         },
+        {
+          provide: PaymentsRepository,
+          useValue: paymentsRepository,
+        },
+        {
+          provide: FoliosRepository,
+          useValue: foliosRepository,
+        },
+        {
+          provide: AuditLogsService,
+          useValue: auditLogsService,
+        },
       ],
     }).compile();
 
