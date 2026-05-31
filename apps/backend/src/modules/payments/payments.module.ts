@@ -9,7 +9,7 @@ import { PaymentsService } from './payments.service';
 import { PaymentsRepository } from './repositories/payments.repository';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuditLogsModule, FoliosModule, InvoicesModule],
   controllers: [PaymentsController],
   providers: [PaymentsService, PaymentsRepository, PermissionsGuard],
   exports: [PaymentsService, PaymentsRepository],

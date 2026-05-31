@@ -127,6 +127,7 @@ describe('StaysController', () => {
   it('delegates stay checkout', () => {
     const dto = {
       notes: 'Guest settled at front desk.',
+      closeFolio: true,
     };
 
     controller.checkOut(currentUser, 40, dto);

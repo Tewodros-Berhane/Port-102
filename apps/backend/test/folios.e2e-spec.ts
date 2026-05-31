@@ -42,6 +42,7 @@ const frontDeskUser: TestUser = {
     'folios.create',
     'folios.read',
     'folios.update',
+    'folios.close',
     'folios.manual_charge.create',
     'folios.discount.apply.small',
     'folios.charge.void',
@@ -55,9 +56,17 @@ const limitedUser: TestUser = {
   permissions: [],
 };
 
+const updateOnlyUser: TestUser = {
+  ...frontDeskUser,
+  sub: 3,
+  email: 'folio-update-only@demo-hotel.com',
+  permissions: ['folios.update'],
+};
+
 const testUsersByToken = new Map<string, TestUser>([
   ['front-desk-token', frontDeskUser],
   ['limited-token', limitedUser],
+  ['update-only-token', updateOnlyUser],
 ]);
 
 const folio = {
@@ -138,6 +147,7 @@ describe('Folios API (e2e)', () => {
     getByStayId: jest.fn(),
     getById: jest.fn(),
     update: jest.fn(),
+    close: jest.fn(),
     openForStay: jest.fn(),
     getSummary: jest.fn(),
     addLineItem: jest.fn(),
@@ -218,6 +228,12 @@ describe('Folios API (e2e)', () => {
     foliosService.update.mockResolvedValue({
       ...folio,
       status: FolioStatus.VOIDED,
+    });
+    foliosService.close.mockResolvedValue({
+      ...folio,
+      status: FolioStatus.CLOSED,
+      closedAt: '2026-06-12T08:00:00.000Z',
+      closedByUserId: 1,
     });
     foliosService.openForStay.mockResolvedValue(folio);
     foliosService.getSummary.mockResolvedValue(folioSummary);
@@ -427,6 +443,50 @@ describe('Folios API (e2e)', () => {
         status: FolioStatus.VOIDED,
       },
     );
+  });
+
+  it('closes one settled folio for permitted users', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/folios/70/close')
+      .set('Authorization', 'Bearer front-desk-token')
+      .send({
+        notes: 'Folio settled at checkout.',
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        status: FolioStatus.CLOSED,
+        closedByUserId: 1,
+      },
+    });
+    expect(foliosService.close).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      70,
+      {
+        notes: 'Folio settled at checkout.',
+      },
+    );
+  });
+
+  it('rejects users without folio close permission', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/folios/70/close')
+      .set('Authorization', 'Bearer update-only-token')
+      .send({
+        notes: 'Folio settled at checkout.',
+      })
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 403,
+      message: 'Missing required permission.',
+    });
+    expect(foliosService.close).not.toHaveBeenCalled();
   });
 
   it('rejects users without manual charge permission', async () => {

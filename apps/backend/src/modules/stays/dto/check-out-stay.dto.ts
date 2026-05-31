@@ -20,4 +20,14 @@ export class CheckOutStayDto {
   @IsBoolean()
   @IsOptional()
   forceCheckout?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    default: false,
+    description:
+      'When true, closes the linked open folio during checkout if its balance is zero.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  closeFolio?: boolean;
 }

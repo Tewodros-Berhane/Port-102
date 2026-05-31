@@ -563,6 +563,7 @@ describe('Stay lifecycle API (e2e)', () => {
       .set('Authorization', 'Bearer front-desk-token')
       .send({
         notes: 'Guest settled at front desk.',
+        closeFolio: true,
       })
       .expect(200);
 
@@ -591,6 +592,7 @@ describe('Stay lifecycle API (e2e)', () => {
       40,
       {
         notes: 'Guest settled at front desk.',
+        closeFolio: true,
       },
     );
   });

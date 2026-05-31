@@ -6,7 +6,9 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 
 import {
+  FolioStatus,
   GuestStatus,
+  Prisma,
   ReservationRoomStatus,
   ReservationSource,
   ReservationStatus,
@@ -17,6 +19,7 @@ import {
   StayStatus,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { FoliosRepository } from '../folios/repositories/folios.repository';
 import { ReservationAvailabilityRepository } from '../reservations/repositories/reservation-availability.repository';
 import { ReservationRoomsRepository } from '../reservations/repositories/reservation-rooms.repository';
 import { ReservationsRepository } from '../reservations/repositories/reservations.repository';
@@ -228,6 +231,47 @@ describe('StaysService', () => {
       },
     ],
   };
+  const settledFolio = {
+    id: 70,
+    folioNumber: 'FOL-20260610-123450',
+    stayId: 40,
+    guestId: 12,
+    status: FolioStatus.OPEN,
+    subtotalAmount: new Prisma.Decimal(200),
+    discountAmount: new Prisma.Decimal(0),
+    taxAmount: new Prisma.Decimal(0),
+    serviceAmount: new Prisma.Decimal(0),
+    totalAmount: new Prisma.Decimal(200),
+    paidAmount: new Prisma.Decimal(200),
+    balanceAmount: new Prisma.Decimal(0),
+    openedAt: new Date('2026-06-10T08:05:00.000Z'),
+    closedAt: null,
+    openedByUserId: 1,
+    closedByUserId: null,
+    createdAt: new Date('2026-06-10T08:05:00.000Z'),
+    updatedAt: new Date('2026-06-10T08:05:00.000Z'),
+    stay: {
+      id: 40,
+      stayNumber: 'STAY-20260610-123450',
+      reservationId: 20,
+      guestId: 12,
+      status: StayStatus.ACTIVE,
+      checkedInAt: new Date('2026-06-10T08:00:00.000Z'),
+      expectedCheckOutDate: new Date('2026-06-12T00:00:00.000Z'),
+    },
+    guest: reservation.guest,
+    openedBy: {
+      id: 1,
+      email: 'admin@demo-hotel.com',
+      fullName: 'Admin User',
+    },
+    closedBy: null,
+  };
+  const unsettledFolio = {
+    ...settledFolio,
+    paidAmount: new Prisma.Decimal(50),
+    balanceAmount: new Prisma.Decimal(150),
+  };
   const extendedStay = {
     ...checkedInStay,
     expectedCheckOutDate: new Date('2026-06-15T00:00:00.000Z'),
@@ -268,6 +312,10 @@ describe('StaysService', () => {
     findRoom: jest.Mock;
     updateRoom: jest.Mock;
     createStatusLogs: jest.Mock;
+  };
+  let foliosRepository: {
+    findByStayId: jest.Mock;
+    updateFolio: jest.Mock;
   };
   let auditLogsService: {
     record: jest.Mock;
@@ -311,6 +359,15 @@ describe('StaysService', () => {
       updateRoom: jest.fn(),
       createStatusLogs: jest.fn(),
     };
+    foliosRepository = {
+      findByStayId: jest.fn().mockResolvedValue(null),
+      updateFolio: jest.fn().mockResolvedValue({
+        ...settledFolio,
+        status: FolioStatus.CLOSED,
+        closedAt: checkedOutAt,
+        closedByUserId: 1,
+      }),
+    };
     auditLogsService = {
       record: jest.fn(),
     };
@@ -341,6 +398,10 @@ describe('StaysService', () => {
         {
           provide: RoomsRepository,
           useValue: roomsRepository,
+        },
+        {
+          provide: FoliosRepository,
+          useValue: foliosRepository,
         },
         {
           provide: AuditLogsService,
@@ -732,6 +793,7 @@ describe('StaysService', () => {
     });
 
     expect(staysRepository.findStay).toHaveBeenCalledWith(40);
+    expect(foliosRepository.findByStayId).toHaveBeenCalledWith(40);
     expect(
       stayRoomAssignmentsRepository.listActiveAssignmentsForStay,
     ).toHaveBeenCalledWith(40);
@@ -806,6 +868,10 @@ describe('StaysService', () => {
         action: 'stays.checked_out',
         entityType: 'Stay',
         entityId: '40',
+        metadata: expect.objectContaining({
+          folioId: null,
+          folioClosed: false,
+        }),
       }),
     );
     expect(result).toMatchObject({
@@ -822,6 +888,78 @@ describe('StaysService', () => {
         },
       ],
     });
+  });
+
+  it('rejects checkout when an open folio has a non-zero balance', async () => {
+    foliosRepository.findByStayId.mockResolvedValueOnce(unsettledFolio);
+
+    await expect(service.checkOut(currentUser, 40, {})).rejects.toThrow(
+      ConflictException,
+    );
+
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: 1,
+        action: 'stays.checkout_blocked_unsettled_folio',
+        entityType: 'Stay',
+        entityId: '40',
+        metadata: expect.objectContaining({
+          folioId: 70,
+          folioNumber: 'FOL-20260610-123450',
+          balanceAmount: '150',
+        }),
+      }),
+    );
+    expect(
+      stayRoomAssignmentsRepository.listActiveAssignmentsForStay,
+    ).not.toHaveBeenCalled();
+    expect(staysRepository.runInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('checks out and closes a settled open folio when requested', async () => {
+    foliosRepository.findByStayId.mockResolvedValueOnce(settledFolio);
+    staysRepository.findStay
+      .mockResolvedValueOnce(checkedInStay)
+      .mockResolvedValueOnce(checkedOutStay);
+
+    await service.checkOut(currentUser, 40, {
+      notes: ' Settled. ',
+      closeFolio: true,
+    });
+
+    expect(foliosRepository.updateFolio).toHaveBeenCalledWith(
+      70,
+      {
+        status: FolioStatus.CLOSED,
+        closedAt: expect.any(Date),
+        closedByUserId: 1,
+      },
+      { transaction: true },
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: 1,
+        action: 'folios.closed',
+        entityType: 'Folio',
+        entityId: '70',
+        metadata: expect.objectContaining({
+          source: 'stay_checkout',
+          notes: 'Settled.',
+        }),
+      }),
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: 1,
+        action: 'stays.checked_out',
+        entityType: 'Stay',
+        entityId: '40',
+        metadata: expect.objectContaining({
+          folioId: 70,
+          folioClosed: true,
+        }),
+      }),
+    );
   });
 
   it('rejects checkout for inactive stays', async () => {

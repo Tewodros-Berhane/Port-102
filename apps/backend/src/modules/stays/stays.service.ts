@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 
 import {
+  FolioStatus,
   GuestStatus,
   ReservationRoomStatus,
   ReservationStatus,
@@ -17,6 +18,10 @@ import {
 } from '../../generated/prisma/client';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import {
+  FolioRecord,
+  FoliosRepository,
+} from '../folios/repositories/folios.repository';
 import { ReservationAvailabilityRepository } from '../reservations/repositories/reservation-availability.repository';
 import {
   ReservationRoomRecord,
@@ -59,6 +64,7 @@ export class StaysService {
     private readonly reservationRoomsRepository: ReservationRoomsRepository,
     private readonly reservationAvailabilityRepository: ReservationAvailabilityRepository,
     private readonly roomsRepository: RoomsRepository,
+    private readonly foliosRepository: FoliosRepository,
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
@@ -228,6 +234,9 @@ export class StaysService {
       throw new ConflictException('Only active stays can be checked out.');
     }
 
+    const folio = await this.foliosRepository.findByStayId(stay.id);
+    await this.ensureCheckoutFolioIsSettled(currentUser, stay, folio);
+
     const activeAssignments =
       await this.stayRoomAssignmentsRepository.listActiveAssignmentsForStay(
         stay.id,
@@ -241,6 +250,10 @@ export class StaysService {
 
     const checkedOutAt = new Date();
     const notes = this.normalizeOptionalString(checkOutStayDto.notes);
+    const shouldCloseFolio =
+      checkOutStayDto.closeFolio === true &&
+      folio?.status === FolioStatus.OPEN &&
+      folio.balanceAmount.equals(0);
     const checkedOutStay = await this.staysRepository.runInTransaction(
       async (client) => {
         for (const assignment of activeAssignments) {
@@ -302,6 +315,18 @@ export class StaysService {
           client,
         );
 
+        if (shouldCloseFolio && folio) {
+          await this.foliosRepository.updateFolio(
+            folio.id,
+            {
+              status: FolioStatus.CLOSED,
+              closedAt: checkedOutAt,
+              closedByUserId: currentUser.sub,
+            },
+            client,
+          );
+        }
+
         // TODO: emit housekeeping task hook here once housekeeping automation exists.
         const updatedStay = await this.staysRepository.findStay(
           stay.id,
@@ -316,6 +341,23 @@ export class StaysService {
       },
     );
 
+    if (shouldCloseFolio && folio) {
+      await this.auditLogsService.record({
+        actorUserId: currentUser.sub,
+        action: 'folios.closed',
+        entityType: 'Folio',
+        entityId: String(folio.id),
+        metadata: {
+          folioNumber: folio.folioNumber,
+          stayId: stay.id,
+          guestId: folio.guestId,
+          closedAt: checkedOutAt.toISOString(),
+          source: 'stay_checkout',
+          notes,
+        },
+      });
+    }
+
     await this.auditLogsService.record({
       actorUserId: currentUser.sub,
       action: 'stays.checked_out',
@@ -326,6 +368,8 @@ export class StaysService {
         reservationId: checkedOutStay.reservationId,
         guestId: checkedOutStay.guestId,
         checkedOutAt: checkedOutAt.toISOString(),
+        folioId: folio?.id ?? null,
+        folioClosed: shouldCloseFolio,
         releasedAssignments: activeAssignments.map((assignment) => ({
           assignmentId: assignment.id,
           reservationRoomId: assignment.reservationRoomId,
@@ -839,6 +883,35 @@ export class StaysService {
     if (assignment.status !== StayRoomAssignmentStatus.ACTIVE) {
       throw new ConflictException(
         'Released room assignments cannot be updated.',
+      );
+    }
+  }
+
+  private async ensureCheckoutFolioIsSettled(
+    currentUser: CurrentUserPayload,
+    stay: StayRecord,
+    folio: FolioRecord | null,
+  ) {
+    if (!folio || folio.status !== FolioStatus.OPEN) {
+      return;
+    }
+
+    if (!folio.balanceAmount.equals(0)) {
+      await this.auditLogsService.record({
+        actorUserId: currentUser.sub,
+        action: 'stays.checkout_blocked_unsettled_folio',
+        entityType: 'Stay',
+        entityId: String(stay.id),
+        metadata: {
+          stayNumber: stay.stayNumber,
+          folioId: folio.id,
+          folioNumber: folio.folioNumber,
+          balanceAmount: folio.balanceAmount.toString(),
+        },
+      });
+
+      throw new ConflictException(
+        'Stay cannot be checked out while the open folio has a non-zero balance.',
       );
     }
   }
