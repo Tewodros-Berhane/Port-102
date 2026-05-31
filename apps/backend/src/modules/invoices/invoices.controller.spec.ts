@@ -27,6 +27,14 @@ describe('InvoicesController', () => {
   };
 
   beforeEach(async () => {
+    invoicesService = {
+      generate: jest.fn(),
+      list: jest.fn(),
+      listByFolio: jest.fn(),
+      getById: jest.fn(),
+      void: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [InvoicesController],
       providers: [
