@@ -7,7 +7,13 @@ import { PaymentsService } from './payments.service';
 
 describe('PaymentsController', () => {
   let controller: PaymentsController;
-  const paymentsService = {};
+  let paymentsService: {
+    record: jest.Mock;
+    list: jest.Mock;
+    listByFolio: jest.Mock;
+    getById: jest.Mock;
+    void: jest.Mock;
+  };
   const guard = {
     canActivate: jest.fn(() => true),
   };
