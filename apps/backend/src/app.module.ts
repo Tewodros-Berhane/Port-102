@@ -51,6 +51,9 @@ import { InvoicesModule } from './modules/invoices/invoices.module';
     ReservationsModule,
     StaysModule,
     FrontDeskModule,
+    FoliosModule,
+    PaymentsModule,
+    InvoicesModule,
   ],
 })
 export class AppModule {}
