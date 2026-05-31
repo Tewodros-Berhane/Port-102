@@ -39,6 +39,7 @@ describe('FoliosController', () => {
       getByStayId: jest.fn(),
       getById: jest.fn(),
       update: jest.fn(),
+      close: jest.fn(),
       getSummary: jest.fn(),
       addLineItem: jest.fn(),
       applyDiscount: jest.fn(),
