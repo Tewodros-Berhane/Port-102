@@ -13,6 +13,7 @@ describe('FoliosController', () => {
     getByStayId: jest.Mock;
     getById: jest.Mock;
     update: jest.Mock;
+    close: jest.Mock;
     getSummary: jest.Mock;
     addLineItem: jest.Mock;
     applyDiscount: jest.Mock;
