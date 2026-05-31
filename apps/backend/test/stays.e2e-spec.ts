@@ -150,6 +150,14 @@ const extendedStay = {
     checkOutDate: '2026-06-15T00:00:00.000Z',
   },
 };
+const folio = {
+  id: 70,
+  folioNumber: 'FOL-20260610-123450',
+  stayId: 40,
+  guestId: 12,
+  status: 'OPEN',
+  balanceAmount: '0',
+};
 
 function getRequiredPermissions(context: ExecutionContext) {
   const controllerPermissions =
@@ -178,6 +186,9 @@ describe('Stay lifecycle API (e2e)', () => {
     updateRoomAssignment: jest.fn(),
     moveRoom: jest.fn(),
     extendStay: jest.fn(),
+  };
+  const foliosService = {
+    openForStay: jest.fn(),
   };
 
   beforeAll(async () => {
@@ -229,6 +240,8 @@ describe('Stay lifecycle API (e2e)', () => {
       })
       .overrideProvider(StaysService)
       .useValue(staysService)
+      .overrideProvider(FoliosService)
+      .useValue(foliosService)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -244,6 +257,7 @@ describe('Stay lifecycle API (e2e)', () => {
     staysService.updateRoomAssignment.mockResolvedValue(roomAssignedStay);
     staysService.moveRoom.mockResolvedValue(roomMovedStay);
     staysService.extendStay.mockResolvedValue(extendedStay);
+    foliosService.openForStay.mockResolvedValue(folio);
     staysService.list.mockResolvedValue({
       items: [checkedInStay],
       pagination: {
@@ -435,6 +449,42 @@ describe('Stay lifecycle API (e2e)', () => {
       },
     });
     expect(staysService.getById).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 1,
+      }),
+      40,
+    );
+  });
+
+  it('rejects users without folio create permission when opening a stay folio', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/stays/40/open-folio')
+      .set('Authorization', 'Bearer limited-token')
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      statusCode: 403,
+      message: 'Missing required permission.',
+    });
+    expect(foliosService.openForStay).not.toHaveBeenCalled();
+  });
+
+  it('opens a folio from a stay for permitted users', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/stays/40/open-folio')
+      .set('Authorization', 'Bearer front-desk-token')
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      statusCode: 201,
+      data: {
+        id: 70,
+        stayId: 40,
+      },
+    });
+    expect(foliosService.openForStay).toHaveBeenCalledWith(
       expect.objectContaining({
         sub: 1,
       }),
