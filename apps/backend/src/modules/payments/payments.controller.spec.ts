@@ -27,6 +27,14 @@ describe('PaymentsController', () => {
   };
 
   beforeEach(async () => {
+    paymentsService = {
+      record: jest.fn(),
+      list: jest.fn(),
+      listByFolio: jest.fn(),
+      getById: jest.fn(),
+      void: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PaymentsController],
       providers: [
