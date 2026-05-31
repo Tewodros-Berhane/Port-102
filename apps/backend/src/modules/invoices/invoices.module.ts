@@ -11,8 +11,8 @@ import { ReceiptsRepository } from './repositories/receipts.repository';
 import { ReceiptsController } from './receipts/receipts.controller';
 
 @Module({
-  imports: [PrismaModule],
-  controllers: [InvoicesController],
+  imports: [PrismaModule, AuditLogsModule, FoliosModule],
+  controllers: [InvoicesController, ReceiptsController],
   providers: [
     InvoicesService,
     InvoicesRepository,
