@@ -148,8 +148,31 @@ describe('InvoicesService', () => {
   };
 
   let service: InvoicesService;
-  const invoicesRepository = {};
-  const receiptsRepository = {};
+  let invoicesRepository: {
+    runInTransaction: jest.Mock;
+    createInvoice: jest.Mock;
+    findInvoice: jest.Mock;
+    findByInvoiceNumber: jest.Mock;
+    findIssuedInvoiceByFolioId: jest.Mock;
+    listInvoices: jest.Mock;
+    updateInvoice: jest.Mock;
+  };
+  let foliosRepository: {
+    findFolio: jest.Mock;
+  };
+  let receiptsRepository: {
+    createReceipt: jest.Mock;
+    findReceipt: jest.Mock;
+    findByReceiptNumber: jest.Mock;
+    listReceipts: jest.Mock;
+    updateReceipt: jest.Mock;
+  };
+  let paymentsRepository: {
+    findPayment: jest.Mock;
+  };
+  let auditLogsService: {
+    record: jest.Mock;
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
