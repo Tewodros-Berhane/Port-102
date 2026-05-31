@@ -48,6 +48,7 @@ const adminUser: TestUser = {
     'room_assignment.update',
     'room_move.execute',
     'stay_extension.execute',
+    'folios.create',
   ],
 };
 
