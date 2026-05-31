@@ -482,6 +482,16 @@ export class FoliosService {
     }
   }
 
+  private ensureFolioCanBeClosed(folio: FolioRecord) {
+    if (folio.status !== FolioStatus.OPEN) {
+      throw new ConflictException('Only open folios can be closed.');
+    }
+
+    if (!folio.balanceAmount.equals(0)) {
+      throw new ConflictException('Folio balance must be zero before closing.');
+    }
+  }
+
   private async findRequiredStayForFolio(stayId: number) {
     const stay = await this.foliosRepository.findStayForFolio(stayId);
 
