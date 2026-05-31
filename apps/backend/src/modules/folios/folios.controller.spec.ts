@@ -113,6 +113,16 @@ describe('FoliosController', () => {
     expect(foliosService.update).toHaveBeenCalledWith(currentUser, 70, dto);
   });
 
+  it('delegates folio close', () => {
+    const dto = {
+      notes: 'Folio settled at checkout.',
+    };
+
+    controller.close(currentUser, 70, dto);
+
+    expect(foliosService.close).toHaveBeenCalledWith(currentUser, 70, dto);
+  });
+
   it('delegates folio summary lookup', () => {
     controller.getSummary(currentUser, 70);
 
