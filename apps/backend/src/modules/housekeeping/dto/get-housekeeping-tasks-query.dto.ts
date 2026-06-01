@@ -28,3 +28,33 @@ export class GetHousekeepingTasksQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
+  @IsOptional()
+  limit = 20;
+
+  @ApiPropertyOptional({
+    example: '101',
+    description: 'Search task number, notes, room number, or assignee.',
+  })
+  @IsString()
+  @IsOptional()
+  search?: string;
+
+  @ApiPropertyOptional({
+    enum: HousekeepingTaskStatus,
+    example: HousekeepingTaskStatus.PENDING,
+  })
+  @IsEnum(HousekeepingTaskStatus)
+  @IsOptional()
+  status?: HousekeepingTaskStatus;
+
+  @ApiPropertyOptional({
+    enum: HousekeepingTaskType,
+    example: HousekeepingTaskType.CHECKOUT_CLEANING,
+  })
+  @IsEnum(HousekeepingTaskType)
+  @IsOptional()
+  type?: HousekeepingTaskType;
+
+  @ApiPropertyOptional({
+    enum: HousekeepingPriority,
