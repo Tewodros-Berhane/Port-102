@@ -44,3 +44,49 @@ CREATE TABLE "housekeeping_tasks" (
     CONSTRAINT "housekeeping_tasks_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "housekeeping_issues" (
+    "id" SERIAL NOT NULL,
+    "issueNumber" TEXT NOT NULL,
+    "taskId" INTEGER,
+    "roomId" INTEGER NOT NULL,
+    "reportedByUserId" INTEGER,
+    "status" "HousekeepingIssueStatus" NOT NULL DEFAULT 'OPEN',
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "photoUrl" TEXT,
+    "resolvedAt" TIMESTAMP(3),
+    "resolvedByUserId" INTEGER,
+    "resolutionNotes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "housekeeping_issues_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "housekeeping_tasks_taskNumber_key" ON "housekeeping_tasks"("taskNumber");
+
+-- CreateIndex
+CREATE INDEX "housekeeping_tasks_roomId_idx" ON "housekeeping_tasks"("roomId");
+
+-- CreateIndex
+CREATE INDEX "housekeeping_tasks_status_idx" ON "housekeeping_tasks"("status");
+
+-- CreateIndex
+CREATE INDEX "housekeeping_tasks_priority_idx" ON "housekeeping_tasks"("priority");
+
+-- CreateIndex
+CREATE INDEX "housekeeping_tasks_assignedToUserId_idx" ON "housekeeping_tasks"("assignedToUserId");
+
+-- CreateIndex
+CREATE INDEX "housekeeping_tasks_type_idx" ON "housekeeping_tasks"("type");
+
+-- CreateIndex
+CREATE INDEX "housekeeping_tasks_createdAt_idx" ON "housekeeping_tasks"("createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "housekeeping_issues_issueNumber_key" ON "housekeeping_issues"("issueNumber");
+
+-- CreateIndex
+CREATE INDEX "housekeeping_issues_taskId_idx" ON "housekeeping_issues"("taskId");
