@@ -334,3 +334,171 @@ describe('HousekeepingService', () => {
         action: 'housekeeping.tasks.assigned',
       }),
     );
+    expect(result).toMatchObject({
+      status: HousekeepingTaskStatus.ASSIGNED,
+      assignedToUserId: assignedUser.id,
+    });
+  });
+
+  it('rejects reassignment for unassigned tasks', async () => {
+    housekeepingTasksRepository.findTask.mockResolvedValue(createTask());
+
+    await expect(
+      service.reassign(currentUser, 9, {
+        assignedToUserId: 8,
+      }),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('starts an assigned task for an assigned-only attendant', async () => {
+    const task = createTask({
+      status: HousekeepingTaskStatus.ASSIGNED,
+      assignedToUserId: currentUser.sub,
+    });
+    const startedTask = createTask({
+      status: HousekeepingTaskStatus.IN_PROGRESS,
+      assignedToUserId: currentUser.sub,
+      startedAt: now,
+      notes: 'Starting now.',
+    });
+    housekeepingTasksRepository.findTask.mockResolvedValue(task);
+    housekeepingTasksRepository.updateTask.mockResolvedValue(startedTask);
+
+    const result = await service.start(
+      currentUser,
+      ['housekeeping.tasks.start.assigned'],
+      9,
+      {
+        notes: ' Starting now. ',
+      },
+    );
+
+    expect(housekeepingTasksRepository.updateTask).toHaveBeenCalledWith(9, {
+      status: HousekeepingTaskStatus.IN_PROGRESS,
+      startedAt: expect.any(Date),
+      notes: 'Starting now.',
+    });
+    expect(result).toMatchObject({
+      status: HousekeepingTaskStatus.IN_PROGRESS,
+      startedAt: now,
+    });
+  });
+
+  it('rejects assigned-only start for a task assigned to another user', async () => {
+    housekeepingTasksRepository.findTask.mockResolvedValue(
+      createTask({
+        status: HousekeepingTaskStatus.ASSIGNED,
+        assignedToUserId: 999,
+      }),
+    );
+
+    await expect(
+      service.start(currentUser, ['housekeeping.tasks.start.assigned'], 9, {}),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('completes a task, marks room clean, and creates a room status log', async () => {
+    const task = createTask({
+      status: HousekeepingTaskStatus.IN_PROGRESS,
+      assignedToUserId: currentUser.sub,
+      room: createRoom({
+        cleaningStatus: RoomCleaningStatus.DIRTY,
+      }),
+    });
+    const completedTask = createTask({
+      status: HousekeepingTaskStatus.INSPECTION_PENDING,
+      assignedToUserId: currentUser.sub,
+      completedAt: now,
+      completedByUserId: currentUser.sub,
+      completionNotes: 'Room cleaned.',
+      room: createRoom({
+        cleaningStatus: RoomCleaningStatus.CLEAN,
+      }),
+    });
+    housekeepingTasksRepository.findTask
+      .mockResolvedValueOnce(task)
+      .mockResolvedValueOnce(completedTask);
+
+    const result = await service.complete(
+      currentUser,
+      ['housekeeping.tasks.complete.assigned'],
+      9,
+      {
+        completionNotes: ' Room cleaned. ',
+      },
+    );
+
+    expect(housekeepingTasksRepository.updateTask).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        status: HousekeepingTaskStatus.INSPECTION_PENDING,
+        completedByUserId: currentUser.sub,
+        completionNotes: 'Room cleaned.',
+      }),
+      expect.any(Object),
+    );
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      12,
+      {
+        cleaningStatus: RoomCleaningStatus.CLEAN,
+      },
+      expect.any(Object),
+    );
+    expect(roomsRepository.createStatusLogs).toHaveBeenCalledWith(
+      [
+        {
+          roomId: 12,
+          actorUserId: currentUser.sub,
+          field: 'cleaningStatus',
+          oldValue: RoomCleaningStatus.DIRTY,
+          newValue: RoomCleaningStatus.CLEAN,
+          reason: 'Housekeeping task completed',
+        },
+      ],
+      expect.any(Object),
+    );
+    expect(result).toMatchObject({
+      status: HousekeepingTaskStatus.INSPECTION_PENDING,
+      completedByUserId: currentUser.sub,
+      room: {
+        cleaningStatus: RoomCleaningStatus.CLEAN,
+      },
+    });
+  });
+
+  it('cancels a task with a required reason', async () => {
+    const cancelledTask = createTask({
+      status: HousekeepingTaskStatus.CANCELLED,
+      cancelledByUserId: currentUser.sub,
+      cancelledAt: now,
+      cancellationReason: 'Guest extended stay.',
+    });
+    housekeepingTasksRepository.findTask.mockResolvedValue(createTask());
+    housekeepingTasksRepository.updateTask.mockResolvedValue(cancelledTask);
+
+    const result = await service.cancel(currentUser, 9, {
+      reason: ' Guest extended stay. ',
+    });
+
+    expect(housekeepingTasksRepository.updateTask).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        status: HousekeepingTaskStatus.CANCELLED,
+        cancelledByUserId: currentUser.sub,
+        cancellationReason: 'Guest extended stay.',
+      }),
+    );
+    expect(result).toMatchObject({
+      status: HousekeepingTaskStatus.CANCELLED,
+      cancellationReason: 'Guest extended stay.',
+    });
+  });
+
+  it('returns not found for missing tasks', async () => {
+    housekeepingTasksRepository.findTask.mockResolvedValue(null);
+
+    await expect(service.getById(currentUser, 99)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});
