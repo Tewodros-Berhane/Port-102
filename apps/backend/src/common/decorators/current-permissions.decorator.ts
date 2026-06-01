@@ -8,3 +8,7 @@ export const getCurrentPermissions = (
 ) => {
   const request = context.switchToHttp().getRequest<PermissionsRequest>();
 
+  return request.permissionKeys ?? [];
+};
+
+export const CurrentPermissions = createParamDecorator(getCurrentPermissions);
