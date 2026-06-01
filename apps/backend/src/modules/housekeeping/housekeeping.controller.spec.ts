@@ -132,3 +132,136 @@ describe('HousekeepingController', () => {
         HousekeepingController.prototype.startTask,
       ),
     ).toEqual([
+      'housekeeping.tasks.start',
+      'housekeeping.tasks.start.assigned',
+    ]);
+    expect(
+      Reflect.getMetadata(
+        ANY_REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.completeTask,
+      ),
+    ).toEqual([
+      'housekeeping.tasks.complete',
+      'housekeeping.tasks.complete.assigned',
+    ]);
+  });
+
+  it('delegates task creation and listing', () => {
+    const createDto = {
+      roomId: 12,
+      type: HousekeepingTaskType.MANUAL,
+      priority: HousekeepingPriority.HIGH,
+    };
+    const query = {
+      page: 2,
+      limit: 10,
+      roomId: 12,
+    };
+
+    controller.createTask(currentUser, createDto);
+    controller.listTasks(currentUser, query);
+
+    expect(housekeepingService.create).toHaveBeenCalledWith(
+      currentUser,
+      createDto,
+    );
+    expect(housekeepingService.list).toHaveBeenCalledWith(currentUser, query);
+  });
+
+  it('delegates assigned task listing', () => {
+    const query = {
+      page: 1,
+      limit: 20,
+    };
+
+    controller.listMyAssignedTasks(currentUser, query);
+
+    expect(housekeepingService.listAssignedToMe).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+
+  it('delegates task detail and update', () => {
+    const updateDto = {
+      priority: HousekeepingPriority.URGENT,
+      notes: 'Needs immediate attention.',
+    };
+
+    controller.getTaskById(currentUser, 9);
+    controller.updateTask(currentUser, 9, updateDto);
+
+    expect(housekeepingService.getById).toHaveBeenCalledWith(currentUser, 9);
+    expect(housekeepingService.update).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      updateDto,
+    );
+  });
+
+  it('delegates assignment, reassignment, and cancellation', () => {
+    const assignDto = {
+      assignedToUserId: 7,
+      notes: 'Start after checkout.',
+    };
+    const reassignDto = {
+      assignedToUserId: 8,
+      notes: 'Move to evening attendant.',
+    };
+    const cancelDto = {
+      reason: 'Guest extended stay.',
+    };
+
+    controller.assignTask(currentUser, 9, assignDto);
+    controller.reassignTask(currentUser, 9, reassignDto);
+    controller.cancelTask(currentUser, 9, cancelDto);
+
+    expect(housekeepingService.assign).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      assignDto,
+    );
+    expect(housekeepingService.reassign).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      reassignDto,
+    );
+    expect(housekeepingService.cancel).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      cancelDto,
+    );
+  });
+
+  it('delegates task start and completion with permission keys', () => {
+    const startPermissionKeys = ['housekeeping.tasks.start.assigned'];
+    const completePermissionKeys = ['housekeeping.tasks.complete.assigned'];
+    const startDto = {
+      notes: 'Starting now.',
+    };
+    const completeDto = {
+      completionNotes: 'Room cleaned.',
+    };
+
+    controller.startTask(currentUser, startPermissionKeys, 9, startDto);
+    controller.completeTask(
+      currentUser,
+      completePermissionKeys,
+      9,
+      completeDto,
+    );
+
+    expect(housekeepingService.start).toHaveBeenCalledWith(
+      currentUser,
+      startPermissionKeys,
+      9,
+      startDto,
+    );
+    expect(housekeepingService.complete).toHaveBeenCalledWith(
+      currentUser,
+      completePermissionKeys,
+      9,
+      completeDto,
+    );
+  });
+});
