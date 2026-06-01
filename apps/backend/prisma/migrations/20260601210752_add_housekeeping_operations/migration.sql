@@ -90,3 +90,48 @@ CREATE UNIQUE INDEX "housekeeping_issues_issueNumber_key" ON "housekeeping_issue
 
 -- CreateIndex
 CREATE INDEX "housekeeping_issues_taskId_idx" ON "housekeeping_issues"("taskId");
+
+-- CreateIndex
+CREATE INDEX "housekeeping_issues_roomId_idx" ON "housekeeping_issues"("roomId");
+
+-- CreateIndex
+CREATE INDEX "housekeeping_issues_status_idx" ON "housekeeping_issues"("status");
+
+-- CreateIndex
+CREATE INDEX "housekeeping_issues_reportedByUserId_idx" ON "housekeeping_issues"("reportedByUserId");
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_tasks" ADD CONSTRAINT "housekeeping_tasks_roomId_fkey" FOREIGN KEY ("roomId") REFERENCES "rooms"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_tasks" ADD CONSTRAINT "housekeeping_tasks_assignedToUserId_fkey" FOREIGN KEY ("assignedToUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_tasks" ADD CONSTRAINT "housekeeping_tasks_assignedByUserId_fkey" FOREIGN KEY ("assignedByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_tasks" ADD CONSTRAINT "housekeeping_tasks_completedByUserId_fkey" FOREIGN KEY ("completedByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_tasks" ADD CONSTRAINT "housekeeping_tasks_inspectedByUserId_fkey" FOREIGN KEY ("inspectedByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_tasks" ADD CONSTRAINT "housekeeping_tasks_approvedByUserId_fkey" FOREIGN KEY ("approvedByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_tasks" ADD CONSTRAINT "housekeeping_tasks_rejectedByUserId_fkey" FOREIGN KEY ("rejectedByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_tasks" ADD CONSTRAINT "housekeeping_tasks_cancelledByUserId_fkey" FOREIGN KEY ("cancelledByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_issues" ADD CONSTRAINT "housekeeping_issues_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "housekeeping_tasks"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_issues" ADD CONSTRAINT "housekeeping_issues_roomId_fkey" FOREIGN KEY ("roomId") REFERENCES "rooms"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_issues" ADD CONSTRAINT "housekeeping_issues_reportedByUserId_fkey" FOREIGN KEY ("reportedByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "housekeeping_issues" ADD CONSTRAINT "housekeeping_issues_resolvedByUserId_fkey" FOREIGN KEY ("resolvedByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
