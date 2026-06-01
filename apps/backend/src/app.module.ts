@@ -22,6 +22,7 @@ import { FrontDeskModule } from './modules/front-desk/front-desk.module';
 import { FoliosModule } from './modules/folios/folios.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
+import { HousekeepingModule } from './modules/housekeeping/housekeeping.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { InvoicesModule } from './modules/invoices/invoices.module';
     FoliosModule,
     PaymentsModule,
     InvoicesModule,
+    HousekeepingModule,
   ],
 })
 export class AppModule {}
