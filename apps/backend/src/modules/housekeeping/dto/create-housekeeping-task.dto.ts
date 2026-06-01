@@ -58,3 +58,33 @@ export class CreateHousekeepingTaskDto {
   @ApiPropertyOptional({
     example: 'Guest requested extra towels after cleaning.',
     nullable: true,
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsOptional()
+  notes?: string | null;
+
+  @ApiPropertyOptional({
+    example: 'MANUAL_REQUEST',
+    nullable: true,
+    description: 'Optional source system/type for traceability.',
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  sourceType?: string | null;
+
+  @ApiPropertyOptional({
+    example: 42,
+    minimum: 1,
+    nullable: true,
+    description: 'Optional source record ID for traceability.',
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  sourceId?: number | null;
+}
