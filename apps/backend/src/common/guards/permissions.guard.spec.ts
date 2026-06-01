@@ -5,6 +5,10 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
+import {
+  ANY_REQUIRED_PERMISSIONS_KEY,
+  REQUIRED_PERMISSIONS_KEY,
+} from '../decorators/permissions.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PermissionsGuard } from './permissions.guard';
 
@@ -30,10 +34,12 @@ function createContext(request: Record<string, unknown> = {}) {
 function createGuard({
   isPublic = false,
   requiredPermissions = ['users.read'],
+  anyRequiredPermissions = [],
   rolePermissions = ['users.read', 'roles.read'],
 }: {
   isPublic?: boolean;
   requiredPermissions?: string[];
+  anyRequiredPermissions?: string[];
   rolePermissions?: string[] | null;
 } = {}) {
   const prisma = {
@@ -51,7 +57,17 @@ function createGuard({
   } as unknown as PrismaService;
   const reflector = {
     getAllAndOverride: jest.fn().mockReturnValue(isPublic),
-    getAllAndMerge: jest.fn().mockReturnValue(requiredPermissions),
+    getAllAndMerge: jest.fn((metadataKey: string) => {
+      if (metadataKey === REQUIRED_PERMISSIONS_KEY) {
+        return requiredPermissions;
+      }
+
+      if (metadataKey === ANY_REQUIRED_PERMISSIONS_KEY) {
+        return anyRequiredPermissions;
+      }
+
+      return [];
+    }),
   } as unknown as Reflector;
 
   return {
@@ -76,6 +92,54 @@ describe('PermissionsGuard', () => {
     await expect(guard.canActivate(createContext())).resolves.toBe(true);
 
     expect(prisma.role.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('allows users with one matching any-required permission', async () => {
+    const { guard } = createGuard({
+      requiredPermissions: [],
+      anyRequiredPermissions: [
+        'housekeeping.tasks.start',
+        'housekeeping.tasks.start.assigned',
+      ],
+      rolePermissions: ['housekeeping.tasks.start.assigned'],
+    });
+    const request = { user: currentUser };
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+
+    expect(request).toMatchObject({
+      permissionKeys: ['housekeeping.tasks.start.assigned'],
+    });
+  });
+
+  it('requires every normal permission even when any-required permission matches', async () => {
+    const { guard } = createGuard({
+      requiredPermissions: ['housekeeping.tasks.read'],
+      anyRequiredPermissions: [
+        'housekeeping.tasks.start',
+        'housekeeping.tasks.start.assigned',
+      ],
+      rolePermissions: ['housekeeping.tasks.start.assigned'],
+    });
+
+    await expect(
+      guard.canActivate(createContext({ user: currentUser })),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('rejects users missing every any-required permission', async () => {
+    const { guard } = createGuard({
+      requiredPermissions: [],
+      anyRequiredPermissions: [
+        'housekeeping.tasks.complete',
+        'housekeeping.tasks.complete.assigned',
+      ],
+      rolePermissions: ['housekeeping.tasks.read.assigned'],
+    });
+
+    await expect(
+      guard.canActivate(createContext({ user: currentUser })),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   it('rejects protected routes without an authenticated user', async () => {
