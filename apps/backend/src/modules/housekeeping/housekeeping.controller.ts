@@ -134,3 +134,139 @@ export class HousekeepingController {
     );
   }
 
+  @Patch('tasks/:id/assign')
+  @Permissions('housekeeping.tasks.assign')
+  @ApiOperation({ summary: 'Assign a housekeeping task' })
+  @ApiOkResponse({ description: 'Housekeeping task assigned.' })
+  @ApiBadRequestResponse({ description: 'Invalid assignment payload.' })
+  @ApiConflictResponse({
+    description: 'Task cannot be assigned in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Housekeeping task or assigned user was not found.',
+  })
+  assignTask(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) taskId: number,
+    @Body() assignHousekeepingTaskDto: AssignHousekeepingTaskDto,
+  ) {
+    return this.housekeepingService.assign(
+      currentUser,
+      taskId,
+      assignHousekeepingTaskDto,
+    );
+  }
+
+  @Patch('tasks/:id/reassign')
+  @Permissions('housekeeping.tasks.reassign')
+  @ApiOperation({ summary: 'Reassign a housekeeping task' })
+  @ApiOkResponse({ description: 'Housekeeping task reassigned.' })
+  @ApiBadRequestResponse({ description: 'Invalid reassignment payload.' })
+  @ApiConflictResponse({
+    description: 'Task cannot be reassigned in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Housekeeping task or assigned user was not found.',
+  })
+  reassignTask(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) taskId: number,
+    @Body() reassignHousekeepingTaskDto: ReassignHousekeepingTaskDto,
+  ) {
+    return this.housekeepingService.reassign(
+      currentUser,
+      taskId,
+      reassignHousekeepingTaskDto,
+    );
+  }
+
+  @Patch('tasks/:id/start')
+  @AnyPermissions(
+    'housekeeping.tasks.start',
+    'housekeeping.tasks.start.assigned',
+  )
+  @ApiOperation({ summary: 'Start a housekeeping task' })
+  @ApiOkResponse({ description: 'Housekeeping task started.' })
+  @ApiBadRequestResponse({ description: 'Invalid start payload.' })
+  @ApiConflictResponse({
+    description: 'Task cannot be started in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({
+    description: 'Missing permission or task is not assigned to current user.',
+  })
+  @ApiNotFoundResponse({ description: 'Housekeeping task was not found.' })
+  startTask(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @CurrentPermissions() permissionKeys: string[],
+    @Param('id', ParseIntPipe) taskId: number,
+    @Body() startHousekeepingTaskDto: StartHousekeepingTaskDto,
+  ) {
+    return this.housekeepingService.start(
+      currentUser,
+      permissionKeys,
+      taskId,
+      startHousekeepingTaskDto,
+    );
+  }
+
+  @Patch('tasks/:id/complete')
+  @AnyPermissions(
+    'housekeeping.tasks.complete',
+    'housekeeping.tasks.complete.assigned',
+  )
+  @ApiOperation({ summary: 'Complete a housekeeping task' })
+  @ApiOkResponse({
+    description:
+      'Housekeeping task completed and room cleaning status set to clean.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid completion payload.' })
+  @ApiConflictResponse({
+    description: 'Task cannot be completed in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({
+    description: 'Missing permission or task is not assigned to current user.',
+  })
+  @ApiNotFoundResponse({ description: 'Housekeeping task was not found.' })
+  completeTask(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @CurrentPermissions() permissionKeys: string[],
+    @Param('id', ParseIntPipe) taskId: number,
+    @Body() completeHousekeepingTaskDto: CompleteHousekeepingTaskDto,
+  ) {
+    return this.housekeepingService.complete(
+      currentUser,
+      permissionKeys,
+      taskId,
+      completeHousekeepingTaskDto,
+    );
+  }
+
+  @Patch('tasks/:id/cancel')
+  @AnyPermissions('housekeeping.tasks.assign', 'housekeeping.tasks.reassign')
+  @ApiOperation({ summary: 'Cancel a housekeeping task' })
+  @ApiOkResponse({ description: 'Housekeeping task cancelled.' })
+  @ApiBadRequestResponse({ description: 'Invalid cancellation payload.' })
+  @ApiConflictResponse({
+    description: 'Task cannot be cancelled in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Housekeeping task was not found.' })
+  cancelTask(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) taskId: number,
+    @Body() cancelHousekeepingTaskDto: CancelHousekeepingTaskDto,
+  ) {
+    return this.housekeepingService.cancel(
+      currentUser,
+      taskId,
+      cancelHousekeepingTaskDto,
+    );
+  }
+}
