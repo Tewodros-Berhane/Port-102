@@ -12,3 +12,10 @@ import { HousekeepingTasksRepository } from './repositories/housekeeping-tasks.r
   imports: [PrismaModule, AuditLogsModule, RoomsModule],
   controllers: [HousekeepingController],
   providers: [
+    HousekeepingService,
+    HousekeepingTasksRepository,
+    PermissionsGuard,
+  ],
+  exports: [HousekeepingService, HousekeepingTasksRepository],
+})
+export class HousekeepingModule {}
