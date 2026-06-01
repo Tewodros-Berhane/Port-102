@@ -187,3 +187,97 @@ export class HousekeepingTasksRepository {
           }
         : {}),
       ...this.searchWhere(search),
+    };
+
+    return Promise.all([
+      this.prisma.housekeepingTask.count({ where }),
+      this.prisma.housekeepingTask.findMany({
+        where,
+        skip,
+        take,
+        select: taskSelect,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
+  }
+
+  updateTask(
+    taskId: number,
+    data: Prisma.HousekeepingTaskUncheckedUpdateInput,
+    client: HousekeepingTaskClient = this.prisma,
+  ) {
+    return client.housekeepingTask.update({
+      where: {
+        id: taskId,
+      },
+      data,
+      select: taskSelect,
+    });
+  }
+
+  findActiveUser(userId: number, client: UserClient = this.prisma) {
+    return client.user.findFirst({
+      where: {
+        id: userId,
+        status: UserStatus.ACTIVE,
+        role: {
+          isActive: true,
+        },
+      },
+      select: activeUserSelect,
+    });
+  }
+
+  private searchWhere(search?: string): Prisma.HousekeepingTaskWhereInput {
+    return search
+      ? {
+          OR: [
+            {
+              taskNumber: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+            {
+              notes: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+            {
+              room: {
+                roomNumber: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              room: {
+                displayName: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              assignedTo: {
+                fullName: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              assignedTo: {
+                email: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          ],
+        }
+      : {};
+  }
+}
