@@ -24,3 +24,28 @@ export class UpdateHousekeepingTaskDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @IsOptional()
+  roomId?: number;
+
+  @ApiPropertyOptional({
+    enum: HousekeepingTaskType,
+    example: HousekeepingTaskType.DEEP_CLEANING,
+  })
+  @IsEnum(HousekeepingTaskType)
+  @IsOptional()
+  type?: HousekeepingTaskType;
+
+  @ApiPropertyOptional({
+    enum: HousekeepingPriority,
+    example: HousekeepingPriority.HIGH,
+  })
+  @IsEnum(HousekeepingPriority)
+  @IsOptional()
+  priority?: HousekeepingPriority;
+
+  @ApiPropertyOptional({
+    example: 'Prioritize before VIP arrival.',
+    nullable: true,
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
