@@ -16,3 +16,11 @@ describe('CurrentPermissions decorator factory', () => {
       getCurrentPermissions(
         undefined,
         createContext(['housekeeping.tasks.start.assigned']),
+      ),
+    ).toEqual(['housekeeping.tasks.start.assigned']);
+  });
+
+  it('returns an empty array when no permission keys are attached', () => {
+    expect(getCurrentPermissions(undefined, createContext())).toEqual([]);
+  });
+});
