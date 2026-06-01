@@ -14,3 +14,11 @@ export class AssignHousekeepingTaskDto {
   assignedToUserId!: number;
 
   @ApiPropertyOptional({
+    example: 'Assign before noon.',
+    nullable: true,
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsOptional()
+  notes?: string | null;
+}
