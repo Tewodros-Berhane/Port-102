@@ -163,40 +163,81 @@ enum ReceiptStatus {
   VOIDED
 }
 
+enum HousekeepingTaskStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  INSPECTION_PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum HousekeepingTaskType {
+  CHECKOUT_CLEANING
+  STAYOVER_CLEANING
+  DEEP_CLEANING
+  INSPECTION
+  MANUAL
+}
+
+enum HousekeepingPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum HousekeepingIssueStatus {
+  OPEN
+  RESOLVED
+  CANCELLED
+}
+
 model User {
-  id                        Int                  @id @default(autoincrement())
-  email                     String               @unique
-  passwordHash              String
-  fullName                  String
-  phone                     String?
-  status                    UserStatus           @default(ACTIVE)
-  tokenVersion              Int                  @default(0)
-  lastLoginAt               DateTime?
-  roleId                    Int
-  departmentId              Int?
-  createdAt                 DateTime             @default(now())
-  updatedAt                 DateTime             @updatedAt
-  role                      Role                 @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  department                Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  refreshTokens             RefreshToken[]
-  employees                 Employee[]
-  guests                    Guest[]
-  auditLogs                 AuditLog[]           @relation("AuditActor")
-  requestedApprovalRequests ApprovalRequest[]    @relation("ApprovalRequester")
-  approvedApprovalRequests  ApprovalRequest[]    @relation("ApprovalApprover")
-  roomStatusLogs            RoomStatusLog[]
-  createdReservations       Reservation[]        @relation("ReservationCreator")
-  cancelledReservations     Reservation[]        @relation("ReservationCanceller")
-  checkedInStays            Stay[]               @relation("StayCheckedInBy")
-  checkedOutStays           Stay[]               @relation("StayCheckedOutBy")
-  assignedStayRooms         StayRoomAssignment[] @relation("StayRoomAssignedBy")
-  releasedStayRooms         StayRoomAssignment[] @relation("StayRoomReleasedBy")
-  openedFolios              Folio[]              @relation("FolioOpenedBy")
-  closedFolios              Folio[]              @relation("FolioClosedBy")
-  postedFolioLineItems      FolioLineItem[]      @relation("FolioLineItemPostedBy")
-  recordedPayments          Payment[]            @relation("PaymentRecordedBy")
-  issuedInvoices            Invoice[]            @relation("InvoiceIssuedBy")
-  issuedReceipts            Receipt[]            @relation("ReceiptIssuedBy")
+  id                          Int                  @id @default(autoincrement())
+  email                       String               @unique
+  passwordHash                String
+  fullName                    String
+  phone                       String?
+  status                      UserStatus           @default(ACTIVE)
+  tokenVersion                Int                  @default(0)
+  lastLoginAt                 DateTime?
+  roleId                      Int
+  departmentId                Int?
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+  role                        Role                 @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  department                  Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  refreshTokens               RefreshToken[]
+  employees                   Employee[]
+  guests                      Guest[]
+  auditLogs                   AuditLog[]           @relation("AuditActor")
+  requestedApprovalRequests   ApprovalRequest[]    @relation("ApprovalRequester")
+  approvedApprovalRequests    ApprovalRequest[]    @relation("ApprovalApprover")
+  roomStatusLogs              RoomStatusLog[]
+  createdReservations         Reservation[]        @relation("ReservationCreator")
+  cancelledReservations       Reservation[]        @relation("ReservationCanceller")
+  checkedInStays              Stay[]               @relation("StayCheckedInBy")
+  checkedOutStays             Stay[]               @relation("StayCheckedOutBy")
+  assignedStayRooms           StayRoomAssignment[] @relation("StayRoomAssignedBy")
+  releasedStayRooms           StayRoomAssignment[] @relation("StayRoomReleasedBy")
+  openedFolios                Folio[]              @relation("FolioOpenedBy")
+  closedFolios                Folio[]              @relation("FolioClosedBy")
+  postedFolioLineItems        FolioLineItem[]      @relation("FolioLineItemPostedBy")
+  recordedPayments            Payment[]            @relation("PaymentRecordedBy")
+  issuedInvoices              Invoice[]            @relation("InvoiceIssuedBy")
+  issuedReceipts              Receipt[]            @relation("ReceiptIssuedBy")
+  assignedHousekeepingTasks   HousekeepingTask[]   @relation("HousekeepingTaskAssignedTo")
+  assignedByHousekeepingTasks HousekeepingTask[]   @relation("HousekeepingTaskAssignedBy")
+  completedHousekeepingTasks  HousekeepingTask[]   @relation("HousekeepingTaskCompletedBy")
+  inspectedHousekeepingTasks  HousekeepingTask[]   @relation("HousekeepingTaskInspectedBy")
+  approvedHousekeepingTasks   HousekeepingTask[]   @relation("HousekeepingTaskApprovedBy")
+  rejectedHousekeepingTasks   HousekeepingTask[]   @relation("HousekeepingTaskRejectedBy")
+  cancelledHousekeepingTasks  HousekeepingTask[]   @relation("HousekeepingTaskCancelledBy")
+  reportedHousekeepingIssues  HousekeepingIssue[]  @relation("HousekeepingIssueReportedBy")
+  resolvedHousekeepingIssues  HousekeepingIssue[]  @relation("HousekeepingIssueResolvedBy")
 
   @@index([roleId])
   @@index([departmentId])
@@ -357,23 +398,25 @@ model RoomTypeAmenity {
 }
 
 model Room {
-  id                Int                   @id @default(autoincrement())
-  roomNumber        String                @unique
-  displayName       String?
-  floorId           Int?
-  roomTypeId        Int
-  occupancyStatus   RoomOccupancyStatus   @default(VACANT)
-  cleaningStatus    RoomCleaningStatus    @default(CLEAN)
-  maintenanceStatus RoomMaintenanceStatus @default(AVAILABLE)
-  notes             String?
-  isActive          Boolean               @default(true)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  floor             Floor?                @relation(fields: [floorId], references: [id], onDelete: SetNull)
-  roomType          RoomType              @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
-  statusLogs        RoomStatusLog[]
-  reservationRooms  ReservationRoom[]
-  stayAssignments   StayRoomAssignment[]
+  id                 Int                   @id @default(autoincrement())
+  roomNumber         String                @unique
+  displayName        String?
+  floorId            Int?
+  roomTypeId         Int
+  occupancyStatus    RoomOccupancyStatus   @default(VACANT)
+  cleaningStatus     RoomCleaningStatus    @default(CLEAN)
+  maintenanceStatus  RoomMaintenanceStatus @default(AVAILABLE)
+  notes              String?
+  isActive           Boolean               @default(true)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  floor              Floor?                @relation(fields: [floorId], references: [id], onDelete: SetNull)
+  roomType           RoomType              @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  statusLogs         RoomStatusLog[]
+  reservationRooms   ReservationRoom[]
+  stayAssignments    StayRoomAssignment[]
+  housekeepingTasks  HousekeepingTask[]
+  housekeepingIssues HousekeepingIssue[]
 
   @@index([floorId])
   @@index([roomTypeId])
@@ -684,6 +727,81 @@ model Receipt {
   @@index([status])
   @@index([issuedAt])
   @@map("receipts")
+}
+
+model HousekeepingTask {
+  id                 Int                    @id @default(autoincrement())
+  taskNumber         String                 @unique
+  roomId             Int
+  type               HousekeepingTaskType   @default(CHECKOUT_CLEANING)
+  status             HousekeepingTaskStatus @default(PENDING)
+  priority           HousekeepingPriority   @default(NORMAL)
+  assignedToUserId   Int?
+  assignedByUserId   Int?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  inspectedAt        DateTime?
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  cancelledAt        DateTime?
+  completedByUserId  Int?
+  inspectedByUserId  Int?
+  approvedByUserId   Int?
+  rejectedByUserId   Int?
+  cancelledByUserId  Int?
+  notes              String?
+  completionNotes    String?
+  inspectionNotes    String?
+  rejectionReason    String?
+  cancellationReason String?
+  sourceType         String?
+  sourceId           Int?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  room               Room                   @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  assignedTo         User?                  @relation("HousekeepingTaskAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  assignedBy         User?                  @relation("HousekeepingTaskAssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+  completedBy        User?                  @relation("HousekeepingTaskCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  inspectedBy        User?                  @relation("HousekeepingTaskInspectedBy", fields: [inspectedByUserId], references: [id], onDelete: SetNull)
+  approvedBy         User?                  @relation("HousekeepingTaskApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejectedBy         User?                  @relation("HousekeepingTaskRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  cancelledBy        User?                  @relation("HousekeepingTaskCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+  issues             HousekeepingIssue[]
+
+  @@index([roomId])
+  @@index([status])
+  @@index([priority])
+  @@index([assignedToUserId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("housekeeping_tasks")
+}
+
+model HousekeepingIssue {
+  id               Int                     @id @default(autoincrement())
+  issueNumber      String                  @unique
+  taskId           Int?
+  roomId           Int
+  reportedByUserId Int?
+  status           HousekeepingIssueStatus @default(OPEN)
+  title            String
+  description      String?
+  photoUrl         String?
+  resolvedAt       DateTime?
+  resolvedByUserId Int?
+  resolutionNotes  String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  task             HousekeepingTask?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  room             Room                    @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  reportedBy       User?                   @relation("HousekeepingIssueReportedBy", fields: [reportedByUserId], references: [id], onDelete: SetNull)
+  resolvedBy       User?                   @relation("HousekeepingIssueResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([roomId])
+  @@index([status])
+  @@index([reportedByUserId])
+  @@map("housekeeping_issues")
 }
 
 model AuditLog {
