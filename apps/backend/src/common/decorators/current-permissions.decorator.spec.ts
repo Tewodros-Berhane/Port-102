@@ -7,3 +7,12 @@ function createContext(permissionKeys?: string[]) {
     switchToHttp: () => ({
       getRequest: () => ({ permissionKeys }),
     }),
+  } as ExecutionContext;
+}
+
+describe('CurrentPermissions decorator factory', () => {
+  it('returns permission keys attached to the request', () => {
+    expect(
+      getCurrentPermissions(
+        undefined,
+        createContext(['housekeeping.tasks.start.assigned']),
