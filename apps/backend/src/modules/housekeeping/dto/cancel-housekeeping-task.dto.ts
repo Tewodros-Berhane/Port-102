@@ -6,3 +6,6 @@ export class CancelHousekeepingTaskDto {
     example: 'Guest extended stay; cleaning no longer needed today.',
   })
   @IsString()
+  @IsNotEmpty()
+  reason!: string;
+}
