@@ -7,3 +7,7 @@ export class StartHousekeepingTaskDto {
     nullable: true,
   })
   @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsOptional()
+  notes?: string | null;
+}
