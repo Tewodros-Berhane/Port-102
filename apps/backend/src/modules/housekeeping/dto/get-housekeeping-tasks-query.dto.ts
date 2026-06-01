@@ -58,3 +58,33 @@ export class GetHousekeepingTasksQueryDto {
 
   @ApiPropertyOptional({
     enum: HousekeepingPriority,
+    example: HousekeepingPriority.NORMAL,
+  })
+  @IsEnum(HousekeepingPriority)
+  @IsOptional()
+  priority?: HousekeepingPriority;
+
+  @ApiPropertyOptional({ example: 12, minimum: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  roomId?: number;
+
+  @ApiPropertyOptional({ example: 7, minimum: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  assignedToUserId?: number;
+
+  @ApiPropertyOptional({ example: '2026-06-01' })
+  @IsDateString()
+  @IsOptional()
+  createdFrom?: string;
+
+  @ApiPropertyOptional({ example: '2026-06-30' })
+  @IsDateString()
+  @IsOptional()
+  createdTo?: string;
+}
