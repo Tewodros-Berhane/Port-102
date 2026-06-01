@@ -56,3 +56,61 @@ describe('HousekeepingTasksRepository', () => {
   });
 
   it('creates tasks through PrismaService', async () => {
+    await repository.createTask({
+      taskNumber: 'HKT-20260602-123450',
+      roomId: 12,
+      type: HousekeepingTaskType.MANUAL,
+      status: HousekeepingTaskStatus.PENDING,
+      priority: HousekeepingPriority.HIGH,
+    });
+
+    expect(prisma.housekeepingTask.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          taskNumber: 'HKT-20260602-123450',
+          roomId: 12,
+          type: HousekeepingTaskType.MANUAL,
+          status: HousekeepingTaskStatus.PENDING,
+          priority: HousekeepingPriority.HIGH,
+        },
+      }),
+    );
+  });
+
+  it('finds tasks by id and task number', async () => {
+    await repository.findTask(9);
+    await repository.findByTaskNumber('HKT-20260602-123450');
+
+    expect(prisma.housekeepingTask.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 9,
+        },
+      }),
+    );
+    expect(prisma.housekeepingTask.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          taskNumber: 'HKT-20260602-123450',
+        },
+      }),
+    );
+  });
+
+  it('lists tasks with filters, search, pagination, and stable ordering', async () => {
+    prisma.housekeepingTask.count.mockResolvedValue(0);
+    prisma.housekeepingTask.findMany.mockResolvedValue([]);
+
+    await repository.listTasks({
+      skip: 10,
+      take: 5,
+      search: '101',
+      status: HousekeepingTaskStatus.PENDING,
+      type: HousekeepingTaskType.CHECKOUT_CLEANING,
+      priority: HousekeepingPriority.URGENT,
+      roomId: 12,
+      assignedToUserId: 7,
+      createdFrom: new Date('2026-06-01'),
+      createdTo: new Date('2026-06-02'),
+    });
+
