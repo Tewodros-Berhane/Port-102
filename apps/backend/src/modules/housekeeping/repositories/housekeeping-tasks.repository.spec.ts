@@ -114,3 +114,61 @@ describe('HousekeepingTasksRepository', () => {
       createdTo: new Date('2026-06-02'),
     });
 
+    expect(prisma.housekeepingTask.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        status: HousekeepingTaskStatus.PENDING,
+        type: HousekeepingTaskType.CHECKOUT_CLEANING,
+        priority: HousekeepingPriority.URGENT,
+        roomId: 12,
+        assignedToUserId: 7,
+        createdAt: {
+          gte: expect.any(Date),
+          lte: expect.any(Date),
+        },
+        OR: expect.any(Array),
+      }),
+    });
+    expect(prisma.housekeepingTask.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 10,
+        take: 5,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
+  it('updates tasks by id', async () => {
+    await repository.updateTask(9, {
+      priority: HousekeepingPriority.HIGH,
+      notes: 'Updated note',
+    });
+
+    expect(prisma.housekeepingTask.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 9,
+        },
+        data: {
+          priority: HousekeepingPriority.HIGH,
+          notes: 'Updated note',
+        },
+      }),
+    );
+  });
+
+  it('finds active users with active roles for assignment', async () => {
+    await repository.findActiveUser(7);
+
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 7,
+          status: UserStatus.ACTIVE,
+          role: {
+            isActive: true,
+          },
+        },
+      }),
+    );
+  });
+});
