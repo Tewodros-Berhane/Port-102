@@ -476,3 +476,241 @@ export class HousekeepingService {
     fullPermission: string;
     assignedPermission: string;
   }) {
+    if (permissionKeys.includes(fullPermission)) {
+      return;
+    }
+
+    if (
+      permissionKeys.includes(assignedPermission) &&
+      task.assignedToUserId === currentUser.sub
+    ) {
+      return;
+    }
+
+    throw new ForbiddenException('Task is not assigned to the current user.');
+  }
+
+  private ensureTaskCanStart(task: HousekeepingTaskRecord) {
+    if (
+      task.status !== HousekeepingTaskStatus.PENDING &&
+      task.status !== HousekeepingTaskStatus.ASSIGNED
+    ) {
+      throw new ConflictException(
+        'Task cannot be started in its current status.',
+      );
+    }
+  }
+
+  private ensureTaskCanComplete(task: HousekeepingTaskRecord) {
+    if (
+      task.status !== HousekeepingTaskStatus.IN_PROGRESS &&
+      task.status !== HousekeepingTaskStatus.ASSIGNED
+    ) {
+      throw new ConflictException(
+        'Task cannot be completed in its current status.',
+      );
+    }
+  }
+
+  private async findRequiredTask(
+    taskId: number,
+    client?: Prisma.TransactionClient,
+  ) {
+    const task = await this.housekeepingTasksRepository.findTask(
+      taskId,
+      client,
+    );
+
+    if (!task) {
+      throw new NotFoundException('Housekeeping task was not found.');
+    }
+
+    return task;
+  }
+
+  private async ensureActiveRoom(roomId: number) {
+    const room = await this.roomsRepository.findRoom(roomId);
+
+    if (!room) {
+      throw new NotFoundException('Room was not found.');
+    }
+
+    if (!room.isActive) {
+      throw new BadRequestException(
+        'Cannot create or update a task for an inactive room.',
+      );
+    }
+
+    return room;
+  }
+
+  private async ensureActiveUser(userId: number) {
+    const user = await this.housekeepingTasksRepository.findActiveUser(userId);
+
+    if (!user) {
+      throw new NotFoundException('Assigned user was not found or inactive.');
+    }
+
+    return user;
+  }
+
+  private ensureTaskCanBeAssigned(task: HousekeepingTaskRecord) {
+    if (
+      task.status === HousekeepingTaskStatus.APPROVED ||
+      task.status === HousekeepingTaskStatus.CANCELLED ||
+      task.status === HousekeepingTaskStatus.INSPECTION_PENDING ||
+      task.status === HousekeepingTaskStatus.COMPLETED
+    ) {
+      throw new ConflictException(
+        'Task cannot be assigned in its current status.',
+      );
+    }
+  }
+
+  private async generateTaskNumber() {
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const sequence = `${Date.now().toString().slice(-6)}${attempt}`.slice(-6);
+      const taskNumber = `HKT-${datePart}-${sequence}`;
+      const existingTask =
+        await this.housekeepingTasksRepository.findByTaskNumber(taskNumber);
+
+      if (!existingTask) {
+        return taskNumber;
+      }
+    }
+
+    throw new ConflictException('Could not generate a unique task number.');
+  }
+
+  private serializeTask(task: HousekeepingTaskRecord) {
+    return {
+      id: task.id,
+      taskNumber: task.taskNumber,
+      roomId: task.roomId,
+      type: task.type,
+      status: task.status,
+      priority: task.priority,
+      assignedToUserId: task.assignedToUserId,
+      assignedByUserId: task.assignedByUserId,
+      startedAt: task.startedAt,
+      completedAt: task.completedAt,
+      inspectedAt: task.inspectedAt,
+      approvedAt: task.approvedAt,
+      rejectedAt: task.rejectedAt,
+      cancelledAt: task.cancelledAt,
+      completedByUserId: task.completedByUserId,
+      inspectedByUserId: task.inspectedByUserId,
+      approvedByUserId: task.approvedByUserId,
+      rejectedByUserId: task.rejectedByUserId,
+      cancelledByUserId: task.cancelledByUserId,
+      notes: task.notes,
+      completionNotes: task.completionNotes,
+      inspectionNotes: task.inspectionNotes,
+      rejectionReason: task.rejectionReason,
+      cancellationReason: task.cancellationReason,
+      sourceType: task.sourceType,
+      sourceId: task.sourceId,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      room: task.room,
+      assignedTo: this.serializeUserSummary(task.assignedTo),
+      assignedBy: this.serializeUserSummary(task.assignedBy),
+      completedBy: this.serializeUserSummary(task.completedBy),
+      inspectedBy: this.serializeUserSummary(task.inspectedBy),
+      approvedBy: this.serializeUserSummary(task.approvedBy),
+      rejectedBy: this.serializeUserSummary(task.rejectedBy),
+      cancelledBy: this.serializeUserSummary(task.cancelledBy),
+    };
+  }
+
+  private serializeUserSummary(
+    user:
+      | HousekeepingTaskRecord['assignedTo']
+      | ActiveHousekeepingUserRecord
+      | null,
+  ) {
+    return user
+      ? {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          status: user.status,
+        }
+      : null;
+  }
+
+  private taskAuditSnapshot(task: HousekeepingTaskRecord) {
+    return {
+      roomId: task.roomId,
+      type: task.type,
+      priority: task.priority,
+      notes: task.notes,
+      sourceType: task.sourceType,
+      sourceId: task.sourceId,
+    };
+  }
+
+  private serializeTaskUpdateData(
+    data: Prisma.HousekeepingTaskUncheckedUpdateInput,
+  ) {
+    return {
+      roomId: this.serializeUpdateValue(data.roomId),
+      type: this.serializeUpdateValue(data.type),
+      priority: this.serializeUpdateValue(data.priority),
+      notes: this.serializeUpdateValue(data.notes),
+      sourceType: this.serializeUpdateValue(data.sourceType),
+      sourceId: this.serializeUpdateValue(data.sourceId),
+    };
+  }
+
+  private serializeUpdateValue(value: unknown) {
+    return value === undefined ? null : (value as Prisma.InputJsonValue);
+  }
+
+  private recordTaskAudit(
+    currentUser: CurrentUserPayload,
+    action: string,
+    task: HousekeepingTaskRecord,
+    metadata: Prisma.InputJsonValue,
+  ) {
+    return this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action,
+      entityType: 'HousekeepingTask',
+      entityId: String(task.id),
+      metadata,
+    });
+  }
+
+  private parseDate(value: string) {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException('Invalid housekeeping task date.');
+    }
+
+    return date;
+  }
+
+  private parseOptionalDate(value?: string) {
+    return value === undefined ? undefined : this.parseDate(value);
+  }
+
+  private normalizeRequiredString(value: string, message: string) {
+    const normalized = value.trim();
+
+    if (!normalized) {
+      throw new BadRequestException(message);
+    }
+
+    return normalized;
+  }
+
+  private normalizeOptionalString(value?: string | null) {
+    const normalized = value?.trim();
+
+    return normalized || null;
+  }
+}
