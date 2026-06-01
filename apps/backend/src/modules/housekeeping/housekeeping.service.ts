@@ -237,3 +237,242 @@ export class HousekeepingService {
     }
 
     return this.assignTask({
+      currentUser,
+      task,
+      assignedToUserId: reassignHousekeepingTaskDto.assignedToUserId,
+      notes: reassignHousekeepingTaskDto.notes,
+      auditAction: 'housekeeping.tasks.reassigned',
+      previousAssignedToUserId: task.assignedToUserId,
+    });
+  }
+
+  async cancel(
+    currentUser: CurrentUserPayload,
+    taskId: number,
+    cancelHousekeepingTaskDto: CancelHousekeepingTaskDto,
+  ) {
+    const task = await this.findRequiredTask(taskId);
+
+    if (task.status === HousekeepingTaskStatus.CANCELLED) {
+      throw new ConflictException('Task is already cancelled.');
+    }
+
+    if (task.status === HousekeepingTaskStatus.APPROVED) {
+      throw new ConflictException('Approved tasks cannot be cancelled.');
+    }
+
+    const reason = this.normalizeRequiredString(
+      cancelHousekeepingTaskDto.reason,
+      'Task cancellation reason is required.',
+    );
+    const cancelledTask = await this.housekeepingTasksRepository.updateTask(
+      task.id,
+      {
+        status: HousekeepingTaskStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledByUserId: currentUser.sub,
+        cancellationReason: reason,
+      },
+    );
+
+    await this.recordTaskAudit(
+      currentUser,
+      'housekeeping.tasks.cancelled',
+      cancelledTask,
+      {
+        taskNumber: cancelledTask.taskNumber,
+        roomId: cancelledTask.roomId,
+        previousStatus: task.status,
+        reason,
+      },
+    );
+
+    return this.serializeTask(cancelledTask);
+  }
+
+  async start(
+    currentUser: CurrentUserPayload,
+    permissionKeys: string[],
+    taskId: number,
+    startHousekeepingTaskDto: StartHousekeepingTaskDto,
+  ) {
+    const task = await this.findRequiredTask(taskId);
+
+    this.ensureAssignedOnlyTaskAccess({
+      currentUser,
+      permissionKeys,
+      task,
+      fullPermission: 'housekeeping.tasks.start',
+      assignedPermission: 'housekeeping.tasks.start.assigned',
+    });
+    this.ensureTaskCanStart(task);
+
+    const notes =
+      startHousekeepingTaskDto.notes === undefined
+        ? undefined
+        : this.normalizeOptionalString(startHousekeepingTaskDto.notes);
+    const startedTask = await this.housekeepingTasksRepository.updateTask(
+      task.id,
+      {
+        status: HousekeepingTaskStatus.IN_PROGRESS,
+        startedAt: new Date(),
+        ...(notes === undefined ? {} : { notes }),
+      },
+    );
+
+    await this.recordTaskAudit(
+      currentUser,
+      'housekeeping.tasks.started',
+      startedTask,
+      {
+        taskNumber: startedTask.taskNumber,
+        roomId: startedTask.roomId,
+        previousStatus: task.status,
+        status: startedTask.status,
+        assignedToUserId: startedTask.assignedToUserId,
+        notes: notes ?? null,
+      },
+    );
+
+    return this.serializeTask(startedTask);
+  }
+
+  async complete(
+    currentUser: CurrentUserPayload,
+    permissionKeys: string[],
+    taskId: number,
+    completeHousekeepingTaskDto: CompleteHousekeepingTaskDto,
+  ) {
+    const task = await this.findRequiredTask(taskId);
+
+    this.ensureAssignedOnlyTaskAccess({
+      currentUser,
+      permissionKeys,
+      task,
+      fullPermission: 'housekeeping.tasks.complete',
+      assignedPermission: 'housekeeping.tasks.complete.assigned',
+    });
+    this.ensureTaskCanComplete(task);
+
+    const completionNotes = this.normalizeOptionalString(
+      completeHousekeepingTaskDto.completionNotes,
+    );
+    const completedAt = new Date();
+    const completedTask =
+      await this.housekeepingTasksRepository.runInTransaction(
+        async (client) => {
+          await this.housekeepingTasksRepository.updateTask(
+            task.id,
+            {
+              status: HousekeepingTaskStatus.INSPECTION_PENDING,
+              completedAt,
+              completedByUserId: currentUser.sub,
+              completionNotes,
+            },
+            client,
+          );
+
+          if (task.room.cleaningStatus !== RoomCleaningStatus.CLEAN) {
+            await this.roomsRepository.updateRoom(
+              task.roomId,
+              {
+                cleaningStatus: RoomCleaningStatus.CLEAN,
+              },
+              client,
+            );
+            await this.roomsRepository.createStatusLogs(
+              [
+                {
+                  roomId: task.roomId,
+                  actorUserId: currentUser.sub,
+                  field: 'cleaningStatus',
+                  oldValue: task.room.cleaningStatus,
+                  newValue: RoomCleaningStatus.CLEAN,
+                  reason: 'Housekeeping task completed',
+                },
+              ],
+              client,
+            );
+          }
+
+          return this.findRequiredTask(task.id, client);
+        },
+      );
+
+    await this.recordTaskAudit(
+      currentUser,
+      'housekeeping.tasks.completed',
+      completedTask,
+      {
+        taskNumber: completedTask.taskNumber,
+        roomId: completedTask.roomId,
+        previousStatus: task.status,
+        status: completedTask.status,
+        previousCleaningStatus: task.room.cleaningStatus,
+        cleaningStatus: completedTask.room.cleaningStatus,
+        completionNotes,
+      },
+    );
+
+    return this.serializeTask(completedTask);
+  }
+
+  private async assignTask({
+    currentUser,
+    task,
+    assignedToUserId,
+    notes,
+    auditAction,
+    previousAssignedToUserId,
+  }: {
+    currentUser: CurrentUserPayload;
+    task: HousekeepingTaskRecord;
+    assignedToUserId: number;
+    notes?: string | null;
+    auditAction: string;
+    previousAssignedToUserId: number | null;
+  }) {
+    this.ensureTaskCanBeAssigned(task);
+    const assignedUser = await this.ensureActiveUser(assignedToUserId);
+    const nextStatus =
+      task.status === HousekeepingTaskStatus.IN_PROGRESS
+        ? HousekeepingTaskStatus.IN_PROGRESS
+        : HousekeepingTaskStatus.ASSIGNED;
+    const updatedTask = await this.housekeepingTasksRepository.updateTask(
+      task.id,
+      {
+        assignedToUserId: assignedUser.id,
+        assignedByUserId: currentUser.sub,
+        status: nextStatus,
+        ...(notes === undefined
+          ? {}
+          : { notes: this.normalizeOptionalString(notes) }),
+      },
+    );
+
+    await this.recordTaskAudit(currentUser, auditAction, updatedTask, {
+      taskNumber: updatedTask.taskNumber,
+      roomId: updatedTask.roomId,
+      previousAssignedToUserId,
+      assignedToUserId: updatedTask.assignedToUserId,
+      previousStatus: task.status,
+      status: updatedTask.status,
+      notes: notes === undefined ? null : this.normalizeOptionalString(notes),
+    });
+
+    return this.serializeTask(updatedTask);
+  }
+
+  private ensureAssignedOnlyTaskAccess({
+    currentUser,
+    permissionKeys,
+    task,
+    fullPermission,
+    assignedPermission,
+  }: {
+    currentUser: CurrentUserPayload;
+    permissionKeys: string[];
+    task: HousekeepingTaskRecord;
+    fullPermission: string;
+    assignedPermission: string;
+  }) {
