@@ -54,6 +54,7 @@ import {
 export class HousekeepingService {
   constructor(
     private readonly housekeepingTasksRepository: HousekeepingTasksRepository,
+    private readonly housekeepingIssuesRepository: HousekeepingIssuesRepository,
     private readonly roomsRepository: RoomsRepository,
     private readonly auditLogsService: AuditLogsService,
   ) {}
