@@ -261,6 +261,82 @@ describe('HousekeepingController', () => {
     expect(housekeepingService.list).toHaveBeenCalledWith(currentUser, query);
   });
 
+  it('delegates dashboard retrieval', () => {
+    const query = {
+      date: '2026-06-03',
+    };
+
+    controller.getDashboard(currentUser, query);
+
+    expect(housekeepingService.getDashboard).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+
+  it('delegates productivity retrieval', () => {
+    const query = {
+      from: '2026-06-01',
+      to: '2026-06-03',
+    };
+
+    controller.getProductivity(currentUser, query);
+
+    expect(housekeepingService.getProductivity).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+
+  it('delegates issue reporting, listing, detail lookup, resolution, and cancellation', () => {
+    const createIssueDto = {
+      roomId: 12,
+      taskId: 9,
+      title: 'Broken lamp',
+      description: 'Lamp does not turn on.',
+    };
+    const query = {
+      page: 1,
+      limit: 20,
+      status: HousekeepingIssueStatus.OPEN,
+    };
+    const resolveDto = {
+      resolutionNotes: 'Lamp was replaced.',
+    };
+    const cancelIssueDto = {
+      reason: 'Duplicate issue.',
+    };
+
+    controller.reportIssue(currentUser, createIssueDto);
+    controller.listIssues(currentUser, query);
+    controller.getIssueById(currentUser, 15);
+    controller.resolveIssue(currentUser, 15, resolveDto);
+    controller.cancelIssue(currentUser, 15, cancelIssueDto);
+
+    expect(housekeepingService.reportIssue).toHaveBeenCalledWith(
+      currentUser,
+      createIssueDto,
+    );
+    expect(housekeepingService.listIssues).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+    expect(housekeepingService.getIssueById).toHaveBeenCalledWith(
+      currentUser,
+      15,
+    );
+    expect(housekeepingService.resolveIssue).toHaveBeenCalledWith(
+      currentUser,
+      15,
+      resolveDto,
+    );
+    expect(housekeepingService.cancelIssue).toHaveBeenCalledWith(
+      currentUser,
+      15,
+      cancelIssueDto,
+    );
+  });
+
   it('delegates assigned task listing', () => {
     const query = {
       page: 1,
