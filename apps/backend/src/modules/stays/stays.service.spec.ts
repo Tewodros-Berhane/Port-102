@@ -851,6 +851,13 @@ describe('StaysService', () => {
       },
       { transaction: true },
     );
+    expect(
+      housekeepingService.createCheckoutCleaningTaskFromStay,
+    ).toHaveBeenCalledWith({
+      stayId: 40,
+      roomId: 9,
+      client: { transaction: true },
+    });
     expect(roomsRepository.createStatusLogs).toHaveBeenCalledWith(
       [
         {
