@@ -1197,6 +1197,28 @@ export class HousekeepingService {
     }
   }
 
+  private ensureTaskAwaitingInspection(
+    task: HousekeepingTaskRecord,
+    action: string,
+  ) {
+    if (
+      task.status !== HousekeepingTaskStatus.INSPECTION_PENDING &&
+      task.status !== HousekeepingTaskStatus.COMPLETED
+    ) {
+      throw new ConflictException(
+        `Task cannot be ${action} in its current status.`,
+      );
+    }
+  }
+
+  private ensureIssueOpen(issue: HousekeepingIssueRecord, action: string) {
+    if (issue.status !== HousekeepingIssueStatus.OPEN) {
+      throw new ConflictException(
+        `Housekeeping issue cannot be ${action} in its current status.`,
+      );
+    }
+  }
+
   private async findRequiredTask(
     taskId: number,
     client?: Prisma.TransactionClient,
