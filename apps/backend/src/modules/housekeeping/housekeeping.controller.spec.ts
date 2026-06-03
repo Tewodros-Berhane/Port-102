@@ -2,8 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 
 import {
+  HousekeepingIssueStatus,
   HousekeepingPriority,
   HousekeepingTaskType,
+  RoomCleaningStatus,
 } from '../../generated/prisma/client';
 import {
   ANY_REQUIRED_PERMISSIONS_KEY,
