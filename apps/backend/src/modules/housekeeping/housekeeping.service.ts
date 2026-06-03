@@ -1144,10 +1144,41 @@ export class HousekeepingService {
     throw new ForbiddenException('Task is not assigned to the current user.');
   }
 
+  private async ensureRoomCleaningStatusAccess({
+    currentUser,
+    permissionKeys,
+    roomId,
+  }: {
+    currentUser: CurrentUserPayload;
+    permissionKeys: string[];
+    roomId: number;
+  }) {
+    if (permissionKeys.includes('room_cleaning_status.update')) {
+      return;
+    }
+
+    if (permissionKeys.includes('room_cleaning_status.update.assigned')) {
+      const assignedTask =
+        await this.housekeepingTasksRepository.findActiveAssignedTaskForRoom({
+          roomId,
+          assignedToUserId: currentUser.sub,
+        });
+
+      if (assignedTask) {
+        return;
+      }
+    }
+
+    throw new ForbiddenException(
+      'Room cleaning status can only be updated for assigned rooms.',
+    );
+  }
+
   private ensureTaskCanStart(task: HousekeepingTaskRecord) {
     if (
       task.status !== HousekeepingTaskStatus.PENDING &&
-      task.status !== HousekeepingTaskStatus.ASSIGNED
+      task.status !== HousekeepingTaskStatus.ASSIGNED &&
+      task.status !== HousekeepingTaskStatus.REJECTED
     ) {
       throw new ConflictException(
         'Task cannot be started in its current status.',
