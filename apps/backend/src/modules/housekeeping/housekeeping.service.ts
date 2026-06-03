@@ -7,25 +7,45 @@ import {
 } from '@nestjs/common';
 
 import {
+  HousekeepingIssueStatus,
   HousekeepingPriority,
   HousekeepingTaskStatus,
   HousekeepingTaskType,
   Prisma,
   RoomCleaningStatus,
+  RoomMaintenanceStatus,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
-import { RoomsRepository } from '../rooms/repositories/rooms.repository';
+import {
+  RoomRecord,
+  RoomsRepository,
+} from '../rooms/repositories/rooms.repository';
 import { AssignHousekeepingTaskDto } from './dto/assign-housekeeping-task.dto';
+import { ApproveHousekeepingTaskDto } from './dto/approve-housekeeping-task.dto';
 import { CancelHousekeepingTaskDto } from './dto/cancel-housekeeping-task.dto';
+import { CancelHousekeepingIssueDto } from './dto/cancel-housekeeping-issue.dto';
 import { CompleteHousekeepingTaskDto } from './dto/complete-housekeeping-task.dto';
 import { CreateHousekeepingTaskDto } from './dto/create-housekeeping-task.dto';
+import { CreateHousekeepingIssueDto } from './dto/create-housekeeping-issue.dto';
+import { GetHousekeepingIssuesQueryDto } from './dto/get-housekeeping-issues-query.dto';
 import { GetHousekeepingTasksQueryDto } from './dto/get-housekeeping-tasks-query.dto';
+import { HousekeepingDashboardQueryDto } from './dto/housekeeping-dashboard-query.dto';
+import { HousekeepingProductivityQueryDto } from './dto/housekeeping-productivity-query.dto';
+import { InspectHousekeepingTaskDto } from './dto/inspect-housekeeping-task.dto';
 import { ReassignHousekeepingTaskDto } from './dto/reassign-housekeeping-task.dto';
+import { RejectHousekeepingTaskDto } from './dto/reject-housekeeping-task.dto';
+import { ResolveHousekeepingIssueDto } from './dto/resolve-housekeeping-issue.dto';
 import { StartHousekeepingTaskDto } from './dto/start-housekeeping-task.dto';
+import { UpdateRoomCleaningStatusDto } from './dto/update-room-cleaning-status.dto';
 import { UpdateHousekeepingTaskDto } from './dto/update-housekeeping-task.dto';
 import {
+  HousekeepingIssueRecord,
+  HousekeepingIssuesRepository,
+} from './repositories/housekeeping-issues.repository';
+import {
   ActiveHousekeepingUserRecord,
+  HousekeepingProductivityTaskRecord,
   HousekeepingTaskRecord,
   HousekeepingTasksRepository,
 } from './repositories/housekeeping-tasks.repository';
