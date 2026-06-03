@@ -257,6 +257,7 @@ export class StaysService {
       checkOutStayDto.closeFolio === true &&
       folio?.status === FolioStatus.OPEN &&
       folio.balanceAmount.equals(0);
+    const createdHousekeepingTasks: HousekeepingTaskRecord[] = [];
     const checkedOutStay = await this.staysRepository.runInTransaction(
       async (client) => {
         for (const assignment of activeAssignments) {
@@ -289,6 +290,17 @@ export class StaysService {
             },
             client,
           );
+
+          const housekeepingTask =
+            await this.housekeepingService.createCheckoutCleaningTaskFromStay({
+              stayId: stay.id,
+              roomId: assignment.roomId,
+              client,
+            });
+
+          if (housekeepingTask.created) {
+            createdHousekeepingTasks.push(housekeepingTask.task);
+          }
         }
 
         const roomStatusLogs = this.buildCheckoutRoomStatusLogs(
