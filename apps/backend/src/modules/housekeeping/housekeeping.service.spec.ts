@@ -19,6 +19,7 @@ import {
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { RoomsRepository } from '../rooms/repositories/rooms.repository';
 import { HousekeepingService } from './housekeeping.service';
+import { HousekeepingIssuesRepository } from './repositories/housekeeping-issues.repository';
 import { HousekeepingTasksRepository } from './repositories/housekeeping-tasks.repository';
 
 const currentUser = {
