@@ -1311,6 +1311,26 @@ export class HousekeepingService {
     throw new ConflictException('Could not generate a unique task number.');
   }
 
+  private async generateIssueNumber(client?: Prisma.TransactionClient) {
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const sequence = `${Date.now().toString().slice(-6)}${attempt}`.slice(-6);
+      const issueNumber = `HKI-${datePart}-${sequence}`;
+      const existingIssue =
+        await this.housekeepingIssuesRepository.findByIssueNumber(
+          issueNumber,
+          client,
+        );
+
+      if (!existingIssue) {
+        return issueNumber;
+      }
+    }
+
+    throw new ConflictException('Could not generate a unique issue number.');
+  }
+
   private serializeTask(task: HousekeepingTaskRecord) {
     return {
       id: task.id,
