@@ -6,6 +6,7 @@ import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { RoomsModule } from '../rooms/rooms.module';
 import { HousekeepingController } from './housekeeping.controller';
 import { HousekeepingService } from './housekeeping.service';
+import { HousekeepingIssuesRepository } from './repositories/housekeeping-issues.repository';
 import { HousekeepingTasksRepository } from './repositories/housekeeping-tasks.repository';
 
 @Module({
