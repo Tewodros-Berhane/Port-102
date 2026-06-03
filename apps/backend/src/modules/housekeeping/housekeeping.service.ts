@@ -1553,6 +1553,68 @@ export class HousekeepingService {
     return date;
   }
 
+  private getDayRange(value?: string) {
+    const date = value === undefined ? new Date() : this.parseDate(value);
+
+    return {
+      from: this.startOfUtcDay(date),
+      to: this.endOfUtcDay(date),
+    };
+  }
+
+  private getDateRange(fromValue?: string, toValue?: string) {
+    const defaultRange = this.getDayRange();
+    const from =
+      fromValue === undefined
+        ? defaultRange.from
+        : this.startOfUtcDay(this.parseDate(fromValue));
+    const to =
+      toValue === undefined
+        ? defaultRange.to
+        : this.endOfUtcDay(this.parseDate(toValue));
+
+    if (from.getTime() > to.getTime()) {
+      throw new BadRequestException(
+        'Housekeeping productivity start date must be before or equal to end date.',
+      );
+    }
+
+    return {
+      from,
+      to,
+    };
+  }
+
+  private isWithinRange(value: Date | null, from: Date, to: Date) {
+    if (!value) {
+      return false;
+    }
+
+    const timestamp = value.getTime();
+
+    return timestamp >= from.getTime() && timestamp <= to.getTime();
+  }
+
+  private startOfUtcDay(date: Date) {
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    );
+  }
+
+  private endOfUtcDay(date: Date) {
+    return new Date(
+      Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        23,
+        59,
+        59,
+        999,
+      ),
+    );
+  }
+
   private parseOptionalDate(value?: string) {
     return value === undefined ? undefined : this.parseDate(value);
   }
