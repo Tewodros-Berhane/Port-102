@@ -113,6 +113,18 @@ describe('HousekeepingController', () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.getDashboard,
+      ),
+    ).toEqual(['housekeeping.dashboard.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.getProductivity,
+      ),
+    ).toEqual(['housekeeping.productivity.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
         HousekeepingController.prototype.createTask,
       ),
     ).toEqual(['housekeeping.tasks.create']);
