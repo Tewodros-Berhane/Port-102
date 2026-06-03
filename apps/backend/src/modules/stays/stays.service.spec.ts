@@ -23,6 +23,7 @@ import {
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { FoliosRepository } from '../folios/repositories/folios.repository';
+import { HousekeepingService } from '../housekeeping/housekeeping.service';
 import { ReservationAvailabilityRepository } from '../reservations/repositories/reservation-availability.repository';
 import { ReservationRoomsRepository } from '../reservations/repositories/reservation-rooms.repository';
 import { ReservationsRepository } from '../reservations/repositories/reservations.repository';
@@ -233,6 +234,16 @@ describe('StaysService', () => {
         },
       },
     ],
+  };
+  const checkoutHousekeepingTask = {
+    id: 80,
+    taskNumber: 'HKT-20260610-123450',
+    roomId: 9,
+    type: HousekeepingTaskType.CHECKOUT_CLEANING,
+    status: HousekeepingTaskStatus.PENDING,
+    priority: HousekeepingPriority.NORMAL,
+    sourceType: 'STAY_CHECKOUT',
+    sourceId: 40,
   };
   const settledFolio = {
     id: 70,
