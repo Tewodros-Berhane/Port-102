@@ -137,6 +137,36 @@ describe('HousekeepingController', () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.reportIssue,
+      ),
+    ).toEqual(['housekeeping.issues.report']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.listIssues,
+      ),
+    ).toEqual(['housekeeping.issues.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.getIssueById,
+      ),
+    ).toEqual(['housekeeping.issues.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.resolveIssue,
+      ),
+    ).toEqual(['housekeeping.issues.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.cancelIssue,
+      ),
+    ).toEqual(['housekeeping.issues.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
         HousekeepingController.prototype.assignTask,
       ),
     ).toEqual(['housekeeping.tasks.assign']);
