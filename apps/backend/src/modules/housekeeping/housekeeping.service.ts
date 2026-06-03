@@ -905,6 +905,172 @@ export class HousekeepingService {
     return this.serializeTask(completedTask);
   }
 
+  async inspect(
+    currentUser: CurrentUserPayload,
+    taskId: number,
+    inspectHousekeepingTaskDto: InspectHousekeepingTaskDto,
+  ) {
+    const task = await this.findRequiredTask(taskId);
+
+    this.ensureTaskAwaitingInspection(task, 'inspected');
+
+    const inspectionNotes =
+      inspectHousekeepingTaskDto.inspectionNotes === undefined
+        ? undefined
+        : this.normalizeOptionalString(
+            inspectHousekeepingTaskDto.inspectionNotes,
+          );
+    const inspectedTask = await this.housekeepingTasksRepository.updateTask(
+      task.id,
+      {
+        inspectedAt: new Date(),
+        inspectedByUserId: currentUser.sub,
+        ...(inspectionNotes === undefined ? {} : { inspectionNotes }),
+      },
+    );
+
+    await this.recordTaskAudit(
+      currentUser,
+      'housekeeping.tasks.inspected',
+      inspectedTask,
+      {
+        taskNumber: inspectedTask.taskNumber,
+        roomId: inspectedTask.roomId,
+        status: inspectedTask.status,
+        inspectionNotes: inspectedTask.inspectionNotes,
+      },
+    );
+
+    return this.serializeTask(inspectedTask);
+  }
+
+  async approve(
+    currentUser: CurrentUserPayload,
+    taskId: number,
+    approveHousekeepingTaskDto: ApproveHousekeepingTaskDto,
+  ) {
+    const task = await this.findRequiredTask(taskId);
+
+    this.ensureTaskAwaitingInspection(task, 'approved');
+
+    const inspectionNotes =
+      approveHousekeepingTaskDto.inspectionNotes === undefined
+        ? undefined
+        : this.normalizeOptionalString(
+            approveHousekeepingTaskDto.inspectionNotes,
+          );
+    const approvedAt = new Date();
+    const approvedTask =
+      await this.housekeepingTasksRepository.runInTransaction(
+        async (client) => {
+          await this.housekeepingTasksRepository.updateTask(
+            task.id,
+            {
+              status: HousekeepingTaskStatus.APPROVED,
+              inspectedAt: task.inspectedAt ?? approvedAt,
+              inspectedByUserId: task.inspectedByUserId ?? currentUser.sub,
+              approvedAt,
+              approvedByUserId: currentUser.sub,
+              ...(inspectionNotes === undefined ? {} : { inspectionNotes }),
+            },
+            client,
+          );
+
+          if (task.room.cleaningStatus !== RoomCleaningStatus.INSPECTED) {
+            await this.roomsRepository.updateRoom(
+              task.roomId,
+              {
+                cleaningStatus: RoomCleaningStatus.INSPECTED,
+              },
+              client,
+            );
+            await this.roomsRepository.createStatusLogs(
+              [
+                {
+                  roomId: task.roomId,
+                  actorUserId: currentUser.sub,
+                  field: 'cleaningStatus',
+                  oldValue: task.room.cleaningStatus,
+                  newValue: RoomCleaningStatus.INSPECTED,
+                  reason: 'Housekeeping task approved',
+                },
+              ],
+              client,
+            );
+          }
+
+          return this.findRequiredTask(task.id, client);
+        },
+      );
+
+    await this.recordTaskAudit(
+      currentUser,
+      'housekeeping.tasks.approved',
+      approvedTask,
+      {
+        taskNumber: approvedTask.taskNumber,
+        roomId: approvedTask.roomId,
+        previousStatus: task.status,
+        status: approvedTask.status,
+        previousCleaningStatus: task.room.cleaningStatus,
+        cleaningStatus: approvedTask.room.cleaningStatus,
+        inspectionNotes: approvedTask.inspectionNotes,
+      },
+    );
+
+    return this.serializeTask(approvedTask);
+  }
+
+  async reject(
+    currentUser: CurrentUserPayload,
+    taskId: number,
+    rejectHousekeepingTaskDto: RejectHousekeepingTaskDto,
+  ) {
+    const task = await this.findRequiredTask(taskId);
+
+    this.ensureTaskAwaitingInspection(task, 'rejected');
+
+    const reason = this.normalizeRequiredString(
+      rejectHousekeepingTaskDto.reason,
+      'Task rejection reason is required.',
+    );
+    const inspectionNotes =
+      rejectHousekeepingTaskDto.inspectionNotes === undefined
+        ? undefined
+        : this.normalizeOptionalString(
+            rejectHousekeepingTaskDto.inspectionNotes,
+          );
+    const rejectedAt = new Date();
+    const rejectedTask = await this.housekeepingTasksRepository.updateTask(
+      task.id,
+      {
+        status: HousekeepingTaskStatus.REJECTED,
+        inspectedAt: task.inspectedAt ?? rejectedAt,
+        inspectedByUserId: task.inspectedByUserId ?? currentUser.sub,
+        rejectedAt,
+        rejectedByUserId: currentUser.sub,
+        rejectionReason: reason,
+        ...(inspectionNotes === undefined ? {} : { inspectionNotes }),
+      },
+    );
+
+    await this.recordTaskAudit(
+      currentUser,
+      'housekeeping.tasks.rejected',
+      rejectedTask,
+      {
+        taskNumber: rejectedTask.taskNumber,
+        roomId: rejectedTask.roomId,
+        previousStatus: task.status,
+        status: rejectedTask.status,
+        rejectionReason: reason,
+        inspectionNotes: rejectedTask.inspectionNotes,
+      },
+    );
+
+    return this.serializeTask(rejectedTask);
+  }
+
   private async assignTask({
     currentUser,
     task,
