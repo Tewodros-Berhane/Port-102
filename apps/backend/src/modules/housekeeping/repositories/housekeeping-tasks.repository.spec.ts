@@ -188,6 +188,66 @@ describe('HousekeepingTasksRepository', () => {
     );
   });
 
+  it('counts tasks for dashboard summaries', async () => {
+    await repository.countTasks({
+      status: HousekeepingTaskStatus.PENDING,
+    });
+
+    expect(prisma.housekeepingTask.count).toHaveBeenCalledWith({
+      where: {
+        status: HousekeepingTaskStatus.PENDING,
+      },
+    });
+  });
+
+  it('lists assigned tasks with activity in the productivity date range', async () => {
+    prisma.housekeepingTask.findMany.mockResolvedValue([]);
+    const from = new Date('2026-06-03T00:00:00.000Z');
+    const to = new Date('2026-06-03T23:59:59.999Z');
+
+    await repository.listTasksForProductivity({
+      from,
+      to,
+    });
+
+    expect(prisma.housekeepingTask.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          assignedToUserId: {
+            not: null,
+          },
+          OR: [
+            {
+              createdAt: {
+                gte: from,
+                lte: to,
+              },
+            },
+            {
+              completedAt: {
+                gte: from,
+                lte: to,
+              },
+            },
+            {
+              approvedAt: {
+                gte: from,
+                lte: to,
+              },
+            },
+            {
+              rejectedAt: {
+                gte: from,
+                lte: to,
+              },
+            },
+          ],
+        },
+        orderBy: [{ assignedToUserId: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
   it('updates tasks by id', async () => {
     await repository.updateTask(9, {
       priority: HousekeepingPriority.HIGH,

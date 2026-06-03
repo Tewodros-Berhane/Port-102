@@ -193,6 +193,10 @@ export class RoomsRepository {
     ]);
   }
 
+  countRooms(where: Prisma.RoomWhereInput) {
+    return this.prisma.room.count({ where });
+  }
+
   findRoom(roomId: number) {
     return this.prisma.room.findUnique({
       where: {
