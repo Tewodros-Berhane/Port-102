@@ -240,6 +240,33 @@ export class HousekeepingController {
     return this.housekeepingService.getById(currentUser, taskId);
   }
 
+  @Patch('rooms/:roomId/cleaning-status')
+  @AnyPermissions(
+    'room_cleaning_status.update',
+    'room_cleaning_status.update.assigned',
+  )
+  @ApiOperation({ summary: 'Update one room cleaning status' })
+  @ApiOkResponse({ description: 'Room cleaning status updated.' })
+  @ApiBadRequestResponse({ description: 'Invalid room cleaning payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({
+    description: 'Missing permission or room is not assigned to current user.',
+  })
+  @ApiNotFoundResponse({ description: 'Room was not found.' })
+  updateRoomCleaningStatus(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @CurrentPermissions() permissionKeys: string[],
+    @Param('roomId', ParseIntPipe) roomId: number,
+    @Body() updateRoomCleaningStatusDto: UpdateRoomCleaningStatusDto,
+  ) {
+    return this.housekeepingService.updateRoomCleaningStatus(
+      currentUser,
+      permissionKeys,
+      roomId,
+      updateRoomCleaningStatusDto,
+    );
+  }
+
   @Patch('tasks/:id')
   @AnyPermissions(
     'housekeeping.tasks.create',
