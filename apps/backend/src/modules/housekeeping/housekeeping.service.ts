@@ -1291,14 +1291,17 @@ export class HousekeepingService {
     }
   }
 
-  private async generateTaskNumber() {
+  private async generateTaskNumber(client?: Prisma.TransactionClient) {
     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
     for (let attempt = 0; attempt < 5; attempt++) {
       const sequence = `${Date.now().toString().slice(-6)}${attempt}`.slice(-6);
       const taskNumber = `HKT-${datePart}-${sequence}`;
       const existingTask =
-        await this.housekeepingTasksRepository.findByTaskNumber(taskNumber);
+        await this.housekeepingTasksRepository.findByTaskNumber(
+          taskNumber,
+          client,
+        );
 
       if (!existingTask) {
         return taskNumber;
