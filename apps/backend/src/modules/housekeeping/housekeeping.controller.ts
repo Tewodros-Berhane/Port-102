@@ -58,6 +58,35 @@ import { HousekeepingService } from './housekeeping.service';
 export class HousekeepingController {
   constructor(private readonly housekeepingService: HousekeepingService) {}
 
+  @Get('dashboard')
+  @Permissions('housekeeping.dashboard.read')
+  @ApiOperation({ summary: 'Get housekeeping dashboard counts' })
+  @ApiOkResponse({ description: 'Housekeeping dashboard counts returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  getDashboard(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: HousekeepingDashboardQueryDto,
+  ) {
+    return this.housekeepingService.getDashboard(currentUser, query);
+  }
+
+  @Get('productivity')
+  @Permissions('housekeeping.productivity.read')
+  @ApiOperation({ summary: 'Get housekeeping productivity summaries' })
+  @ApiOkResponse({
+    description: 'Housekeeping productivity summaries returned.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid productivity date range.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  getProductivity(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: HousekeepingProductivityQueryDto,
+  ) {
+    return this.housekeepingService.getProductivity(currentUser, query);
+  }
+
   @Post('tasks')
   @Permissions('housekeeping.tasks.create')
   @ApiOperation({ summary: 'Create a housekeeping task' })
