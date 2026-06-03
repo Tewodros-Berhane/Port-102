@@ -210,6 +210,33 @@ describe('HousekeepingController', () => {
       'housekeeping.tasks.complete',
       'housekeeping.tasks.complete.assigned',
     ]);
+    expect(
+      Reflect.getMetadata(
+        ANY_REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.updateRoomCleaningStatus,
+      ),
+    ).toEqual([
+      'room_cleaning_status.update',
+      'room_cleaning_status.update.assigned',
+    ]);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.inspectTask,
+      ),
+    ).toEqual(['housekeeping.tasks.inspect']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.approveTask,
+      ),
+    ).toEqual(['housekeeping.tasks.approve']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        HousekeepingController.prototype.rejectTask,
+      ),
+    ).toEqual(['housekeeping.tasks.approve']);
   });
 
   it('delegates task creation and listing', () => {
