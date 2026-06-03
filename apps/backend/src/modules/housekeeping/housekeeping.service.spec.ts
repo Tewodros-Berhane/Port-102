@@ -7,6 +7,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 
 import {
+  HousekeepingIssueStatus,
   HousekeepingPriority,
   HousekeepingTaskStatus,
   HousekeepingTaskType,
