@@ -789,6 +789,21 @@ export class HousekeepingService {
       {
         status: HousekeepingTaskStatus.IN_PROGRESS,
         startedAt: new Date(),
+        ...(task.status === HousekeepingTaskStatus.REJECTED
+          ? {
+              completedAt: null,
+              inspectedAt: null,
+              approvedAt: null,
+              rejectedAt: null,
+              completedByUserId: null,
+              inspectedByUserId: null,
+              approvedByUserId: null,
+              rejectedByUserId: null,
+              completionNotes: null,
+              inspectionNotes: null,
+              rejectionReason: null,
+            }
+          : {}),
         ...(notes === undefined ? {} : { notes }),
       },
     );
