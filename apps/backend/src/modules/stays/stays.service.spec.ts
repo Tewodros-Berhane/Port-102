@@ -331,6 +331,9 @@ describe('StaysService', () => {
     findByStayId: jest.Mock;
     updateFolio: jest.Mock;
   };
+  let housekeepingService: {
+    createCheckoutCleaningTaskFromStay: jest.Mock;
+  };
   let auditLogsService: {
     record: jest.Mock;
   };
@@ -380,6 +383,12 @@ describe('StaysService', () => {
         status: FolioStatus.CLOSED,
         closedAt: checkedOutAt,
         closedByUserId: 1,
+      }),
+    };
+    housekeepingService = {
+      createCheckoutCleaningTaskFromStay: jest.fn().mockResolvedValue({
+        task: checkoutHousekeepingTask,
+        created: true,
       }),
     };
     auditLogsService = {
