@@ -170,6 +170,61 @@ export class HousekeepingTasksRepository {
     });
   }
 
+  findOpenCheckoutCleaningTask(
+    {
+      roomId,
+      sourceId,
+    }: {
+      roomId: number;
+      sourceId: number;
+    },
+    client: HousekeepingTaskClient = this.prisma,
+  ) {
+    return client.housekeepingTask.findFirst({
+      where: {
+        roomId,
+        type: HousekeepingTaskType.CHECKOUT_CLEANING,
+        sourceType: 'STAY_CHECKOUT',
+        sourceId,
+        status: {
+          notIn: [
+            HousekeepingTaskStatus.APPROVED,
+            HousekeepingTaskStatus.CANCELLED,
+          ],
+        },
+      },
+      select: taskSelect,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+  }
+
+  findActiveAssignedTaskForRoom(
+    {
+      roomId,
+      assignedToUserId,
+    }: {
+      roomId: number;
+      assignedToUserId: number;
+    },
+    client: HousekeepingTaskClient = this.prisma,
+  ) {
+    return client.housekeepingTask.findFirst({
+      where: {
+        roomId,
+        assignedToUserId,
+        status: {
+          in: [
+            HousekeepingTaskStatus.ASSIGNED,
+            HousekeepingTaskStatus.IN_PROGRESS,
+            HousekeepingTaskStatus.REJECTED,
+          ],
+        },
+      },
+      select: taskSelect,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+  }
+
   listTasks({
     skip,
     take,
