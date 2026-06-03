@@ -455,4 +455,37 @@ describe('HousekeepingController', () => {
       completeDto,
     );
   });
+
+  it('delegates task inspection decisions', () => {
+    const inspectDto = {
+      inspectionNotes: 'Bathroom checked.',
+    };
+    const approveDto = {
+      inspectionNotes: 'Passed inspection.',
+    };
+    const rejectDto = {
+      reason: 'Desk still dusty.',
+      inspectionNotes: 'Reclean and reinspect.',
+    };
+
+    controller.inspectTask(currentUser, 9, inspectDto);
+    controller.approveTask(currentUser, 9, approveDto);
+    controller.rejectTask(currentUser, 9, rejectDto);
+
+    expect(housekeepingService.inspect).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      inspectDto,
+    );
+    expect(housekeepingService.approve).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      approveDto,
+    );
+    expect(housekeepingService.reject).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      rejectDto,
+    );
+  });
 });
