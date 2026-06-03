@@ -22,6 +22,8 @@ import {
   FolioRecord,
   FoliosRepository,
 } from '../folios/repositories/folios.repository';
+import { HousekeepingService } from '../housekeeping/housekeeping.service';
+import type { HousekeepingTaskRecord } from '../housekeeping/repositories/housekeeping-tasks.repository';
 import { ReservationAvailabilityRepository } from '../reservations/repositories/reservation-availability.repository';
 import {
   ReservationRoomRecord,
@@ -65,6 +67,7 @@ export class StaysService {
     private readonly reservationAvailabilityRepository: ReservationAvailabilityRepository,
     private readonly roomsRepository: RoomsRepository,
     private readonly foliosRepository: FoliosRepository,
+    private readonly housekeepingService: HousekeepingService,
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
