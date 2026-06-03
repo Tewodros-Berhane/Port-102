@@ -129,6 +129,18 @@ describe('RoomsRepository', () => {
     );
   });
 
+  it('counts rooms for summaries', async () => {
+    await repository.countRooms({
+      cleaningStatus: RoomCleaningStatus.DIRTY,
+    });
+
+    expect(prisma.room.count).toHaveBeenCalledWith({
+      where: {
+        cleaningStatus: RoomCleaningStatus.DIRTY,
+      },
+    });
+  });
+
   it('updates rooms by id', async () => {
     await repository.updateRoom(9, {
       displayName: null,
