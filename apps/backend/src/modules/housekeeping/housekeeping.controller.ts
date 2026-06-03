@@ -406,6 +406,78 @@ export class HousekeepingController {
     );
   }
 
+  @Patch('tasks/:id/inspect')
+  @Permissions('housekeeping.tasks.inspect')
+  @ApiOperation({ summary: 'Record housekeeping task inspection notes' })
+  @ApiOkResponse({ description: 'Housekeeping task inspection recorded.' })
+  @ApiBadRequestResponse({ description: 'Invalid inspection payload.' })
+  @ApiConflictResponse({
+    description: 'Task cannot be inspected in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Housekeeping task was not found.' })
+  inspectTask(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) taskId: number,
+    @Body() inspectHousekeepingTaskDto: InspectHousekeepingTaskDto,
+  ) {
+    return this.housekeepingService.inspect(
+      currentUser,
+      taskId,
+      inspectHousekeepingTaskDto,
+    );
+  }
+
+  @Patch('tasks/:id/approve')
+  @Permissions('housekeeping.tasks.approve')
+  @ApiOperation({ summary: 'Approve a housekeeping task inspection' })
+  @ApiOkResponse({
+    description:
+      'Housekeeping task approved and room cleaning status set to inspected.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid approval payload.' })
+  @ApiConflictResponse({
+    description: 'Task cannot be approved in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Housekeeping task was not found.' })
+  approveTask(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) taskId: number,
+    @Body() approveHousekeepingTaskDto: ApproveHousekeepingTaskDto,
+  ) {
+    return this.housekeepingService.approve(
+      currentUser,
+      taskId,
+      approveHousekeepingTaskDto,
+    );
+  }
+
+  @Patch('tasks/:id/reject')
+  @Permissions('housekeeping.tasks.approve')
+  @ApiOperation({ summary: 'Reject a housekeeping task inspection' })
+  @ApiOkResponse({ description: 'Housekeeping task rejected.' })
+  @ApiBadRequestResponse({ description: 'Invalid rejection payload.' })
+  @ApiConflictResponse({
+    description: 'Task cannot be rejected in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Housekeeping task was not found.' })
+  rejectTask(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) taskId: number,
+    @Body() rejectHousekeepingTaskDto: RejectHousekeepingTaskDto,
+  ) {
+    return this.housekeepingService.reject(
+      currentUser,
+      taskId,
+      rejectHousekeepingTaskDto,
+    );
+  }
+
   @Patch('tasks/:id/cancel')
   @AnyPermissions('housekeeping.tasks.assign', 'housekeeping.tasks.reassign')
   @ApiOperation({ summary: 'Cancel a housekeeping task' })
