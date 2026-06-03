@@ -1262,9 +1262,7 @@ export class HousekeepingService {
     }
 
     if (!room.isActive) {
-      throw new BadRequestException(
-        'Cannot create or update a task for an inactive room.',
-      );
+      throw new BadRequestException(inactiveMessage);
     }
 
     return room;
