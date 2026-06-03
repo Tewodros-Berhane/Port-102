@@ -8,6 +8,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   FolioStatus,
   GuestStatus,
+  HousekeepingPriority,
+  HousekeepingTaskStatus,
+  HousekeepingTaskType,
   Prisma,
   ReservationRoomStatus,
   ReservationSource,

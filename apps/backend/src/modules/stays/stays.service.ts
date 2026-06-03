@@ -408,6 +408,7 @@ export class StaysService {
           reservationRoomId: assignment.reservationRoomId,
           roomId: assignment.roomId,
         })),
+        housekeepingTaskIds: createdHousekeepingTasks.map((task) => task.id),
       },
     });
 
