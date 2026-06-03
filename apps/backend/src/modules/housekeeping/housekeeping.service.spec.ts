@@ -439,6 +439,278 @@ describe('HousekeepingService', () => {
     );
   });
 
+  it('updates room cleaning status, creates a status log, and audits the change', async () => {
+    const updatedRoom = createRoom({
+      cleaningStatus: RoomCleaningStatus.INSPECTED,
+    });
+    roomsRepository.updateRoom.mockResolvedValue(updatedRoom);
+
+    const result = await service.updateRoomCleaningStatus(
+      currentUser,
+      ['room_cleaning_status.update'],
+      12,
+      {
+        cleaningStatus: RoomCleaningStatus.INSPECTED,
+        reason: ' Supervisor inspected room. ',
+      },
+    );
+
+    expect(roomsRepository.findRoom).toHaveBeenCalledWith(12);
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(12, {
+      cleaningStatus: RoomCleaningStatus.INSPECTED,
+    });
+    expect(roomsRepository.createStatusLogs).toHaveBeenCalledWith([
+      {
+        roomId: 12,
+        actorUserId: currentUser.sub,
+        field: 'cleaningStatus',
+        oldValue: RoomCleaningStatus.DIRTY,
+        newValue: RoomCleaningStatus.INSPECTED,
+        reason: 'Supervisor inspected room.',
+      },
+    ]);
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'room_cleaning_status.updated',
+        entityType: 'Room',
+        entityId: '12',
+        metadata: expect.objectContaining({
+          previousCleaningStatus: RoomCleaningStatus.DIRTY,
+          cleaningStatus: RoomCleaningStatus.INSPECTED,
+          reason: 'Supervisor inspected room.',
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      id: 12,
+      cleaningStatus: RoomCleaningStatus.INSPECTED,
+    });
+  });
+
+  it('rejects assigned-only room cleaning updates without an active assigned task', async () => {
+    housekeepingTasksRepository.findActiveAssignedTaskForRoom.mockResolvedValue(
+      null,
+    );
+
+    await expect(
+      service.updateRoomCleaningStatus(
+        currentUser,
+        ['room_cleaning_status.update.assigned'],
+        12,
+        {
+          cleaningStatus: RoomCleaningStatus.CLEAN,
+        },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(
+      housekeepingTasksRepository.findActiveAssignedTaskForRoom,
+    ).toHaveBeenCalledWith({
+      roomId: 12,
+      assignedToUserId: currentUser.sub,
+    });
+    expect(roomsRepository.updateRoom).not.toHaveBeenCalled();
+  });
+
+  it('reports a housekeeping issue for an active room and linked task', async () => {
+    const task = createTask({
+      roomId: 12,
+    });
+    const issue = createIssue({
+      taskId: task.id,
+      task: {
+        id: task.id,
+        taskNumber: task.taskNumber,
+        roomId: task.roomId,
+        type: task.type,
+        status: task.status,
+        priority: task.priority,
+      },
+      title: 'Broken lamp',
+      description: 'Lamp does not turn on.',
+      photoUrl: 'https://cdn.example.com/lamp.jpg',
+    });
+    housekeepingTasksRepository.findTask.mockResolvedValue(task);
+    housekeepingIssuesRepository.createIssue.mockResolvedValue(issue);
+
+    const result = await service.reportIssue(currentUser, {
+      roomId: 12,
+      taskId: task.id,
+      title: ' Broken lamp ',
+      description: ' Lamp does not turn on. ',
+      photoUrl: ' https://cdn.example.com/lamp.jpg ',
+    });
+
+    expect(roomsRepository.findRoom).toHaveBeenCalledWith(12);
+    expect(housekeepingTasksRepository.findTask).toHaveBeenCalledWith(
+      task.id,
+      undefined,
+    );
+    expect(housekeepingIssuesRepository.createIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueNumber: expect.stringMatching(/^HKI-\d{8}-\d{6}$/),
+        roomId: 12,
+        taskId: task.id,
+        reportedByUserId: currentUser.sub,
+        status: HousekeepingIssueStatus.OPEN,
+        title: 'Broken lamp',
+        description: 'Lamp does not turn on.',
+        photoUrl: 'https://cdn.example.com/lamp.jpg',
+      }),
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'housekeeping.issues.reported',
+        entityType: 'HousekeepingIssue',
+        entityId: '15',
+      }),
+    );
+    expect(result).toMatchObject({
+      id: 15,
+      status: HousekeepingIssueStatus.OPEN,
+      title: 'Broken lamp',
+      taskId: task.id,
+    });
+  });
+
+  it('rejects issue reporting when the linked task belongs to another room', async () => {
+    housekeepingTasksRepository.findTask.mockResolvedValue(
+      createTask({
+        roomId: 99,
+      }),
+    );
+
+    await expect(
+      service.reportIssue(currentUser, {
+        roomId: 12,
+        taskId: 9,
+        title: 'Broken lamp',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(housekeepingIssuesRepository.createIssue).not.toHaveBeenCalled();
+  });
+
+  it('lists housekeeping issues with pagination and filters', async () => {
+    const issue = createIssue();
+    housekeepingIssuesRepository.listIssues.mockResolvedValue([1, [issue]]);
+
+    const result = await service.listIssues(currentUser, {
+      page: 2,
+      limit: 5,
+      status: HousekeepingIssueStatus.OPEN,
+      roomId: 12,
+      createdFrom: '2026-06-01',
+      createdTo: '2026-06-02',
+    });
+
+    expect(housekeepingIssuesRepository.listIssues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 5,
+        take: 5,
+        status: HousekeepingIssueStatus.OPEN,
+        roomId: 12,
+        createdFrom: expect.any(Date),
+        createdTo: expect.any(Date),
+      }),
+    );
+    expect(result.pagination).toEqual({
+      page: 2,
+      limit: 5,
+      total: 1,
+      totalPages: 1,
+    });
+  });
+
+  it('resolves an open housekeeping issue', async () => {
+    const issue = createIssue();
+    const resolvedIssue = createIssue({
+      status: HousekeepingIssueStatus.RESOLVED,
+      resolvedAt: now,
+      resolvedByUserId: currentUser.sub,
+      resolutionNotes: 'Lamp was replaced.',
+    });
+    housekeepingIssuesRepository.findIssue.mockResolvedValue(issue);
+    housekeepingIssuesRepository.updateIssue.mockResolvedValue(resolvedIssue);
+
+    const result = await service.resolveIssue(currentUser, 15, {
+      resolutionNotes: ' Lamp was replaced. ',
+    });
+
+    expect(housekeepingIssuesRepository.updateIssue).toHaveBeenCalledWith(15, {
+      status: HousekeepingIssueStatus.RESOLVED,
+      resolvedAt: expect.any(Date),
+      resolvedByUserId: currentUser.sub,
+      resolutionNotes: 'Lamp was replaced.',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'housekeeping.issues.resolved',
+        entityType: 'HousekeepingIssue',
+        entityId: '15',
+      }),
+    );
+    expect(result).toMatchObject({
+      status: HousekeepingIssueStatus.RESOLVED,
+      resolvedByUserId: currentUser.sub,
+      resolutionNotes: 'Lamp was replaced.',
+    });
+  });
+
+  it('rejects resolving a closed housekeeping issue', async () => {
+    housekeepingIssuesRepository.findIssue.mockResolvedValue(
+      createIssue({
+        status: HousekeepingIssueStatus.CANCELLED,
+      }),
+    );
+
+    await expect(
+      service.resolveIssue(currentUser, 15, {
+        resolutionNotes: 'Fixed.',
+      }),
+    ).rejects.toThrow(ConflictException);
+    expect(housekeepingIssuesRepository.updateIssue).not.toHaveBeenCalled();
+  });
+
+  it('cancels an open housekeeping issue with a required reason', async () => {
+    const issue = createIssue();
+    const cancelledIssue = createIssue({
+      status: HousekeepingIssueStatus.CANCELLED,
+    });
+    housekeepingIssuesRepository.findIssue.mockResolvedValue(issue);
+    housekeepingIssuesRepository.updateIssue.mockResolvedValue(cancelledIssue);
+
+    const result = await service.cancelIssue(currentUser, 15, {
+      reason: ' Duplicate issue. ',
+    });
+
+    expect(housekeepingIssuesRepository.updateIssue).toHaveBeenCalledWith(15, {
+      status: HousekeepingIssueStatus.CANCELLED,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'housekeeping.issues.cancelled',
+        entityType: 'HousekeepingIssue',
+        entityId: '15',
+        metadata: expect.objectContaining({
+          reason: 'Duplicate issue.',
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      status: HousekeepingIssueStatus.CANCELLED,
+    });
+  });
+
+  it('requires a reason before cancelling a housekeeping issue', async () => {
+    housekeepingIssuesRepository.findIssue.mockResolvedValue(createIssue());
+
+    await expect(
+      service.cancelIssue(currentUser, 15, {
+        reason: '  ',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(housekeepingIssuesRepository.updateIssue).not.toHaveBeenCalled();
+  });
+
   it('assigns an unassigned task to an active user', async () => {
     const assignedUser = createUser();
     const task = createTask();
