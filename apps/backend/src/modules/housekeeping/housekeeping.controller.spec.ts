@@ -368,6 +368,28 @@ describe('HousekeepingController', () => {
     );
   });
 
+  it('delegates room cleaning status updates with permission keys', () => {
+    const permissionKeys = ['room_cleaning_status.update'];
+    const updateDto = {
+      cleaningStatus: RoomCleaningStatus.INSPECTED,
+      reason: 'Supervisor inspected room.',
+    };
+
+    controller.updateRoomCleaningStatus(
+      currentUser,
+      permissionKeys,
+      12,
+      updateDto,
+    );
+
+    expect(housekeepingService.updateRoomCleaningStatus).toHaveBeenCalledWith(
+      currentUser,
+      permissionKeys,
+      12,
+      updateDto,
+    );
+  });
+
   it('delegates assignment, reassignment, and cancellation', () => {
     const assignDto = {
       assignedToUserId: 7,
