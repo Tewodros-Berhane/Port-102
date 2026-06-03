@@ -203,12 +203,25 @@ describe('HousekeepingService', () => {
       createTask: jest.fn(),
       findTask: jest.fn(),
       findByTaskNumber: jest.fn().mockResolvedValue(null),
+      findOpenCheckoutCleaningTask: jest.fn().mockResolvedValue(null),
+      findActiveAssignedTaskForRoom: jest.fn(),
       listTasks: jest.fn(),
+      countTasks: jest.fn(),
+      listTasksForProductivity: jest.fn(),
       updateTask: jest.fn(),
       findActiveUser: jest.fn(),
     };
+    housekeepingIssuesRepository = {
+      createIssue: jest.fn(),
+      findIssue: jest.fn(),
+      findByIssueNumber: jest.fn().mockResolvedValue(null),
+      listIssues: jest.fn(),
+      countIssues: jest.fn(),
+      updateIssue: jest.fn(),
+    };
     roomsRepository = {
       findRoom: jest.fn().mockResolvedValue(createRoom()),
+      countRooms: jest.fn(),
       updateRoom: jest.fn(),
       createStatusLogs: jest.fn(),
     };
