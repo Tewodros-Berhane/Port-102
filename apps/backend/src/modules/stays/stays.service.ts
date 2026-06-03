@@ -342,7 +342,6 @@ export class StaysService {
           );
         }
 
-        // TODO: emit housekeeping task hook here once housekeeping automation exists.
         const updatedStay = await this.staysRepository.findStay(
           stay.id,
           client,
@@ -369,6 +368,25 @@ export class StaysService {
           closedAt: checkedOutAt.toISOString(),
           source: 'stay_checkout',
           notes,
+        },
+      });
+    }
+
+    for (const task of createdHousekeepingTasks) {
+      await this.auditLogsService.record({
+        actorUserId: currentUser.sub,
+        action: 'housekeeping.tasks.auto_created',
+        entityType: 'HousekeepingTask',
+        entityId: String(task.id),
+        metadata: {
+          taskNumber: task.taskNumber,
+          roomId: task.roomId,
+          type: task.type,
+          status: task.status,
+          sourceType: task.sourceType,
+          sourceId: task.sourceId,
+          stayId: checkedOutStay.id,
+          stayNumber: checkedOutStay.stayNumber,
         },
       });
     }
