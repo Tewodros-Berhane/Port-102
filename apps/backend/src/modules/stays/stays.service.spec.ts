@@ -427,6 +427,10 @@ describe('StaysService', () => {
           useValue: foliosRepository,
         },
         {
+          provide: HousekeepingService,
+          useValue: housekeepingService,
+        },
+        {
           provide: AuditLogsService,
           useValue: auditLogsService,
         },
