@@ -1372,9 +1372,33 @@ export class HousekeepingService {
     };
   }
 
+  private serializeIssue(issue: HousekeepingIssueRecord) {
+    return {
+      id: issue.id,
+      issueNumber: issue.issueNumber,
+      taskId: issue.taskId,
+      roomId: issue.roomId,
+      reportedByUserId: issue.reportedByUserId,
+      status: issue.status,
+      title: issue.title,
+      description: issue.description,
+      photoUrl: issue.photoUrl,
+      resolvedAt: issue.resolvedAt,
+      resolvedByUserId: issue.resolvedByUserId,
+      resolutionNotes: issue.resolutionNotes,
+      createdAt: issue.createdAt,
+      updatedAt: issue.updatedAt,
+      room: issue.room,
+      task: issue.task,
+      reportedBy: this.serializeUserSummary(issue.reportedBy),
+      resolvedBy: this.serializeUserSummary(issue.resolvedBy),
+    };
+  }
+
   private serializeUserSummary(
     user:
       | HousekeepingTaskRecord['assignedTo']
+      | HousekeepingIssueRecord['reportedBy']
       | ActiveHousekeepingUserRecord
       | null,
   ) {
