@@ -99,6 +99,55 @@ describe('HousekeepingTasksRepository', () => {
     );
   });
 
+  it('finds open checkout cleaning tasks by room and source stay', async () => {
+    await repository.findOpenCheckoutCleaningTask({
+      roomId: 12,
+      sourceId: 40,
+    });
+
+    expect(prisma.housekeepingTask.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          roomId: 12,
+          type: HousekeepingTaskType.CHECKOUT_CLEANING,
+          sourceType: 'STAY_CHECKOUT',
+          sourceId: 40,
+          status: {
+            notIn: [
+              HousekeepingTaskStatus.APPROVED,
+              HousekeepingTaskStatus.CANCELLED,
+            ],
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
+  it('finds active assigned tasks for room cleaning status updates', async () => {
+    await repository.findActiveAssignedTaskForRoom({
+      roomId: 12,
+      assignedToUserId: 7,
+    });
+
+    expect(prisma.housekeepingTask.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          roomId: 12,
+          assignedToUserId: 7,
+          status: {
+            in: [
+              HousekeepingTaskStatus.ASSIGNED,
+              HousekeepingTaskStatus.IN_PROGRESS,
+              HousekeepingTaskStatus.REJECTED,
+            ],
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
   it('lists tasks with filters, search, pagination, and stable ordering', async () => {
     prisma.housekeepingTask.count.mockResolvedValue(0);
     prisma.housekeepingTask.findMany.mockResolvedValue([]);
