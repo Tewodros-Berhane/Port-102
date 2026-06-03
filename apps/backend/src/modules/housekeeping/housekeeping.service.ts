@@ -195,10 +195,417 @@ export class HousekeepingService {
     });
   }
 
+  async reportIssue(
+    currentUser: CurrentUserPayload,
+    createHousekeepingIssueDto: CreateHousekeepingIssueDto,
+  ) {
+    const room = await this.ensureActiveRoom(
+      createHousekeepingIssueDto.roomId,
+      'Cannot report a housekeeping issue for an inactive room.',
+    );
+    const task =
+      createHousekeepingIssueDto.taskId === undefined ||
+      createHousekeepingIssueDto.taskId === null
+        ? null
+        : await this.findRequiredTask(createHousekeepingIssueDto.taskId);
+
+    if (task && task.roomId !== room.id) {
+      throw new BadRequestException(
+        'Housekeeping issue task must belong to the selected room.',
+      );
+    }
+
+    const title = this.normalizeRequiredString(
+      createHousekeepingIssueDto.title,
+      'Housekeeping issue title is required.',
+    );
+    const issueNumber = await this.generateIssueNumber();
+    const issue = await this.housekeepingIssuesRepository.createIssue({
+      issueNumber,
+      roomId: room.id,
+      taskId: task?.id ?? null,
+      reportedByUserId: currentUser.sub,
+      status: HousekeepingIssueStatus.OPEN,
+      title,
+      description: this.normalizeOptionalString(
+        createHousekeepingIssueDto.description,
+      ),
+      photoUrl: this.normalizeOptionalString(
+        createHousekeepingIssueDto.photoUrl,
+      ),
+    });
+
+    await this.recordIssueAudit(
+      currentUser,
+      'housekeeping.issues.reported',
+      issue,
+      {
+        issueNumber: issue.issueNumber,
+        roomId: issue.roomId,
+        taskId: issue.taskId,
+        status: issue.status,
+        title: issue.title,
+      },
+    );
+    // TODO: Emit a maintenance-ticket event once maintenance integration exists.
+
+    return this.serializeIssue(issue);
+  }
+
+  async listIssues(
+    _currentUser: CurrentUserPayload,
+    query: GetHousekeepingIssuesQueryDto,
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const search = this.normalizeOptionalString(query.search);
+    const [total, issues] = await this.housekeepingIssuesRepository.listIssues({
+      skip: (page - 1) * limit,
+      take: limit,
+      search: search ?? undefined,
+      status: query.status,
+      roomId: query.roomId,
+      taskId: query.taskId,
+      reportedByUserId: query.reportedByUserId,
+      createdFrom: this.parseOptionalDate(query.createdFrom),
+      createdTo: this.parseOptionalDate(query.createdTo),
+    });
+
+    return {
+      items: issues.map((issue) => this.serializeIssue(issue)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getIssueById(_currentUser: CurrentUserPayload, issueId: number) {
+    const issue = await this.findRequiredIssue(issueId);
+
+    return this.serializeIssue(issue);
+  }
+
+  async resolveIssue(
+    currentUser: CurrentUserPayload,
+    issueId: number,
+    resolveHousekeepingIssueDto: ResolveHousekeepingIssueDto,
+  ) {
+    const issue = await this.findRequiredIssue(issueId);
+
+    this.ensureIssueOpen(issue, 'resolved');
+
+    const resolutionNotes = this.normalizeOptionalString(
+      resolveHousekeepingIssueDto.resolutionNotes,
+    );
+    const resolvedIssue = await this.housekeepingIssuesRepository.updateIssue(
+      issue.id,
+      {
+        status: HousekeepingIssueStatus.RESOLVED,
+        resolvedAt: new Date(),
+        resolvedByUserId: currentUser.sub,
+        resolutionNotes,
+      },
+    );
+
+    await this.recordIssueAudit(
+      currentUser,
+      'housekeeping.issues.resolved',
+      resolvedIssue,
+      {
+        issueNumber: resolvedIssue.issueNumber,
+        roomId: resolvedIssue.roomId,
+        taskId: resolvedIssue.taskId,
+        previousStatus: issue.status,
+        status: resolvedIssue.status,
+        resolutionNotes,
+      },
+    );
+
+    return this.serializeIssue(resolvedIssue);
+  }
+
+  async cancelIssue(
+    currentUser: CurrentUserPayload,
+    issueId: number,
+    cancelHousekeepingIssueDto: CancelHousekeepingIssueDto,
+  ) {
+    const issue = await this.findRequiredIssue(issueId);
+
+    this.ensureIssueOpen(issue, 'cancelled');
+
+    const reason = this.normalizeRequiredString(
+      cancelHousekeepingIssueDto.reason,
+      'Housekeeping issue cancellation reason is required.',
+    );
+    const cancelledIssue = await this.housekeepingIssuesRepository.updateIssue(
+      issue.id,
+      {
+        status: HousekeepingIssueStatus.CANCELLED,
+      },
+    );
+
+    await this.recordIssueAudit(
+      currentUser,
+      'housekeeping.issues.cancelled',
+      cancelledIssue,
+      {
+        issueNumber: cancelledIssue.issueNumber,
+        roomId: cancelledIssue.roomId,
+        taskId: cancelledIssue.taskId,
+        previousStatus: issue.status,
+        status: cancelledIssue.status,
+        reason,
+      },
+    );
+
+    return this.serializeIssue(cancelledIssue);
+  }
+
   async getById(_currentUser: CurrentUserPayload, taskId: number) {
     const task = await this.findRequiredTask(taskId);
 
     return this.serializeTask(task);
+  }
+
+  async getDashboard(
+    _currentUser: CurrentUserPayload,
+    query: HousekeepingDashboardQueryDto,
+  ) {
+    const { from, to } = this.getDayRange(query.date);
+    const openTaskStatuses = [
+      HousekeepingTaskStatus.PENDING,
+      HousekeepingTaskStatus.ASSIGNED,
+      HousekeepingTaskStatus.IN_PROGRESS,
+      HousekeepingTaskStatus.INSPECTION_PENDING,
+      HousekeepingTaskStatus.REJECTED,
+    ];
+    const [
+      pendingTasks,
+      assignedTasks,
+      inProgressTasks,
+      inspectionPendingTasks,
+      approvedTasksToday,
+      rejectedTasksToday,
+      openIssues,
+      dirtyRooms,
+      cleanRooms,
+      inspectedRooms,
+      roomsOutOfOrder,
+      urgentTasks,
+    ] = await Promise.all([
+      this.housekeepingTasksRepository.countTasks({
+        status: HousekeepingTaskStatus.PENDING,
+      }),
+      this.housekeepingTasksRepository.countTasks({
+        status: HousekeepingTaskStatus.ASSIGNED,
+      }),
+      this.housekeepingTasksRepository.countTasks({
+        status: HousekeepingTaskStatus.IN_PROGRESS,
+      }),
+      this.housekeepingTasksRepository.countTasks({
+        status: HousekeepingTaskStatus.INSPECTION_PENDING,
+      }),
+      this.housekeepingTasksRepository.countTasks({
+        status: HousekeepingTaskStatus.APPROVED,
+        approvedAt: {
+          gte: from,
+          lte: to,
+        },
+      }),
+      this.housekeepingTasksRepository.countTasks({
+        status: HousekeepingTaskStatus.REJECTED,
+        rejectedAt: {
+          gte: from,
+          lte: to,
+        },
+      }),
+      this.housekeepingIssuesRepository.countIssues({
+        status: HousekeepingIssueStatus.OPEN,
+      }),
+      this.roomsRepository.countRooms({
+        cleaningStatus: RoomCleaningStatus.DIRTY,
+      }),
+      this.roomsRepository.countRooms({
+        cleaningStatus: RoomCleaningStatus.CLEAN,
+      }),
+      this.roomsRepository.countRooms({
+        cleaningStatus: RoomCleaningStatus.INSPECTED,
+      }),
+      this.roomsRepository.countRooms({
+        maintenanceStatus: RoomMaintenanceStatus.OUT_OF_ORDER,
+      }),
+      this.housekeepingTasksRepository.countTasks({
+        priority: HousekeepingPriority.URGENT,
+        status: {
+          in: openTaskStatuses,
+        },
+      }),
+    ]);
+
+    return {
+      date: from.toISOString().slice(0, 10),
+      range: {
+        from,
+        to,
+      },
+      pendingTasks,
+      assignedTasks,
+      inProgressTasks,
+      inspectionPendingTasks,
+      approvedTasksToday,
+      rejectedTasksToday,
+      openIssues,
+      dirtyRooms,
+      cleanRooms,
+      inspectedRooms,
+      roomsOutOfOrder,
+      urgentTasks,
+    };
+  }
+
+  async getProductivity(
+    _currentUser: CurrentUserPayload,
+    query: HousekeepingProductivityQueryDto,
+  ) {
+    const { from, to } = this.getDateRange(query.from, query.to);
+    const tasks =
+      await this.housekeepingTasksRepository.listTasksForProductivity({
+        from,
+        to,
+      });
+    const summaries = new Map<
+      number,
+      {
+        attendant: NonNullable<
+          HousekeepingProductivityTaskRecord['assignedTo']
+        >;
+        assignedCount: number;
+        completedCount: number;
+        approvedCount: number;
+        rejectedCount: number;
+        completionMinutesTotal: number;
+        completionDurationCount: number;
+      }
+    >();
+
+    for (const task of tasks) {
+      if (task.assignedToUserId === null || task.assignedTo === null) {
+        continue;
+      }
+
+      const summary = this.getProductivitySummary(
+        summaries,
+        task.assignedToUserId,
+        task.assignedTo,
+      );
+
+      if (this.isWithinRange(task.createdAt, from, to)) {
+        summary.assignedCount += 1;
+      }
+
+      if (this.isWithinRange(task.completedAt, from, to)) {
+        summary.completedCount += 1;
+
+        if (task.startedAt && task.completedAt) {
+          summary.completionMinutesTotal +=
+            (task.completedAt.getTime() - task.startedAt.getTime()) / 60000;
+          summary.completionDurationCount += 1;
+        }
+      }
+
+      if (this.isWithinRange(task.approvedAt, from, to)) {
+        summary.approvedCount += 1;
+      }
+
+      if (this.isWithinRange(task.rejectedAt, from, to)) {
+        summary.rejectedCount += 1;
+      }
+    }
+
+    return {
+      range: {
+        from,
+        to,
+      },
+      items: [...summaries.values()]
+        .sort((left, right) =>
+          left.attendant.fullName.localeCompare(right.attendant.fullName),
+        )
+        .map((summary) => ({
+          attendant: this.serializeUserSummary(summary.attendant),
+          assignedCount: summary.assignedCount,
+          completedCount: summary.completedCount,
+          approvedCount: summary.approvedCount,
+          rejectedCount: summary.rejectedCount,
+          averageCompletionMinutes:
+            summary.completionDurationCount === 0
+              ? null
+              : Number(
+                  (
+                    summary.completionMinutesTotal /
+                    summary.completionDurationCount
+                  ).toFixed(2),
+                ),
+        })),
+    };
+  }
+
+  async updateRoomCleaningStatus(
+    currentUser: CurrentUserPayload,
+    permissionKeys: string[],
+    roomId: number,
+    updateRoomCleaningStatusDto: UpdateRoomCleaningStatusDto,
+  ) {
+    const room = await this.ensureActiveRoom(
+      roomId,
+      'Cannot update cleaning status for an inactive room.',
+    );
+
+    await this.ensureRoomCleaningStatusAccess({
+      currentUser,
+      permissionKeys,
+      roomId: room.id,
+    });
+
+    if (room.cleaningStatus === updateRoomCleaningStatusDto.cleaningStatus) {
+      return this.serializeRoom(room);
+    }
+
+    const reason = this.normalizeOptionalString(
+      updateRoomCleaningStatusDto.reason,
+    );
+    const updatedRoom = await this.roomsRepository.updateRoom(room.id, {
+      cleaningStatus: updateRoomCleaningStatusDto.cleaningStatus,
+    });
+
+    await this.roomsRepository.createStatusLogs([
+      {
+        roomId: room.id,
+        actorUserId: currentUser.sub,
+        field: 'cleaningStatus',
+        oldValue: room.cleaningStatus,
+        newValue: updatedRoom.cleaningStatus,
+        reason,
+      },
+    ]);
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'room_cleaning_status.updated',
+      entityType: 'Room',
+      entityId: String(room.id),
+      metadata: {
+        roomId: room.id,
+        previousCleaningStatus: room.cleaningStatus,
+        cleaningStatus: updatedRoom.cleaningStatus,
+        reason,
+      },
+    });
+
+    return this.serializeRoom(updatedRoom);
   }
 
   async update(
