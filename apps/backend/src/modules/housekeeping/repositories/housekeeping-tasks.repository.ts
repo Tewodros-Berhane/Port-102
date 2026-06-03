@@ -158,8 +158,11 @@ export class HousekeepingTasksRepository {
     });
   }
 
-  findByTaskNumber(taskNumber: string) {
-    return this.prisma.housekeepingTask.findUnique({
+  findByTaskNumber(
+    taskNumber: string,
+    client: HousekeepingTaskClient = this.prisma,
+  ) {
+    return client.housekeepingTask.findUnique({
       where: {
         taskNumber,
       },
