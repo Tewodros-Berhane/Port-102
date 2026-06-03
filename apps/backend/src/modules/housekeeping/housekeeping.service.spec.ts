@@ -1115,4 +1115,137 @@ describe('HousekeepingService', () => {
       NotFoundException,
     );
   });
+
+  it('returns housekeeping dashboard counts', async () => {
+    housekeepingTasksRepository.countTasks
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(4)
+      .mockResolvedValueOnce(5)
+      .mockResolvedValueOnce(6)
+      .mockResolvedValueOnce(7)
+      .mockResolvedValueOnce(8);
+    housekeepingIssuesRepository.countIssues.mockResolvedValueOnce(9);
+    roomsRepository.countRooms
+      .mockResolvedValueOnce(10)
+      .mockResolvedValueOnce(11)
+      .mockResolvedValueOnce(12)
+      .mockResolvedValueOnce(13);
+
+    const result = await service.getDashboard(currentUser, {
+      date: '2026-06-03',
+    });
+
+    expect(housekeepingTasksRepository.countTasks).toHaveBeenCalledWith({
+      status: HousekeepingTaskStatus.PENDING,
+    });
+    expect(housekeepingTasksRepository.countTasks).toHaveBeenCalledWith({
+      status: HousekeepingTaskStatus.APPROVED,
+      approvedAt: {
+        gte: new Date('2026-06-03T00:00:00.000Z'),
+        lte: new Date('2026-06-03T23:59:59.999Z'),
+      },
+    });
+    expect(housekeepingTasksRepository.countTasks).toHaveBeenCalledWith({
+      priority: HousekeepingPriority.URGENT,
+      status: {
+        in: [
+          HousekeepingTaskStatus.PENDING,
+          HousekeepingTaskStatus.ASSIGNED,
+          HousekeepingTaskStatus.IN_PROGRESS,
+          HousekeepingTaskStatus.INSPECTION_PENDING,
+          HousekeepingTaskStatus.REJECTED,
+        ],
+      },
+    });
+    expect(housekeepingIssuesRepository.countIssues).toHaveBeenCalledWith({
+      status: HousekeepingIssueStatus.OPEN,
+    });
+    expect(roomsRepository.countRooms).toHaveBeenCalledWith({
+      cleaningStatus: RoomCleaningStatus.DIRTY,
+    });
+    expect(roomsRepository.countRooms).toHaveBeenCalledWith({
+      maintenanceStatus: RoomMaintenanceStatus.OUT_OF_ORDER,
+    });
+    expect(result).toMatchObject({
+      date: '2026-06-03',
+      pendingTasks: 2,
+      assignedTasks: 3,
+      inProgressTasks: 4,
+      inspectionPendingTasks: 5,
+      approvedTasksToday: 6,
+      rejectedTasksToday: 7,
+      urgentTasks: 8,
+      openIssues: 9,
+      dirtyRooms: 10,
+      cleanRooms: 11,
+      inspectedRooms: 12,
+      roomsOutOfOrder: 13,
+    });
+  });
+
+  it('returns housekeeping productivity summaries for a date range', async () => {
+    const attendant = {
+      id: 7,
+      email: 'attendant@demo-hotel.com',
+      fullName: 'Housekeeping Attendant',
+      status: UserStatus.ACTIVE,
+    };
+    housekeepingTasksRepository.listTasksForProductivity.mockResolvedValue([
+      {
+        id: 1,
+        assignedToUserId: attendant.id,
+        createdAt: new Date('2026-06-03T08:00:00.000Z'),
+        startedAt: new Date('2026-06-03T08:15:00.000Z'),
+        completedAt: new Date('2026-06-03T09:45:00.000Z'),
+        approvedAt: new Date('2026-06-03T10:00:00.000Z'),
+        rejectedAt: null,
+        assignedTo: attendant,
+      },
+      {
+        id: 2,
+        assignedToUserId: attendant.id,
+        createdAt: new Date('2026-06-03T11:00:00.000Z'),
+        startedAt: new Date('2026-06-03T11:30:00.000Z'),
+        completedAt: new Date('2026-06-03T12:00:00.000Z'),
+        approvedAt: null,
+        rejectedAt: new Date('2026-06-03T12:15:00.000Z'),
+        assignedTo: attendant,
+      },
+    ]);
+
+    const result = await service.getProductivity(currentUser, {
+      from: '2026-06-03',
+      to: '2026-06-03',
+    });
+
+    expect(
+      housekeepingTasksRepository.listTasksForProductivity,
+    ).toHaveBeenCalledWith({
+      from: new Date('2026-06-03T00:00:00.000Z'),
+      to: new Date('2026-06-03T23:59:59.999Z'),
+    });
+    expect(result.items).toEqual([
+      {
+        attendant,
+        assignedCount: 2,
+        completedCount: 2,
+        approvedCount: 1,
+        rejectedCount: 1,
+        averageCompletionMinutes: 60,
+      },
+    ]);
+  });
+
+  it('rejects productivity requests with an inverted date range', async () => {
+    await expect(
+      service.getProductivity(currentUser, {
+        from: '2026-06-04',
+        to: '2026-06-03',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(
+      housekeepingTasksRepository.listTasksForProductivity,
+    ).not.toHaveBeenCalled();
+  });
 });
