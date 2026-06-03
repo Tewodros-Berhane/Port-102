@@ -171,12 +171,25 @@ describe('HousekeepingService', () => {
     createTask: jest.Mock;
     findTask: jest.Mock;
     findByTaskNumber: jest.Mock;
+    findOpenCheckoutCleaningTask: jest.Mock;
+    findActiveAssignedTaskForRoom: jest.Mock;
     listTasks: jest.Mock;
+    countTasks: jest.Mock;
+    listTasksForProductivity: jest.Mock;
     updateTask: jest.Mock;
     findActiveUser: jest.Mock;
   };
+  let housekeepingIssuesRepository: {
+    createIssue: jest.Mock;
+    findIssue: jest.Mock;
+    findByIssueNumber: jest.Mock;
+    listIssues: jest.Mock;
+    countIssues: jest.Mock;
+    updateIssue: jest.Mock;
+  };
   let roomsRepository: {
     findRoom: jest.Mock;
+    countRooms: jest.Mock;
     updateRoom: jest.Mock;
     createStatusLogs: jest.Mock;
   };
