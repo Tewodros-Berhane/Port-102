@@ -277,6 +277,41 @@ export class HousekeepingTasksRepository {
     ]);
   }
 
+  countTasks(where: Prisma.HousekeepingTaskWhereInput) {
+    return this.prisma.housekeepingTask.count({ where });
+  }
+
+  listTasksForProductivity({ from, to }: { from: Date; to: Date }) {
+    const dateRange = {
+      gte: from,
+      lte: to,
+    };
+
+    return this.prisma.housekeepingTask.findMany({
+      where: {
+        assignedToUserId: {
+          not: null,
+        },
+        OR: [
+          {
+            createdAt: dateRange,
+          },
+          {
+            completedAt: dateRange,
+          },
+          {
+            approvedAt: dateRange,
+          },
+          {
+            rejectedAt: dateRange,
+          },
+        ],
+      },
+      select: productivityTaskSelect,
+      orderBy: [{ assignedToUserId: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   updateTask(
     taskId: number,
     data: Prisma.HousekeepingTaskUncheckedUpdateInput,
