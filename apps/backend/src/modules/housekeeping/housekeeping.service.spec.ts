@@ -871,6 +871,215 @@ describe('HousekeepingService', () => {
     });
   });
 
+  it('records inspection notes for a completed housekeeping task', async () => {
+    const task = createTask({
+      status: HousekeepingTaskStatus.INSPECTION_PENDING,
+    });
+    const inspectedTask = createTask({
+      status: HousekeepingTaskStatus.INSPECTION_PENDING,
+      inspectedAt: now,
+      inspectedByUserId: currentUser.sub,
+      inspectionNotes: 'Bathroom and minibar checked.',
+    });
+    housekeepingTasksRepository.findTask.mockResolvedValue(task);
+    housekeepingTasksRepository.updateTask.mockResolvedValue(inspectedTask);
+
+    const result = await service.inspect(currentUser, 9, {
+      inspectionNotes: ' Bathroom and minibar checked. ',
+    });
+
+    expect(housekeepingTasksRepository.updateTask).toHaveBeenCalledWith(9, {
+      inspectedAt: expect.any(Date),
+      inspectedByUserId: currentUser.sub,
+      inspectionNotes: 'Bathroom and minibar checked.',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'housekeeping.tasks.inspected',
+      }),
+    );
+    expect(result).toMatchObject({
+      status: HousekeepingTaskStatus.INSPECTION_PENDING,
+      inspectedByUserId: currentUser.sub,
+      inspectionNotes: 'Bathroom and minibar checked.',
+    });
+  });
+
+  it('approves a task, marks room inspected, and creates a room status log', async () => {
+    const task = createTask({
+      status: HousekeepingTaskStatus.INSPECTION_PENDING,
+      room: createRoom({
+        cleaningStatus: RoomCleaningStatus.CLEAN,
+      }),
+    });
+    const approvedTask = createTask({
+      status: HousekeepingTaskStatus.APPROVED,
+      inspectedAt: now,
+      inspectedByUserId: currentUser.sub,
+      approvedAt: now,
+      approvedByUserId: currentUser.sub,
+      inspectionNotes: 'Passed supervisor inspection.',
+      room: createRoom({
+        cleaningStatus: RoomCleaningStatus.INSPECTED,
+      }),
+    });
+    housekeepingTasksRepository.findTask
+      .mockResolvedValueOnce(task)
+      .mockResolvedValueOnce(approvedTask);
+
+    const result = await service.approve(currentUser, 9, {
+      inspectionNotes: ' Passed supervisor inspection. ',
+    });
+
+    expect(housekeepingTasksRepository.updateTask).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        status: HousekeepingTaskStatus.APPROVED,
+        inspectedByUserId: currentUser.sub,
+        approvedByUserId: currentUser.sub,
+        inspectionNotes: 'Passed supervisor inspection.',
+      }),
+      expect.any(Object),
+    );
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      12,
+      {
+        cleaningStatus: RoomCleaningStatus.INSPECTED,
+      },
+      expect.any(Object),
+    );
+    expect(roomsRepository.createStatusLogs).toHaveBeenCalledWith(
+      [
+        {
+          roomId: 12,
+          actorUserId: currentUser.sub,
+          field: 'cleaningStatus',
+          oldValue: RoomCleaningStatus.CLEAN,
+          newValue: RoomCleaningStatus.INSPECTED,
+          reason: 'Housekeeping task approved',
+        },
+      ],
+      expect.any(Object),
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'housekeeping.tasks.approved',
+      }),
+    );
+    expect(result).toMatchObject({
+      status: HousekeepingTaskStatus.APPROVED,
+      approvedByUserId: currentUser.sub,
+      room: {
+        cleaningStatus: RoomCleaningStatus.INSPECTED,
+      },
+    });
+  });
+
+  it('rejects a task with a required reason', async () => {
+    const task = createTask({
+      status: HousekeepingTaskStatus.INSPECTION_PENDING,
+    });
+    const rejectedTask = createTask({
+      status: HousekeepingTaskStatus.REJECTED,
+      inspectedAt: now,
+      inspectedByUserId: currentUser.sub,
+      rejectedAt: now,
+      rejectedByUserId: currentUser.sub,
+      rejectionReason: 'Desk still dusty.',
+      inspectionNotes: 'Reclean before reinspection.',
+    });
+    housekeepingTasksRepository.findTask.mockResolvedValue(task);
+    housekeepingTasksRepository.updateTask.mockResolvedValue(rejectedTask);
+
+    const result = await service.reject(currentUser, 9, {
+      reason: ' Desk still dusty. ',
+      inspectionNotes: ' Reclean before reinspection. ',
+    });
+
+    expect(housekeepingTasksRepository.updateTask).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        status: HousekeepingTaskStatus.REJECTED,
+        inspectedByUserId: currentUser.sub,
+        rejectedByUserId: currentUser.sub,
+        rejectionReason: 'Desk still dusty.',
+        inspectionNotes: 'Reclean before reinspection.',
+      }),
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'housekeeping.tasks.rejected',
+      }),
+    );
+    expect(result).toMatchObject({
+      status: HousekeepingTaskStatus.REJECTED,
+      rejectionReason: 'Desk still dusty.',
+    });
+  });
+
+  it('requires a rejection reason before rejecting a task', async () => {
+    housekeepingTasksRepository.findTask.mockResolvedValue(
+      createTask({
+        status: HousekeepingTaskStatus.INSPECTION_PENDING,
+      }),
+    );
+
+    await expect(
+      service.reject(currentUser, 9, {
+        reason: '  ',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(housekeepingTasksRepository.updateTask).not.toHaveBeenCalled();
+  });
+
+  it('allows a rejected task to be restarted for rework', async () => {
+    const task = createTask({
+      status: HousekeepingTaskStatus.REJECTED,
+      assignedToUserId: currentUser.sub,
+      completedAt: now,
+      completedByUserId: currentUser.sub,
+      inspectedAt: now,
+      inspectedByUserId: currentUser.sub,
+      rejectedAt: now,
+      rejectedByUserId: currentUser.sub,
+      completionNotes: 'Room cleaned.',
+      inspectionNotes: 'Needs correction.',
+      rejectionReason: 'Desk still dusty.',
+    });
+    const startedTask = createTask({
+      status: HousekeepingTaskStatus.IN_PROGRESS,
+      assignedToUserId: currentUser.sub,
+      startedAt: now,
+    });
+    housekeepingTasksRepository.findTask.mockResolvedValue(task);
+    housekeepingTasksRepository.updateTask.mockResolvedValue(startedTask);
+
+    await service.start(
+      currentUser,
+      ['housekeeping.tasks.start.assigned'],
+      9,
+      {},
+    );
+
+    expect(housekeepingTasksRepository.updateTask).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        status: HousekeepingTaskStatus.IN_PROGRESS,
+        completedAt: null,
+        inspectedAt: null,
+        approvedAt: null,
+        rejectedAt: null,
+        completedByUserId: null,
+        inspectedByUserId: null,
+        approvedByUserId: null,
+        rejectedByUserId: null,
+        completionNotes: null,
+        inspectionNotes: null,
+        rejectionReason: null,
+      }),
+    );
+  });
+
   it('cancels a task with a required reason', async () => {
     const cancelledTask = createTask({
       status: HousekeepingTaskStatus.CANCELLED,
