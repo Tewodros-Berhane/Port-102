@@ -23,12 +23,23 @@ describe('HousekeepingController', () => {
     create: jest.Mock;
     list: jest.Mock;
     listAssignedToMe: jest.Mock;
+    getDashboard: jest.Mock;
+    getProductivity: jest.Mock;
+    reportIssue: jest.Mock;
+    listIssues: jest.Mock;
+    getIssueById: jest.Mock;
+    resolveIssue: jest.Mock;
+    cancelIssue: jest.Mock;
     getById: jest.Mock;
+    updateRoomCleaningStatus: jest.Mock;
     update: jest.Mock;
     assign: jest.Mock;
     reassign: jest.Mock;
     start: jest.Mock;
     complete: jest.Mock;
+    inspect: jest.Mock;
+    approve: jest.Mock;
+    reject: jest.Mock;
     cancel: jest.Mock;
   };
 
