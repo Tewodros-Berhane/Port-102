@@ -16,6 +16,7 @@ describe('HousekeepingTasksRepository', () => {
     housekeepingTask: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      findFirst: jest.Mock;
       count: jest.Mock;
       findMany: jest.Mock;
       update: jest.Mock;
