@@ -120,6 +120,99 @@ export class HousekeepingController {
     return this.housekeepingService.list(currentUser, query);
   }
 
+  @Post('issues')
+  @Permissions('housekeeping.issues.report')
+  @ApiOperation({ summary: 'Report a housekeeping issue' })
+  @ApiCreatedResponse({ description: 'Housekeeping issue reported.' })
+  @ApiBadRequestResponse({ description: 'Invalid issue payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Room or linked housekeeping task was not found.',
+  })
+  reportIssue(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Body() createHousekeepingIssueDto: CreateHousekeepingIssueDto,
+  ) {
+    return this.housekeepingService.reportIssue(
+      currentUser,
+      createHousekeepingIssueDto,
+    );
+  }
+
+  @Get('issues')
+  @Permissions('housekeeping.issues.read')
+  @ApiOperation({ summary: 'List housekeeping issues' })
+  @ApiOkResponse({ description: 'Housekeeping issues returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listIssues(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: GetHousekeepingIssuesQueryDto,
+  ) {
+    return this.housekeepingService.listIssues(currentUser, query);
+  }
+
+  @Get('issues/:id')
+  @Permissions('housekeeping.issues.read')
+  @ApiOperation({ summary: 'Get one housekeeping issue' })
+  @ApiOkResponse({ description: 'Housekeeping issue returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Housekeeping issue was not found.' })
+  getIssueById(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) issueId: number,
+  ) {
+    return this.housekeepingService.getIssueById(currentUser, issueId);
+  }
+
+  @Patch('issues/:id/resolve')
+  @Permissions('housekeeping.issues.read')
+  @ApiOperation({ summary: 'Resolve a housekeeping issue' })
+  @ApiOkResponse({ description: 'Housekeeping issue resolved.' })
+  @ApiBadRequestResponse({ description: 'Invalid issue resolution payload.' })
+  @ApiConflictResponse({
+    description: 'Issue cannot be resolved in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Housekeeping issue was not found.' })
+  resolveIssue(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) issueId: number,
+    @Body() resolveHousekeepingIssueDto: ResolveHousekeepingIssueDto,
+  ) {
+    return this.housekeepingService.resolveIssue(
+      currentUser,
+      issueId,
+      resolveHousekeepingIssueDto,
+    );
+  }
+
+  @Patch('issues/:id/cancel')
+  @Permissions('housekeeping.issues.read')
+  @ApiOperation({ summary: 'Cancel a housekeeping issue' })
+  @ApiOkResponse({ description: 'Housekeeping issue cancelled.' })
+  @ApiBadRequestResponse({ description: 'Invalid issue cancellation payload.' })
+  @ApiConflictResponse({
+    description: 'Issue cannot be cancelled in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Housekeeping issue was not found.' })
+  cancelIssue(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) issueId: number,
+    @Body() cancelHousekeepingIssueDto: CancelHousekeepingIssueDto,
+  ) {
+    return this.housekeepingService.cancelIssue(
+      currentUser,
+      issueId,
+      cancelHousekeepingIssueDto,
+    );
+  }
+
   @Get('tasks/assigned/me')
   @AnyPermissions('housekeeping.tasks.read', 'housekeeping.tasks.read.assigned')
   @ApiOperation({ summary: 'List housekeeping tasks assigned to current user' })
