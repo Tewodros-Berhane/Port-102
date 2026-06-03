@@ -1412,6 +1412,79 @@ export class HousekeepingService {
       : null;
   }
 
+  private getProductivitySummary(
+    summaries: Map<
+      number,
+      {
+        attendant: NonNullable<
+          HousekeepingProductivityTaskRecord['assignedTo']
+        >;
+        assignedCount: number;
+        completedCount: number;
+        approvedCount: number;
+        rejectedCount: number;
+        completionMinutesTotal: number;
+        completionDurationCount: number;
+      }
+    >,
+    attendantId: number,
+    attendant: NonNullable<HousekeepingProductivityTaskRecord['assignedTo']>,
+  ) {
+    const existingSummary = summaries.get(attendantId);
+
+    if (existingSummary) {
+      return existingSummary;
+    }
+
+    const summary = {
+      attendant,
+      assignedCount: 0,
+      completedCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      completionMinutesTotal: 0,
+      completionDurationCount: 0,
+    };
+
+    summaries.set(attendantId, summary);
+
+    return summary;
+  }
+
+  private serializeRoom(room: RoomRecord) {
+    return {
+      id: room.id,
+      roomNumber: room.roomNumber,
+      displayName: room.displayName,
+      floorId: room.floorId,
+      roomTypeId: room.roomTypeId,
+      occupancyStatus: room.occupancyStatus,
+      cleaningStatus: room.cleaningStatus,
+      maintenanceStatus: room.maintenanceStatus,
+      notes: room.notes,
+      isActive: room.isActive,
+      createdAt: room.createdAt,
+      updatedAt: room.updatedAt,
+      floor: room.floor
+        ? {
+            id: room.floor.id,
+            number: room.floor.number,
+            name: room.floor.name,
+            isActive: room.floor.isActive,
+          }
+        : null,
+      roomType: {
+        id: room.roomType.id,
+        name: room.roomType.name,
+        code: room.roomType.code,
+        baseOccupancy: room.roomType.baseOccupancy,
+        maxOccupancy: room.roomType.maxOccupancy,
+        baseRate: room.roomType.baseRate?.toString() ?? null,
+        isActive: room.roomType.isActive,
+      },
+    };
+  }
+
   private taskAuditSnapshot(task: HousekeepingTaskRecord) {
     return {
       roomId: task.roomId,
