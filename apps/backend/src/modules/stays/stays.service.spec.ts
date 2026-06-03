@@ -908,6 +908,20 @@ describe('StaysService', () => {
         }),
       }),
     );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: 1,
+        action: 'housekeeping.tasks.auto_created',
+        entityType: 'HousekeepingTask',
+        entityId: '80',
+        metadata: expect.objectContaining({
+          taskNumber: 'HKT-20260610-123450',
+          roomId: 9,
+          sourceType: 'STAY_CHECKOUT',
+          sourceId: 40,
+        }),
+      }),
+    );
     expect(result).toMatchObject({
       id: 40,
       status: StayStatus.CHECKED_OUT,
