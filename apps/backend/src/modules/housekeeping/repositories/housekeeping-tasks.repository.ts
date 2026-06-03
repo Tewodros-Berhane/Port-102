@@ -97,9 +97,27 @@ const activeUserSelect = {
   },
 } as const;
 
+const productivityTaskSelect = {
+  id: true,
+  assignedToUserId: true,
+  createdAt: true,
+  startedAt: true,
+  completedAt: true,
+  approvedAt: true,
+  rejectedAt: true,
+  assignedTo: {
+    select: userSummarySelect,
+  },
+} as const;
+
 export type HousekeepingTaskRecord = Prisma.HousekeepingTaskGetPayload<{
   select: typeof taskSelect;
 }>;
+
+export type HousekeepingProductivityTaskRecord =
+  Prisma.HousekeepingTaskGetPayload<{
+    select: typeof productivityTaskSelect;
+  }>;
 
 export type ActiveHousekeepingUserRecord = Prisma.UserGetPayload<{
   select: typeof activeUserSelect;
