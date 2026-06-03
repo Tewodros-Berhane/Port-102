@@ -32,6 +32,7 @@ describe('HousekeepingTasksRepository', () => {
       housekeepingTask: {
         create: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         count: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
