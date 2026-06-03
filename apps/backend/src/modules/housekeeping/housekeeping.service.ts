@@ -1235,7 +1235,26 @@ export class HousekeepingService {
     return task;
   }
 
-  private async ensureActiveRoom(roomId: number) {
+  private async findRequiredIssue(
+    issueId: number,
+    client?: Prisma.TransactionClient,
+  ) {
+    const issue = await this.housekeepingIssuesRepository.findIssue(
+      issueId,
+      client,
+    );
+
+    if (!issue) {
+      throw new NotFoundException('Housekeeping issue was not found.');
+    }
+
+    return issue;
+  }
+
+  private async ensureActiveRoom(
+    roomId: number,
+    inactiveMessage = 'Cannot create or update a task for an inactive room.',
+  ) {
     const room = await this.roomsRepository.findRoom(roomId);
 
     if (!room) {
