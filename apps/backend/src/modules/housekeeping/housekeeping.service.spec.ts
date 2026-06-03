@@ -125,6 +125,45 @@ function createTask(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function createIssue(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 15,
+    issueNumber: 'HKI-20260602-123450',
+    taskId: null,
+    roomId: 12,
+    reportedByUserId: currentUser.sub,
+    status: HousekeepingIssueStatus.OPEN,
+    title: 'Broken lamp',
+    description: 'Lamp does not turn on.',
+    photoUrl: null,
+    resolvedAt: null,
+    resolvedByUserId: null,
+    resolutionNotes: null,
+    createdAt: now,
+    updatedAt: now,
+    room: {
+      id: 12,
+      roomNumber: '101',
+      displayName: 'Deluxe 101',
+      floorId: 1,
+      roomTypeId: 2,
+      occupancyStatus: RoomOccupancyStatus.VACANT,
+      cleaningStatus: RoomCleaningStatus.DIRTY,
+      maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+      isActive: true,
+    },
+    task: null,
+    reportedBy: {
+      id: currentUser.sub,
+      email: currentUser.email,
+      fullName: 'Supervisor User',
+      status: UserStatus.ACTIVE,
+    },
+    resolvedBy: null,
+    ...overrides,
+  };
+}
+
 describe('HousekeepingService', () => {
   let service: HousekeepingService;
   let housekeepingTasksRepository: {
