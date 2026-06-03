@@ -289,6 +289,68 @@ describe('HousekeepingService', () => {
     });
   });
 
+  it('creates a checkout cleaning task from stay checkout', async () => {
+    const task = createTask({
+      sourceType: 'STAY_CHECKOUT',
+      sourceId: 40,
+    });
+    const client = {};
+    housekeepingTasksRepository.createTask.mockResolvedValue(task);
+
+    const result = await service.createCheckoutCleaningTaskFromStay({
+      stayId: 40,
+      roomId: 12,
+      client,
+    });
+
+    expect(
+      housekeepingTasksRepository.findOpenCheckoutCleaningTask,
+    ).toHaveBeenCalledWith(
+      {
+        roomId: 12,
+        sourceId: 40,
+      },
+      client,
+    );
+    expect(housekeepingTasksRepository.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskNumber: expect.stringMatching(/^HKT-\d{8}-\d{6}$/),
+        roomId: 12,
+        type: HousekeepingTaskType.CHECKOUT_CLEANING,
+        status: HousekeepingTaskStatus.PENDING,
+        priority: HousekeepingPriority.NORMAL,
+        sourceType: 'STAY_CHECKOUT',
+        sourceId: 40,
+      }),
+      client,
+    );
+    expect(result).toEqual({
+      task,
+      created: true,
+    });
+  });
+
+  it('reuses an open checkout cleaning task instead of duplicating it', async () => {
+    const existingTask = createTask({
+      sourceType: 'STAY_CHECKOUT',
+      sourceId: 40,
+    });
+    housekeepingTasksRepository.findOpenCheckoutCleaningTask.mockResolvedValue(
+      existingTask,
+    );
+
+    const result = await service.createCheckoutCleaningTaskFromStay({
+      stayId: 40,
+      roomId: 12,
+    });
+
+    expect(housekeepingTasksRepository.createTask).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      task: existingTask,
+      created: false,
+    });
+  });
+
   it('creates an assigned task when an active assignee is provided', async () => {
     const assignedUser = createUser();
     const task = createTask({
