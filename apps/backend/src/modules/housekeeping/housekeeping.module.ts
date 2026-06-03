@@ -14,9 +14,14 @@ import { HousekeepingTasksRepository } from './repositories/housekeeping-tasks.r
   controllers: [HousekeepingController],
   providers: [
     HousekeepingService,
+    HousekeepingIssuesRepository,
     HousekeepingTasksRepository,
     PermissionsGuard,
   ],
-  exports: [HousekeepingService, HousekeepingTasksRepository],
+  exports: [
+    HousekeepingService,
+    HousekeepingIssuesRepository,
+    HousekeepingTasksRepository,
+  ],
 })
 export class HousekeepingModule {}
