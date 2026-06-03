@@ -109,6 +109,51 @@ export class HousekeepingService {
     return this.serializeTask(task);
   }
 
+  async createCheckoutCleaningTaskFromStay({
+    stayId,
+    roomId,
+    client,
+  }: {
+    stayId: number;
+    roomId: number;
+    client?: Prisma.TransactionClient;
+  }) {
+    const existingTask =
+      await this.housekeepingTasksRepository.findOpenCheckoutCleaningTask(
+        {
+          roomId,
+          sourceId: stayId,
+        },
+        client,
+      );
+
+    if (existingTask) {
+      return {
+        task: existingTask,
+        created: false,
+      };
+    }
+
+    const taskNumber = await this.generateTaskNumber(client);
+    const task = await this.housekeepingTasksRepository.createTask(
+      {
+        taskNumber,
+        roomId,
+        type: HousekeepingTaskType.CHECKOUT_CLEANING,
+        status: HousekeepingTaskStatus.PENDING,
+        priority: HousekeepingPriority.NORMAL,
+        sourceType: 'STAY_CHECKOUT',
+        sourceId: stayId,
+      },
+      client,
+    );
+
+    return {
+      task,
+      created: true,
+    };
+  }
+
   async list(
     _currentUser: CurrentUserPayload,
     query: GetHousekeepingTasksQueryDto,
