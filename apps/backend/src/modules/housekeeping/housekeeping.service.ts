@@ -1528,6 +1528,21 @@ export class HousekeepingService {
     });
   }
 
+  private recordIssueAudit(
+    currentUser: CurrentUserPayload,
+    action: string,
+    issue: HousekeepingIssueRecord,
+    metadata: Prisma.InputJsonValue,
+  ) {
+    return this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action,
+      entityType: 'HousekeepingIssue',
+      entityId: String(issue.id),
+      metadata,
+    });
+  }
+
   private parseDate(value: string) {
     const date = new Date(value);
 
