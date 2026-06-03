@@ -938,6 +938,33 @@ describe('StaysService', () => {
     });
   });
 
+  it('does not audit a duplicate checkout housekeeping task', async () => {
+    housekeepingService.createCheckoutCleaningTaskFromStay.mockResolvedValueOnce(
+      {
+        task: checkoutHousekeepingTask,
+        created: false,
+      },
+    );
+    staysRepository.findStay
+      .mockResolvedValueOnce(checkedInStay)
+      .mockResolvedValueOnce(checkedOutStay);
+
+    await service.checkOut(currentUser, 40, {});
+
+    expect(
+      housekeepingService.createCheckoutCleaningTaskFromStay,
+    ).toHaveBeenCalledWith({
+      stayId: 40,
+      roomId: 9,
+      client: { transaction: true },
+    });
+    expect(auditLogsService.record).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'housekeeping.tasks.auto_created',
+      }),
+    );
+  });
+
   it('rejects checkout when an open folio has a non-zero balance', async () => {
     foliosRepository.findByStayId.mockResolvedValueOnce(unsettledFolio);
 
