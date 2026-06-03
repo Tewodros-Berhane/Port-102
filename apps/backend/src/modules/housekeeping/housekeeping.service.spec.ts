@@ -237,6 +237,10 @@ describe('HousekeepingService', () => {
           useValue: housekeepingTasksRepository,
         },
         {
+          provide: HousekeepingIssuesRepository,
+          useValue: housekeepingIssuesRepository,
+        },
+        {
           provide: RoomsRepository,
           useValue: roomsRepository,
         },
