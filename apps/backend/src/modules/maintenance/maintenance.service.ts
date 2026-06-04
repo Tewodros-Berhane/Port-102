@@ -140,6 +140,16 @@ export class MaintenanceService {
     };
   }
 
+  listAssignedToMe(
+    currentUser: CurrentUserPayload,
+    query: GetMaintenanceTicketsQueryDto,
+  ) {
+    return this.listTickets(currentUser, {
+      ...query,
+      assignedToUserId: currentUser.sub,
+    });
+  }
+
   async getTicketById(_currentUser: CurrentUserPayload, ticketId: number) {
     const ticket = await this.maintenanceTicketsRepository.findTicket(ticketId);
 
