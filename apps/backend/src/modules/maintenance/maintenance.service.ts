@@ -160,6 +160,64 @@ export class MaintenanceService {
     return this.serializeTicket(ticket);
   }
 
+  async assignTicket(
+    currentUser: CurrentUserPayload,
+    ticketId: number,
+    assignMaintenanceTicketDto: AssignMaintenanceTicketDto,
+  ) {
+    const ticket = await this.ensureTicket(ticketId);
+    const assignedUser = await this.ensureActiveUser(
+      assignMaintenanceTicketDto.assignedToUserId,
+    );
+
+    if (
+      ticket.status === MaintenanceTicketStatus.APPROVED ||
+      ticket.status === MaintenanceTicketStatus.CANCELLED
+    ) {
+      throw new ConflictException(
+        'Approved or cancelled maintenance tickets cannot be assigned.',
+      );
+    }
+
+    const updatedTicket = await this.maintenanceTicketsRepository.updateTicket(
+      ticket.id,
+      {
+        assignedToUserId: assignedUser.id,
+        assignedByUserId: currentUser.sub,
+        assignedAt: new Date(),
+        status:
+          ticket.status === MaintenanceTicketStatus.IN_PROGRESS
+            ? MaintenanceTicketStatus.IN_PROGRESS
+            : MaintenanceTicketStatus.ASSIGNED,
+      },
+    );
+
+    await this.recordTicketAudit(
+      currentUser,
+      'maintenance.tickets.assigned',
+      updatedTicket,
+      {
+        previousAssignedToUserId: ticket.assignedToUserId,
+        assignedToUserId: updatedTicket.assignedToUserId,
+        assignedByUserId: updatedTicket.assignedByUserId,
+        previousStatus: ticket.status,
+        status: updatedTicket.status,
+      },
+    );
+
+    return this.serializeTicket(updatedTicket);
+  }
+
+  private async ensureTicket(ticketId: number) {
+    const ticket = await this.maintenanceTicketsRepository.findTicket(ticketId);
+
+    if (!ticket) {
+      throw new NotFoundException('Maintenance ticket was not found.');
+    }
+
+    return ticket;
+  }
+
   private async ensureActiveRoom(roomId: number) {
     const room = await this.roomsRepository.findRoom(roomId);
 
