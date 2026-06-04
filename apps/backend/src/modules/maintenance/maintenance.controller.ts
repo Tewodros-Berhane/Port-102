@@ -75,6 +75,22 @@ export class MaintenanceController {
     return this.maintenanceService.listTickets(currentUser, query);
   }
 
+  @Get('tickets/assigned/me')
+  @AnyPermissions(
+    'maintenance.tickets.read',
+    'maintenance.tickets.read.assigned',
+  )
+  @ApiOperation({ summary: 'List maintenance tickets assigned to current user' })
+  @ApiOkResponse({ description: 'Assigned maintenance tickets returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listAssignedToMe(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: GetMaintenanceTicketsQueryDto,
+  ) {
+    return this.maintenanceService.listAssignedToMe(currentUser, query);
+  }
+
   @Get('tickets/:id')
   @Permissions('maintenance.tickets.read')
   @ApiOperation({ summary: 'Get one maintenance ticket' })
