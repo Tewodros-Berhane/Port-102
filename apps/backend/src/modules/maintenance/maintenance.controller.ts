@@ -105,5 +105,28 @@ export class MaintenanceController {
     return this.maintenanceService.getTicketById(currentUser, ticketId);
   }
 
-
+  @Patch('tickets/:id/assign')
+  @Permissions('maintenance.tickets.assign')
+  @ApiOperation({ summary: 'Assign a maintenance ticket to a technician' })
+  @ApiOkResponse({ description: 'Maintenance ticket assigned.' })
+  @ApiBadRequestResponse({ description: 'Invalid assignment payload.' })
+  @ApiConflictResponse({
+    description: 'Ticket cannot be assigned in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Maintenance ticket or assigned user was not found.',
+  })
+  assignTicket(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) ticketId: number,
+    @Body() assignMaintenanceTicketDto: AssignMaintenanceTicketDto,
+  ) {
+    return this.maintenanceService.assignTicket(
+      currentUser,
+      ticketId,
+      assignMaintenanceTicketDto,
+    );
+  }
 }
