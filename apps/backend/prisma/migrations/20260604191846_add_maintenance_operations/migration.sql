@@ -1,0 +1,18 @@
+-- CreateEnum
+CREATE TYPE "MaintenanceTicketStatus" AS ENUM ('OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'APPROVED', 'REJECTED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "MaintenancePriority" AS ENUM ('LOW', 'NORMAL', 'HIGH', 'URGENT');
+
+-- CreateEnum
+CREATE TYPE "MaintenanceTicketSource" AS ENUM ('FRONT_DESK', 'HOUSEKEEPING', 'MANAGER', 'TECHNICIAN', 'PREVENTIVE', 'MANUAL');
+
+-- CreateEnum
+CREATE TYPE "MaintenanceIssueType" AS ENUM ('ELECTRICAL', 'PLUMBING', 'HVAC', 'FURNITURE', 'APPLIANCE', 'CLEANLINESS', 'STRUCTURAL', 'INTERNET_TV', 'SAFETY', 'OTHER');
+
+-- CreateEnum
+CREATE TYPE "AssetStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'UNDER_MAINTENANCE', 'RETIRED');
+
+-- CreateEnum
+CREATE TYPE "PreventiveMaintenanceStatus" AS ENUM ('ACTIVE', 'PAUSED', 'COMPLETED', 'CANCELLED');
+
