@@ -113,3 +113,66 @@ CREATE TABLE "preventive_maintenance_plans" (
     CONSTRAINT "preventive_maintenance_plans_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateIndex
+CREATE UNIQUE INDEX "maintenance_tickets_ticketNumber_key" ON "maintenance_tickets"("ticketNumber");
+
+-- CreateIndex
+CREATE INDEX "maintenance_tickets_roomId_idx" ON "maintenance_tickets"("roomId");
+
+-- CreateIndex
+CREATE INDEX "maintenance_tickets_assetId_idx" ON "maintenance_tickets"("assetId");
+
+-- CreateIndex
+CREATE INDEX "maintenance_tickets_status_idx" ON "maintenance_tickets"("status");
+
+-- CreateIndex
+CREATE INDEX "maintenance_tickets_priority_idx" ON "maintenance_tickets"("priority");
+
+-- CreateIndex
+CREATE INDEX "maintenance_tickets_assignedToUserId_idx" ON "maintenance_tickets"("assignedToUserId");
+
+-- CreateIndex
+CREATE INDEX "maintenance_tickets_issueType_idx" ON "maintenance_tickets"("issueType");
+
+-- CreateIndex
+CREATE INDEX "maintenance_tickets_createdAt_idx" ON "maintenance_tickets"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "maintenance_ticket_notes_ticketId_idx" ON "maintenance_ticket_notes"("ticketId");
+
+-- CreateIndex
+CREATE INDEX "maintenance_ticket_notes_authorUserId_idx" ON "maintenance_ticket_notes"("authorUserId");
+
+-- CreateIndex
+CREATE INDEX "maintenance_ticket_photos_ticketId_idx" ON "maintenance_ticket_photos"("ticketId");
+
+-- CreateIndex
+CREATE INDEX "maintenance_ticket_photos_uploadedByUserId_idx" ON "maintenance_ticket_photos"("uploadedByUserId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "assets_assetNumber_key" ON "assets"("assetNumber");
+
+-- CreateIndex
+CREATE INDEX "assets_roomId_idx" ON "assets"("roomId");
+
+-- CreateIndex
+CREATE INDEX "assets_status_idx" ON "assets"("status");
+
+-- CreateIndex
+CREATE INDEX "assets_category_idx" ON "assets"("category");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "preventive_maintenance_plans_planNumber_key" ON "preventive_maintenance_plans"("planNumber");
+
+-- CreateIndex
+CREATE INDEX "preventive_maintenance_plans_assetId_idx" ON "preventive_maintenance_plans"("assetId");
+
+-- CreateIndex
+CREATE INDEX "preventive_maintenance_plans_roomId_idx" ON "preventive_maintenance_plans"("roomId");
+
+-- CreateIndex
+CREATE INDEX "preventive_maintenance_plans_status_idx" ON "preventive_maintenance_plans"("status");
+
+-- CreateIndex
+CREATE INDEX "preventive_maintenance_plans_nextDueDate_idx" ON "preventive_maintenance_plans"("nextDueDate");
+
