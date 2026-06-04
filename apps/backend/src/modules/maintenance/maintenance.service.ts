@@ -202,6 +202,7 @@ export class MaintenanceService {
         assignedByUserId: updatedTicket.assignedByUserId,
         previousStatus: ticket.status,
         status: updatedTicket.status,
+        notes: this.normalizeOptionalString(assignMaintenanceTicketDto.notes),
       },
     );
 
