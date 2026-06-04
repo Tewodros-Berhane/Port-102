@@ -147,6 +147,20 @@ export class MaintenanceTicketsRepository {
     });
   }
 
+  updateTicket(
+    ticketId: number,
+    data: Prisma.MaintenanceTicketUncheckedUpdateInput,
+    client: MaintenanceTicketClient = this.prisma,
+  ) {
+    return client.maintenanceTicket.update({
+      where: {
+        id: ticketId,
+      },
+      data,
+      select: maintenanceTicketSelect,
+    });
+  }
+
   listTickets({
     skip,
     take,
