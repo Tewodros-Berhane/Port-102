@@ -195,6 +195,59 @@ enum HousekeepingIssueStatus {
   CANCELLED
 }
 
+enum MaintenanceTicketStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum MaintenancePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MaintenanceTicketSource {
+  FRONT_DESK
+  HOUSEKEEPING
+  MANAGER
+  TECHNICIAN
+  PREVENTIVE
+  MANUAL
+}
+
+enum MaintenanceIssueType {
+  ELECTRICAL
+  PLUMBING
+  HVAC
+  FURNITURE
+  APPLIANCE
+  CLEANLINESS
+  STRUCTURAL
+  INTERNET_TV
+  SAFETY
+  OTHER
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_MAINTENANCE
+  RETIRED
+}
+
+enum PreventiveMaintenanceStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id                          Int                  @id @default(autoincrement())
   email                       String               @unique
@@ -238,6 +291,16 @@ model User {
   cancelledHousekeepingTasks  HousekeepingTask[]   @relation("HousekeepingTaskCancelledBy")
   reportedHousekeepingIssues  HousekeepingIssue[]  @relation("HousekeepingIssueReportedBy")
   resolvedHousekeepingIssues  HousekeepingIssue[]  @relation("HousekeepingIssueResolvedBy")
+  reportedMaintenanceTickets  MaintenanceTicket[]  @relation("MaintenanceTicketReportedBy")
+  assignedMaintenanceTickets  MaintenanceTicket[]  @relation("MaintenanceTicketAssignedTo")
+  assignedByMaintenanceTasks  MaintenanceTicket[]  @relation("MaintenanceTicketAssignedBy")
+  completedMaintenanceTickets MaintenanceTicket[]  @relation("MaintenanceTicketCompletedBy")
+  approvedMaintenanceTickets  MaintenanceTicket[]  @relation("MaintenanceTicketApprovedBy")
+  rejectedMaintenanceTickets  MaintenanceTicket[]  @relation("MaintenanceTicketRejectedBy")
+  cancelledMaintenanceTickets MaintenanceTicket[]  @relation("MaintenanceTicketCancelledBy")
+  maintenanceTicketNotes      MaintenanceTicketNote[] @relation("MaintenanceTicketNoteAuthor")
+  maintenanceTicketPhotos     MaintenanceTicketPhoto[] @relation("MaintenanceTicketPhotoUploadedBy")
+  preventiveMaintenancePlans  PreventiveMaintenancePlan[] @relation("PreventiveMaintenanceCreatedBy")
 
   @@index([roleId])
   @@index([departmentId])
@@ -417,6 +480,9 @@ model Room {
   stayAssignments    StayRoomAssignment[]
   housekeepingTasks  HousekeepingTask[]
   housekeepingIssues HousekeepingIssue[]
+  maintenanceTickets MaintenanceTicket[]
+  assets             Asset[]
+  preventiveMaintenancePlans PreventiveMaintenancePlan[]
 
   @@index([floorId])
   @@index([roomTypeId])
@@ -802,6 +868,137 @@ model HousekeepingIssue {
   @@index([status])
   @@index([reportedByUserId])
   @@map("housekeeping_issues")
+}
+
+model MaintenanceTicket {
+  id                 Int                     @id @default(autoincrement())
+  ticketNumber       String                  @unique
+  roomId             Int?
+  assetId            Int?
+  source             MaintenanceTicketSource @default(MANUAL)
+  sourceType         String?
+  sourceId           Int?
+  issueType          MaintenanceIssueType    @default(OTHER)
+  status             MaintenanceTicketStatus @default(OPEN)
+  priority           MaintenancePriority     @default(NORMAL)
+  title              String
+  description        String?
+  reportedByUserId   Int?
+  assignedToUserId   Int?
+  assignedByUserId   Int?
+  assignedAt         DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  cancelledAt        DateTime?
+  completedByUserId  Int?
+  approvedByUserId   Int?
+  rejectedByUserId   Int?
+  cancelledByUserId  Int?
+  completionNotes    String?
+  approvalNotes      String?
+  rejectionReason    String?
+  cancellationReason String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  room               Room?                   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  asset              Asset?                  @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  reportedBy         User?                   @relation("MaintenanceTicketReportedBy", fields: [reportedByUserId], references: [id], onDelete: SetNull)
+  assignedTo         User?                   @relation("MaintenanceTicketAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  assignedBy         User?                   @relation("MaintenanceTicketAssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+  completedBy        User?                   @relation("MaintenanceTicketCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  approvedBy         User?                   @relation("MaintenanceTicketApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejectedBy         User?                   @relation("MaintenanceTicketRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  cancelledBy        User?                   @relation("MaintenanceTicketCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+  notes              MaintenanceTicketNote[]
+  photos             MaintenanceTicketPhoto[]
+
+  @@index([roomId])
+  @@index([assetId])
+  @@index([status])
+  @@index([priority])
+  @@index([assignedToUserId])
+  @@index([issueType])
+  @@index([createdAt])
+  @@map("maintenance_tickets")
+}
+
+model MaintenanceTicketNote {
+  id           Int      @id @default(autoincrement())
+  ticketId     Int
+  authorUserId Int?
+  note         String
+  createdAt    DateTime @default(now())
+  ticket       MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author       User?             @relation("MaintenanceTicketNoteAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@index([authorUserId])
+  @@map("maintenance_ticket_notes")
+}
+
+model MaintenanceTicketPhoto {
+  id               Int      @id @default(autoincrement())
+  ticketId         Int
+  uploadedByUserId Int?
+  url              String
+  description      String?
+  createdAt        DateTime @default(now())
+  ticket           MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  uploadedBy       User?             @relation("MaintenanceTicketPhotoUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@index([uploadedByUserId])
+  @@map("maintenance_ticket_photos")
+}
+
+model Asset {
+  id               Int          @id @default(autoincrement())
+  assetNumber      String       @unique
+  name             String
+  category         String?
+  location         String?
+  roomId           Int?
+  status           AssetStatus  @default(ACTIVE)
+  description      String?
+  purchaseDate     DateTime?
+  warrantyUntil    DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  room             Room?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  tickets          MaintenanceTicket[]
+  preventivePlans  PreventiveMaintenancePlan[]
+
+  @@index([roomId])
+  @@index([status])
+  @@index([category])
+  @@map("assets")
+}
+
+model PreventiveMaintenancePlan {
+  id              Int                         @id @default(autoincrement())
+  planNumber      String                      @unique
+  assetId         Int?
+  roomId          Int?
+  title           String
+  description     String?
+  status          PreventiveMaintenanceStatus @default(ACTIVE)
+  intervalDays    Int
+  nextDueDate     DateTime
+  lastCompletedAt DateTime?
+  createdByUserId Int?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  asset           Asset?                      @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  room            Room?                       @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  createdBy       User?                       @relation("PreventiveMaintenanceCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([assetId])
+  @@index([roomId])
+  @@index([status])
+  @@index([nextDueDate])
+  @@map("preventive_maintenance_plans")
 }
 
 model AuditLog {
