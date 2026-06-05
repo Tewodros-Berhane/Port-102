@@ -793,4 +793,38 @@ describe('MaintenanceService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('rejects a completed ticket with a required reason', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.COMPLETED,
+      }),
+    );
+    maintenanceTicketsRepository.updateTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.REJECTED,
+        rejectedAt: now,
+        rejectedByUserId: currentUser.sub,
+        rejectionReason: 'Still leaking.',
+      }),
+    );
+
+    const result = await service.rejectTicket(currentUser, 30, {
+      rejectionReason: ' Still leaking. ',
+      notes: 'Retest after repair.',
+    });
+
+    expect(maintenanceTicketsRepository.updateTicket).toHaveBeenCalledWith(30, {
+      status: MaintenanceTicketStatus.REJECTED,
+      rejectedAt: expect.any(Date),
+      rejectedByUserId: currentUser.sub,
+      rejectionReason: 'Still leaking.',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.tickets.rejected',
+      }),
+    );
+    expect(result.status).toBe(MaintenanceTicketStatus.REJECTED);
+  });
+
 });
