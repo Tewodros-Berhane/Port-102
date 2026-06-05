@@ -673,6 +673,20 @@ export class MaintenanceService {
     });
   }
 
+  clearRoomMaintenance(
+    currentUser: CurrentUserPayload,
+    roomId: number,
+    clearRoomMaintenanceDto: ClearRoomMaintenanceDto,
+  ) {
+    return this.setRoomMaintenanceStatus({
+      currentUser,
+      roomId,
+      maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+      reason: this.normalizeOptionalString(clearRoomMaintenanceDto.reason),
+      auditAction: 'maintenance.rooms.maintenance_cleared',
+    });
+  }
+
   private async ensureTicket(ticketId: number) {
     const ticket = await this.maintenanceTicketsRepository.findTicket(ticketId);
 
