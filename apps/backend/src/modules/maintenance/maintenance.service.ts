@@ -602,6 +602,49 @@ export class MaintenanceService {
     return this.serializeTicket(rejectedTicket);
   }
 
+  async cancelTicket(
+    currentUser: CurrentUserPayload,
+    ticketId: number,
+    cancelMaintenanceTicketDto: CancelMaintenanceTicketDto,
+  ) {
+    const ticket = await this.ensureTicket(ticketId);
+
+    if (ticket.status === MaintenanceTicketStatus.CANCELLED) {
+      throw new ConflictException('Maintenance ticket is already cancelled.');
+    }
+
+    if (ticket.status === MaintenanceTicketStatus.APPROVED) {
+      throw new ConflictException('Approved maintenance tickets cannot be cancelled.');
+    }
+
+    const cancellationReason = this.normalizeRequiredString(
+      cancelMaintenanceTicketDto.reason,
+      'Maintenance ticket cancellation reason is required.',
+    );
+    const cancelledTicket =
+      await this.maintenanceTicketsRepository.updateTicket(ticket.id, {
+        status: MaintenanceTicketStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledByUserId: currentUser.sub,
+        cancellationReason,
+      });
+
+    await this.recordTicketAudit(
+      currentUser,
+      'maintenance.tickets.cancelled',
+      cancelledTicket,
+      {
+        ticketNumber: cancelledTicket.ticketNumber,
+        previousStatus: ticket.status,
+        status: cancelledTicket.status,
+        cancelledByUserId: cancelledTicket.cancelledByUserId,
+        cancellationReason,
+      },
+    );
+
+    return this.serializeTicket(cancelledTicket);
+  }
+
   private async ensureTicket(ticketId: number) {
     const ticket = await this.maintenanceTicketsRepository.findTicket(ticketId);
 
