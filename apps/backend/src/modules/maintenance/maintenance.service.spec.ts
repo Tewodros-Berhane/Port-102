@@ -781,4 +781,16 @@ describe('MaintenanceService', () => {
     expect(result.status).toBe(MaintenanceTicketStatus.APPROVED);
   });
 
+  it('rejects approval for tickets that are not completed', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.IN_PROGRESS,
+      }),
+    );
+
+    await expect(
+      service.approveTicket(currentUser, 30, {}),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
 });
