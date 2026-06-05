@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -154,6 +155,7 @@ describe('MaintenanceService', () => {
     findTicket: jest.Mock;
     findByTicketNumber: jest.Mock;
     updateTicket: jest.Mock;
+    runInTransaction: jest.Mock;
     listTickets: jest.Mock;
     findActiveUser: jest.Mock;
   };
@@ -162,6 +164,8 @@ describe('MaintenanceService', () => {
   };
   let roomsRepository: {
     findRoom: jest.Mock;
+    updateRoom: jest.Mock;
+    createStatusLogs: jest.Mock;
   };
   let auditLogsService: {
     record: jest.Mock;
@@ -174,6 +178,7 @@ describe('MaintenanceService', () => {
       findTicket: jest.fn(),
       findByTicketNumber: jest.fn(),
       updateTicket: jest.fn(),
+      runInTransaction: jest.fn((callback) => callback({})),
       listTickets: jest.fn(),
       findActiveUser: jest.fn(),
     };
@@ -182,6 +187,8 @@ describe('MaintenanceService', () => {
     };
     roomsRepository = {
       findRoom: jest.fn(),
+      updateRoom: jest.fn(),
+      createStatusLogs: jest.fn(),
     };
     auditLogsService = {
       record: jest.fn(),
@@ -475,4 +482,5 @@ describe('MaintenanceService', () => {
       }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
 });
