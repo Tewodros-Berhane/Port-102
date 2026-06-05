@@ -526,4 +526,23 @@ describe('MaintenanceService', () => {
     expect(result.priority).toBe(MaintenancePriority.HIGH);
   });
 
+  it('rejects assigned-only updates for unassigned users', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        assignedToUserId: 9,
+      }),
+    );
+
+    await expect(
+      service.updateTicket(
+        currentUser,
+        ['maintenance.tickets.update.assigned'],
+        30,
+        {
+          priority: MaintenancePriority.HIGH,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
 });
