@@ -122,6 +122,26 @@ export class MaintenanceController {
     );
   }
 
+  @Patch('rooms/:roomId/mark-under-maintenance')
+  @Permissions('rooms.out_of_order.mark')
+  @ApiOperation({ summary: 'Mark a room under maintenance' })
+  @ApiOkResponse({ description: 'Room marked under maintenance.' })
+  @ApiBadRequestResponse({ description: 'Invalid room maintenance payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room was not found.' })
+  markRoomUnderMaintenance(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('roomId', ParseIntPipe) roomId: number,
+    @Body() markRoomUnderMaintenanceDto: MarkRoomUnderMaintenanceDto,
+  ) {
+    return this.maintenanceService.markRoomUnderMaintenance(
+      currentUser,
+      roomId,
+      markRoomUnderMaintenanceDto,
+    );
+  }
+
   @Get('tickets/:id')
   @Permissions('maintenance.tickets.read')
   @ApiOperation({ summary: 'Get one maintenance ticket' })
