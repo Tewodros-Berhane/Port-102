@@ -562,6 +562,46 @@ export class MaintenanceService {
     return this.serializeTicket(result.ticket);
   }
 
+  async rejectTicket(
+    currentUser: CurrentUserPayload,
+    ticketId: number,
+    rejectMaintenanceTicketDto: RejectMaintenanceTicketDto,
+  ) {
+    const ticket = await this.ensureTicket(ticketId);
+
+    this.ensureTicketCanReject(ticket);
+
+    const rejectionReason = this.normalizeRequiredString(
+      rejectMaintenanceTicketDto.rejectionReason,
+      'Maintenance ticket rejection reason is required.',
+    );
+    const rejectedTicket = await this.maintenanceTicketsRepository.updateTicket(
+      ticket.id,
+      {
+        status: MaintenanceTicketStatus.REJECTED,
+        rejectedAt: new Date(),
+        rejectedByUserId: currentUser.sub,
+        rejectionReason,
+      },
+    );
+
+    await this.recordTicketAudit(
+      currentUser,
+      'maintenance.tickets.rejected',
+      rejectedTicket,
+      {
+        ticketNumber: rejectedTicket.ticketNumber,
+        previousStatus: ticket.status,
+        status: rejectedTicket.status,
+        rejectedByUserId: rejectedTicket.rejectedByUserId,
+        rejectionReason,
+        notes: this.normalizeOptionalString(rejectMaintenanceTicketDto.notes),
+      },
+    );
+
+    return this.serializeTicket(rejectedTicket);
+  }
+
   private async ensureTicket(ticketId: number) {
     const ticket = await this.maintenanceTicketsRepository.findTicket(ticketId);
 
