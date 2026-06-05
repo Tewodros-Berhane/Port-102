@@ -13,6 +13,7 @@ import { MaintenanceTicketsRepository } from './maintenance-tickets.repository';
 describe('MaintenanceTicketsRepository', () => {
   let repository: MaintenanceTicketsRepository;
   let prisma: {
+    $transaction: jest.Mock;
     maintenanceTicket: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -27,6 +28,7 @@ describe('MaintenanceTicketsRepository', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn((callback) => callback({ tx: true })),
       maintenanceTicket: {
         create: jest.fn(),
         findUnique: jest.fn(),
@@ -78,6 +80,14 @@ describe('MaintenanceTicketsRepository', () => {
         },
       }),
     );
+  });
+
+  it('runs callbacks in a Prisma transaction', async () => {
+    const callback = jest.fn().mockResolvedValue('done');
+
+    await expect(repository.runInTransaction(callback)).resolves.toBe('done');
+    expect(prisma.$transaction).toHaveBeenCalledWith(callback);
+    expect(callback).toHaveBeenCalledWith({ tx: true });
   });
 
   it('finds tickets by id and ticket number', async () => {
