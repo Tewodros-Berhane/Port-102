@@ -465,6 +465,103 @@ export class MaintenanceService {
     return this.serializeTicket(completedTicket);
   }
 
+  async approveTicket(
+    currentUser: CurrentUserPayload,
+    ticketId: number,
+    approveMaintenanceTicketDto: ApproveMaintenanceTicketDto,
+  ) {
+    const ticket = await this.ensureTicket(ticketId);
+
+    this.ensureTicketCanApprove(ticket);
+
+    const approvalNotes = this.normalizeOptionalString(
+      approveMaintenanceTicketDto.approvalNotes,
+    );
+    const result = await this.maintenanceTicketsRepository.runInTransaction(
+      async (client) => {
+        const approvedTicket =
+          await this.maintenanceTicketsRepository.updateTicket(
+            ticket.id,
+            {
+              status: MaintenanceTicketStatus.APPROVED,
+              approvedAt: new Date(),
+              approvedByUserId: currentUser.sub,
+              approvalNotes,
+            },
+            client,
+          );
+        const shouldClearMaintenance =
+          approveMaintenanceTicketDto.clearMaintenance === true &&
+          ticket.roomId !== null &&
+          (ticket.room?.maintenanceStatus ===
+            RoomMaintenanceStatus.UNDER_MAINTENANCE ||
+            ticket.room?.maintenanceStatus ===
+              RoomMaintenanceStatus.OUT_OF_ORDER);
+
+        if (shouldClearMaintenance) {
+          const roomId = ticket.roomId as number;
+
+          await this.roomsRepository.updateRoom(
+            roomId,
+            {
+              maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+            },
+            client,
+          );
+          await this.roomsRepository.createStatusLogs(
+            [
+              {
+                roomId,
+                actorUserId: currentUser.sub,
+                field: 'maintenanceStatus',
+                oldValue: ticket.room?.maintenanceStatus ?? null,
+                newValue: RoomMaintenanceStatus.AVAILABLE,
+                reason: `Maintenance ticket ${ticket.ticketNumber} approved.`,
+              },
+            ],
+            client,
+          );
+        }
+
+        return {
+          ticket: approvedTicket,
+          roomMaintenanceCleared: shouldClearMaintenance,
+        };
+      },
+    );
+
+    await this.recordTicketAudit(
+      currentUser,
+      'maintenance.tickets.approved',
+      result.ticket,
+      {
+        ticketNumber: result.ticket.ticketNumber,
+        previousStatus: ticket.status,
+        status: result.ticket.status,
+        approvedByUserId: result.ticket.approvedByUserId,
+        approvalNotes,
+        roomMaintenanceCleared: result.roomMaintenanceCleared,
+      },
+    );
+
+    if (result.roomMaintenanceCleared && ticket.roomId !== null) {
+      await this.auditLogsService.record({
+        actorUserId: currentUser.sub,
+        action: 'maintenance.rooms.maintenance_cleared',
+        entityType: 'Room',
+        entityId: String(ticket.roomId),
+        metadata: {
+          ticketId: result.ticket.id,
+          ticketNumber: result.ticket.ticketNumber,
+          previousMaintenanceStatus: ticket.room?.maintenanceStatus ?? null,
+          maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+        },
+      });
+    }
+
+    return this.serializeTicket(result.ticket);
+  }
+
   private async ensureTicket(ticketId: number) {
     const ticket = await this.maintenanceTicketsRepository.findTicket(ticketId);
 
