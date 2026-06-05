@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,13 +12,24 @@ import {
   MaintenanceTicketSource,
   MaintenanceTicketStatus,
   Prisma,
+  RoomMaintenanceStatus,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
+import type { RoomRecord } from '../rooms/repositories/rooms.repository';
 import { RoomsRepository } from '../rooms/repositories/rooms.repository';
 import { AssignMaintenanceTicketDto } from './dto/assign-maintenance-ticket.dto';
+import { ApproveMaintenanceTicketDto } from './dto/approve-maintenance-ticket.dto';
+import { CancelMaintenanceTicketDto } from './dto/cancel-maintenance-ticket.dto';
+import { ClearRoomMaintenanceDto } from './dto/clear-room-maintenance.dto';
+import { CompleteMaintenanceTicketDto } from './dto/complete-maintenance-ticket.dto';
 import { CreateMaintenanceTicketDto } from './dto/create-maintenance-ticket.dto';
 import { GetMaintenanceTicketsQueryDto } from './dto/get-maintenance-tickets-query.dto';
+import { MarkRoomOutOfOrderFromMaintenanceDto } from './dto/mark-room-out-of-order-from-maintenance.dto';
+import { MarkRoomUnderMaintenanceDto } from './dto/mark-room-under-maintenance.dto';
+import { RejectMaintenanceTicketDto } from './dto/reject-maintenance-ticket.dto';
+import { StartMaintenanceTicketDto } from './dto/start-maintenance-ticket.dto';
+import { UpdateMaintenanceTicketDto } from './dto/update-maintenance-ticket.dto';
 import { AssetsRepository } from './repositories/assets.repository';
 import {
   MaintenanceTicketRecord,
@@ -209,6 +221,106 @@ export class MaintenanceService {
     return this.serializeTicket(updatedTicket);
   }
 
+  async updateTicket(
+    currentUser: CurrentUserPayload,
+    permissionKeys: string[],
+    ticketId: number,
+    updateMaintenanceTicketDto: UpdateMaintenanceTicketDto,
+  ) {
+    const ticket = await this.ensureTicket(ticketId);
+
+    this.ensureAssignedOnlyTicketAccess({
+      currentUser,
+      permissionKeys,
+      ticket,
+      fullPermission: 'maintenance.tickets.update',
+      assignedPermission: 'maintenance.tickets.update.assigned',
+    });
+
+    if (
+      ticket.status === MaintenanceTicketStatus.APPROVED ||
+      ticket.status === MaintenanceTicketStatus.CANCELLED
+    ) {
+      throw new ConflictException(
+        'Approved or cancelled maintenance tickets cannot be updated.',
+      );
+    }
+
+    const data: Prisma.MaintenanceTicketUncheckedUpdateInput = {};
+
+    if (updateMaintenanceTicketDto.title !== undefined) {
+      data.title = this.normalizeRequiredString(
+        updateMaintenanceTicketDto.title,
+        'Ticket title is required.',
+      );
+    }
+
+    if (updateMaintenanceTicketDto.description !== undefined) {
+      data.description = this.normalizeOptionalString(
+        updateMaintenanceTicketDto.description,
+      );
+    }
+
+    if (updateMaintenanceTicketDto.roomId !== undefined) {
+      data.roomId =
+        updateMaintenanceTicketDto.roomId === null
+          ? null
+          : (await this.ensureActiveRoom(updateMaintenanceTicketDto.roomId)).id;
+    }
+
+    if (updateMaintenanceTicketDto.assetId !== undefined) {
+      data.assetId =
+        updateMaintenanceTicketDto.assetId === null
+          ? null
+          : (await this.ensureActiveAsset(updateMaintenanceTicketDto.assetId))
+              .id;
+    }
+
+    if (updateMaintenanceTicketDto.issueType !== undefined) {
+      data.issueType = updateMaintenanceTicketDto.issueType;
+    }
+
+    if (updateMaintenanceTicketDto.priority !== undefined) {
+      data.priority = updateMaintenanceTicketDto.priority;
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('No maintenance ticket changes provided.');
+    }
+
+    const updatedTicket = await this.maintenanceTicketsRepository.updateTicket(
+      ticket.id,
+      data,
+    );
+
+    await this.recordTicketAudit(
+      currentUser,
+      'maintenance.tickets.updated',
+      updatedTicket,
+      {
+        ticketNumber: updatedTicket.ticketNumber,
+        previous: {
+          roomId: ticket.roomId,
+          assetId: ticket.assetId,
+          issueType: ticket.issueType,
+          priority: ticket.priority,
+          title: ticket.title,
+          description: ticket.description,
+        },
+        current: {
+          roomId: updatedTicket.roomId,
+          assetId: updatedTicket.assetId,
+          issueType: updatedTicket.issueType,
+          priority: updatedTicket.priority,
+          title: updatedTicket.title,
+          description: updatedTicket.description,
+        },
+      },
+    );
+
+    return this.serializeTicket(updatedTicket);
+  }
+
   private async ensureTicket(ticketId: number) {
     const ticket = await this.maintenanceTicketsRepository.findTicket(ticketId);
 
@@ -217,6 +329,73 @@ export class MaintenanceService {
     }
 
     return ticket;
+  }
+
+  private ensureAssignedOnlyTicketAccess({
+    currentUser,
+    permissionKeys,
+    ticket,
+    fullPermission,
+    assignedPermission,
+  }: {
+    currentUser: CurrentUserPayload;
+    permissionKeys: string[];
+    ticket: MaintenanceTicketRecord;
+    fullPermission: string;
+    assignedPermission: string;
+  }) {
+    if (permissionKeys.includes(fullPermission)) {
+      return;
+    }
+
+    if (
+      permissionKeys.includes(assignedPermission) &&
+      ticket.assignedToUserId === currentUser.sub
+    ) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'You can only work on maintenance tickets assigned to you.',
+    );
+  }
+
+  private ensureTicketCanStart(ticket: MaintenanceTicketRecord) {
+    if (
+      ticket.status !== MaintenanceTicketStatus.OPEN &&
+      ticket.status !== MaintenanceTicketStatus.ASSIGNED
+    ) {
+      throw new ConflictException(
+        'Only open or assigned maintenance tickets can be started.',
+      );
+    }
+  }
+
+  private ensureTicketCanComplete(ticket: MaintenanceTicketRecord) {
+    if (
+      ticket.status !== MaintenanceTicketStatus.IN_PROGRESS &&
+      ticket.status !== MaintenanceTicketStatus.ASSIGNED
+    ) {
+      throw new ConflictException(
+        'Only assigned or in-progress maintenance tickets can be completed.',
+      );
+    }
+  }
+
+  private ensureTicketCanApprove(ticket: MaintenanceTicketRecord) {
+    if (ticket.status !== MaintenanceTicketStatus.COMPLETED) {
+      throw new ConflictException(
+        'Only completed maintenance tickets can be approved.',
+      );
+    }
+  }
+
+  private ensureTicketCanReject(ticket: MaintenanceTicketRecord) {
+    if (ticket.status !== MaintenanceTicketStatus.COMPLETED) {
+      throw new ConflictException(
+        'Only completed maintenance tickets can be rejected.',
+      );
+    }
   }
 
   private async ensureActiveRoom(roomId: number) {
@@ -231,6 +410,69 @@ export class MaintenanceService {
     }
 
     return room;
+  }
+
+  private async setRoomMaintenanceStatus({
+    currentUser,
+    roomId,
+    maintenanceStatus,
+    reason,
+    auditAction,
+  }: {
+    currentUser: CurrentUserPayload;
+    roomId: number;
+    maintenanceStatus: RoomMaintenanceStatus;
+    reason: string | null;
+    auditAction: string;
+  }) {
+    const room = await this.ensureActiveRoom(roomId);
+
+    if (room.maintenanceStatus === maintenanceStatus) {
+      return this.serializeRoom(room);
+    }
+
+    const updatedRoom = await this.maintenanceTicketsRepository.runInTransaction(
+      async (client) => {
+        const changedRoom = await this.roomsRepository.updateRoom(
+          room.id,
+          {
+            maintenanceStatus,
+          },
+          client,
+        );
+
+        await this.roomsRepository.createStatusLogs(
+          [
+            {
+              roomId: room.id,
+              actorUserId: currentUser.sub,
+              field: 'maintenanceStatus',
+              oldValue: room.maintenanceStatus,
+              newValue: maintenanceStatus,
+              reason,
+            },
+          ],
+          client,
+        );
+
+        return changedRoom;
+      },
+    );
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: auditAction,
+      entityType: 'Room',
+      entityId: String(room.id),
+      metadata: {
+        roomNumber: room.roomNumber,
+        previousMaintenanceStatus: room.maintenanceStatus,
+        maintenanceStatus,
+        reason,
+      },
+    });
+
+    return this.serializeRoom(updatedRoom);
   }
 
   private async ensureActiveAsset(assetId: number) {
@@ -336,6 +578,25 @@ export class MaintenanceService {
       approvedBy: ticket.approvedBy,
       rejectedBy: ticket.rejectedBy,
       cancelledBy: ticket.cancelledBy,
+    };
+  }
+
+  private serializeRoom(room: RoomRecord) {
+    return {
+      id: room.id,
+      roomNumber: room.roomNumber,
+      displayName: room.displayName,
+      floorId: room.floorId,
+      roomTypeId: room.roomTypeId,
+      occupancyStatus: room.occupancyStatus,
+      cleaningStatus: room.cleaningStatus,
+      maintenanceStatus: room.maintenanceStatus,
+      notes: room.notes,
+      isActive: room.isActive,
+      createdAt: room.createdAt,
+      updatedAt: room.updatedAt,
+      floor: room.floor,
+      roomType: room.roomType,
     };
   }
 
