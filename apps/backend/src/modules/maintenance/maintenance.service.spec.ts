@@ -698,4 +698,21 @@ describe('MaintenanceService', () => {
     expect(result.status).toBe(MaintenanceTicketStatus.COMPLETED);
   });
 
+  it('rejects complete from invalid ticket status', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.OPEN,
+      }),
+    );
+
+    await expect(
+      service.completeTicket(
+        currentUser,
+        ['maintenance.tickets.complete'],
+        30,
+        {},
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
 });
