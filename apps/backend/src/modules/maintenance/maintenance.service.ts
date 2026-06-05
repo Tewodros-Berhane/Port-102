@@ -659,6 +659,20 @@ export class MaintenanceService {
     });
   }
 
+  markRoomUnderMaintenance(
+    currentUser: CurrentUserPayload,
+    roomId: number,
+    markRoomUnderMaintenanceDto: MarkRoomUnderMaintenanceDto,
+  ) {
+    return this.setRoomMaintenanceStatus({
+      currentUser,
+      roomId,
+      maintenanceStatus: RoomMaintenanceStatus.UNDER_MAINTENANCE,
+      reason: this.normalizeOptionalString(markRoomUnderMaintenanceDto.reason),
+      auditAction: 'maintenance.rooms.marked_under_maintenance',
+    });
+  }
+
   private async ensureTicket(ticketId: number) {
     const ticket = await this.maintenanceTicketsRepository.findTicket(ticketId);
 
