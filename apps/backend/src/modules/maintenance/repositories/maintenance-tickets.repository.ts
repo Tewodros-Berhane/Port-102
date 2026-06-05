@@ -114,6 +114,12 @@ type UserClient = Pick<PrismaService | Prisma.TransactionClient, 'user'>;
 export class MaintenanceTicketsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  runInTransaction<T>(
+    callback: (client: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return this.prisma.$transaction(callback);
+  }
+
   createTicket(
     data: Prisma.MaintenanceTicketUncheckedCreateInput,
     client: MaintenanceTicketClient = this.prisma,
