@@ -841,4 +841,33 @@ describe('MaintenanceService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('cancels a ticket with a required reason', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(createTicket());
+    maintenanceTicketsRepository.updateTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.CANCELLED,
+        cancelledAt: now,
+        cancelledByUserId: currentUser.sub,
+        cancellationReason: 'Duplicate.',
+      }),
+    );
+
+    const result = await service.cancelTicket(currentUser, 30, {
+      reason: ' Duplicate. ',
+    });
+
+    expect(maintenanceTicketsRepository.updateTicket).toHaveBeenCalledWith(30, {
+      status: MaintenanceTicketStatus.CANCELLED,
+      cancelledAt: expect.any(Date),
+      cancelledByUserId: currentUser.sub,
+      cancellationReason: 'Duplicate.',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.tickets.cancelled',
+      }),
+    );
+    expect(result.status).toBe(MaintenanceTicketStatus.CANCELLED);
+  });
+
 });
