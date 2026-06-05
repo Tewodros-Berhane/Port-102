@@ -1006,4 +1006,30 @@ describe('MaintenanceService', () => {
     expect(result.maintenanceStatus).toBe(RoomMaintenanceStatus.AVAILABLE);
   });
 
+  it('does not create status log when room already has requested maintenance status', async () => {
+    roomsRepository.findRoom.mockResolvedValue(
+      createRoom({
+        maintenanceStatus: RoomMaintenanceStatus.OUT_OF_ORDER,
+      }),
+    );
+
+    const result = await service.markRoomOutOfOrder(currentUser, 12, {});
+
+    expect(roomsRepository.updateRoom).not.toHaveBeenCalled();
+    expect(roomsRepository.createStatusLogs).not.toHaveBeenCalled();
+    expect(auditLogsService.record).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.rooms.marked_out_of_order',
+      }),
+    );
+    expect(result.maintenanceStatus).toBe(RoomMaintenanceStatus.OUT_OF_ORDER);
+  });
+
+  it('rejects room maintenance changes for inactive rooms', async () => {
+    roomsRepository.findRoom.mockResolvedValue(createRoom({ isActive: false }));
+
+    await expect(
+      service.markRoomUnderMaintenance(currentUser, 12, {}),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });
