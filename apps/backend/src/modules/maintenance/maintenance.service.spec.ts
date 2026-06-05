@@ -715,4 +715,70 @@ describe('MaintenanceService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('approves a completed ticket and can clear room maintenance', async () => {
+    const completedTicket = createTicket({
+      status: MaintenanceTicketStatus.COMPLETED,
+      room: createRoom({
+        maintenanceStatus: RoomMaintenanceStatus.UNDER_MAINTENANCE,
+      }),
+    });
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(completedTicket);
+    maintenanceTicketsRepository.updateTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.APPROVED,
+        approvedAt: now,
+        approvedByUserId: currentUser.sub,
+        approvalNotes: 'Verified.',
+      }),
+    );
+
+    const result = await service.approveTicket(currentUser, 30, {
+      approvalNotes: ' Verified. ',
+      clearMaintenance: true,
+    });
+
+    expect(maintenanceTicketsRepository.runInTransaction).toHaveBeenCalled();
+    expect(maintenanceTicketsRepository.updateTicket).toHaveBeenCalledWith(
+      30,
+      {
+        status: MaintenanceTicketStatus.APPROVED,
+        approvedAt: expect.any(Date),
+        approvedByUserId: currentUser.sub,
+        approvalNotes: 'Verified.',
+      },
+      {},
+    );
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      12,
+      {
+        maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+      },
+      {},
+    );
+    expect(roomsRepository.createStatusLogs).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          roomId: 12,
+          field: 'maintenanceStatus',
+          oldValue: RoomMaintenanceStatus.UNDER_MAINTENANCE,
+          newValue: RoomMaintenanceStatus.AVAILABLE,
+        }),
+      ],
+      {},
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.tickets.approved',
+      }),
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.rooms.maintenance_cleared',
+        entityType: 'Room',
+        entityId: '12',
+      }),
+    );
+    expect(result.status).toBe(MaintenanceTicketStatus.APPROVED);
+  });
+
 });
