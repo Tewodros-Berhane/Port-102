@@ -628,4 +628,22 @@ describe('MaintenanceService', () => {
     expect(result.status).toBe(MaintenanceTicketStatus.IN_PROGRESS);
   });
 
+  it('rejects assigned-only start for unassigned users', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.ASSIGNED,
+        assignedToUserId: 9,
+      }),
+    );
+
+    await expect(
+      service.startTicket(
+        currentUser,
+        ['maintenance.tickets.start.assigned'],
+        30,
+        {},
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
 });
