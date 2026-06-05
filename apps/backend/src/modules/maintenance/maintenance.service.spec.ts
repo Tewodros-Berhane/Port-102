@@ -646,4 +646,16 @@ describe('MaintenanceService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('rejects start from invalid ticket status', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.COMPLETED,
+      }),
+    );
+
+    await expect(
+      service.startTicket(currentUser, ['maintenance.tickets.start'], 30, {}),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
 });
