@@ -234,5 +234,28 @@ export class MaintenanceController {
     );
   }
 
+  @Patch('tickets/:id/approve')
+  @Permissions('maintenance.tickets.approve')
+  @ApiOperation({ summary: 'Approve a completed maintenance ticket' })
+  @ApiOkResponse({ description: 'Maintenance ticket approved.' })
+  @ApiBadRequestResponse({ description: 'Invalid approval payload.' })
+  @ApiConflictResponse({
+    description: 'Ticket cannot be approved in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Maintenance ticket was not found.' })
+  approveTicket(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) ticketId: number,
+    @Body() approveMaintenanceTicketDto: ApproveMaintenanceTicketDto,
+  ) {
+    return this.maintenanceService.approveTicket(
+      currentUser,
+      ticketId,
+      approveMaintenanceTicketDto,
+    );
+  }
+
 
 }
