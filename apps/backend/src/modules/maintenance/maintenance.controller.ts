@@ -101,6 +101,27 @@ export class MaintenanceController {
     return this.maintenanceService.listAssignedToMe(currentUser, query);
   }
 
+  @Patch('rooms/:roomId/mark-out-of-order')
+  @Permissions('rooms.out_of_order.mark')
+  @ApiOperation({ summary: 'Mark a room out of order from maintenance' })
+  @ApiOkResponse({ description: 'Room marked out of order.' })
+  @ApiBadRequestResponse({ description: 'Invalid room maintenance payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room was not found.' })
+  markRoomOutOfOrder(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('roomId', ParseIntPipe) roomId: number,
+    @Body()
+    markRoomOutOfOrderDto: MarkRoomOutOfOrderFromMaintenanceDto,
+  ) {
+    return this.maintenanceService.markRoomOutOfOrder(
+      currentUser,
+      roomId,
+      markRoomOutOfOrderDto,
+    );
+  }
+
   @Get('tickets/:id')
   @Permissions('maintenance.tickets.read')
   @ApiOperation({ summary: 'Get one maintenance ticket' })
