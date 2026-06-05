@@ -658,4 +658,44 @@ describe('MaintenanceService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('completes assigned or in-progress tickets', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.IN_PROGRESS,
+        assignedToUserId: currentUser.sub,
+      }),
+    );
+    maintenanceTicketsRepository.updateTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.COMPLETED,
+        assignedToUserId: currentUser.sub,
+        completedAt: now,
+        completedByUserId: currentUser.sub,
+        completionNotes: 'Done.',
+      }),
+    );
+
+    const result = await service.completeTicket(
+      currentUser,
+      ['maintenance.tickets.complete.assigned'],
+      30,
+      {
+        completionNotes: ' Done. ',
+      },
+    );
+
+    expect(maintenanceTicketsRepository.updateTicket).toHaveBeenCalledWith(30, {
+      status: MaintenanceTicketStatus.COMPLETED,
+      completedAt: expect.any(Date),
+      completedByUserId: currentUser.sub,
+      completionNotes: 'Done.',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.tickets.completed',
+      }),
+    );
+    expect(result.status).toBe(MaintenanceTicketStatus.COMPLETED);
+  });
+
 });
