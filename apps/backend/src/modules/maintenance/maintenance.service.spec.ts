@@ -483,4 +483,47 @@ describe('MaintenanceService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('updates editable ticket details', async () => {
+    const ticket = createTicket({
+      assignedToUserId: 9,
+    });
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(ticket);
+    roomsRepository.findRoom.mockResolvedValue(createRoom({ id: 13 }));
+    assetsRepository.findActiveAsset.mockResolvedValue(createAsset({ id: 5 }));
+    maintenanceTicketsRepository.updateTicket.mockResolvedValue(
+      createTicket({
+        roomId: 13,
+        assetId: 5,
+        priority: MaintenancePriority.HIGH,
+        title: 'Updated AC leak',
+      }),
+    );
+
+    const result = await service.updateTicket(
+      currentUser,
+      ['maintenance.tickets.update'],
+      30,
+      {
+        roomId: 13,
+        assetId: 5,
+        priority: MaintenancePriority.HIGH,
+        title: ' Updated AC leak ',
+      },
+    );
+
+    expect(maintenanceTicketsRepository.updateTicket).toHaveBeenCalledWith(30, {
+      roomId: 13,
+      assetId: 5,
+      priority: MaintenancePriority.HIGH,
+      title: 'Updated AC leak',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.tickets.updated',
+        entityType: 'MaintenanceTicket',
+      }),
+    );
+    expect(result.priority).toBe(MaintenancePriority.HIGH);
+  });
+
 });
