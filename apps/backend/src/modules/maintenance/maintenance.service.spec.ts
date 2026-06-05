@@ -559,4 +559,73 @@ describe('MaintenanceService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('starts an assigned ticket and can mark the room under maintenance', async () => {
+    const assignedTicket = createTicket({
+      status: MaintenanceTicketStatus.ASSIGNED,
+      assignedToUserId: currentUser.sub,
+      room: createRoom({
+        maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+      }),
+    });
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(assignedTicket);
+    maintenanceTicketsRepository.updateTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.IN_PROGRESS,
+        assignedToUserId: currentUser.sub,
+        startedAt: now,
+      }),
+    );
+
+    const result = await service.startTicket(
+      currentUser,
+      ['maintenance.tickets.start.assigned'],
+      30,
+      {
+        notes: 'Starting work.',
+        markRoomUnderMaintenance: true,
+      },
+    );
+
+    expect(maintenanceTicketsRepository.runInTransaction).toHaveBeenCalled();
+    expect(maintenanceTicketsRepository.updateTicket).toHaveBeenCalledWith(
+      30,
+      {
+        status: MaintenanceTicketStatus.IN_PROGRESS,
+        startedAt: expect.any(Date),
+      },
+      {},
+    );
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      12,
+      {
+        maintenanceStatus: RoomMaintenanceStatus.UNDER_MAINTENANCE,
+      },
+      {},
+    );
+    expect(roomsRepository.createStatusLogs).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          roomId: 12,
+          field: 'maintenanceStatus',
+          oldValue: RoomMaintenanceStatus.AVAILABLE,
+          newValue: RoomMaintenanceStatus.UNDER_MAINTENANCE,
+        }),
+      ],
+      {},
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.tickets.started',
+      }),
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.rooms.marked_under_maintenance',
+        entityType: 'Room',
+        entityId: '12',
+      }),
+    );
+    expect(result.status).toBe(MaintenanceTicketStatus.IN_PROGRESS);
+  });
+
 });
