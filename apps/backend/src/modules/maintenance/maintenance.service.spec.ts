@@ -870,4 +870,18 @@ describe('MaintenanceService', () => {
     expect(result.status).toBe(MaintenanceTicketStatus.CANCELLED);
   });
 
+  it('does not cancel approved tickets', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.APPROVED,
+      }),
+    );
+
+    await expect(
+      service.cancelTicket(currentUser, 30, {
+        reason: 'Duplicate.',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
 });
