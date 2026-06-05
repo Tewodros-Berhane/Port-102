@@ -172,5 +172,35 @@ export class MaintenanceController {
     );
   }
 
+  @Patch('tickets/:id/start')
+  @AnyPermissions(
+    'maintenance.tickets.start',
+    'maintenance.tickets.start.assigned',
+  )
+  @ApiOperation({ summary: 'Start a maintenance ticket' })
+  @ApiOkResponse({ description: 'Maintenance ticket started.' })
+  @ApiBadRequestResponse({ description: 'Invalid start payload.' })
+  @ApiConflictResponse({
+    description: 'Ticket cannot be started in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({
+    description: 'Missing permission or ticket is not assigned to current user.',
+  })
+  @ApiNotFoundResponse({ description: 'Maintenance ticket was not found.' })
+  startTicket(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @CurrentPermissions() permissionKeys: string[],
+    @Param('id', ParseIntPipe) ticketId: number,
+    @Body() startMaintenanceTicketDto: StartMaintenanceTicketDto,
+  ) {
+    return this.maintenanceService.startTicket(
+      currentUser,
+      permissionKeys,
+      ticketId,
+      startMaintenanceTicketDto,
+    );
+  }
+
 
 }
