@@ -420,6 +420,51 @@ export class MaintenanceService {
     return this.serializeTicket(result.ticket);
   }
 
+  async completeTicket(
+    currentUser: CurrentUserPayload,
+    permissionKeys: string[],
+    ticketId: number,
+    completeMaintenanceTicketDto: CompleteMaintenanceTicketDto,
+  ) {
+    const ticket = await this.ensureTicket(ticketId);
+
+    this.ensureAssignedOnlyTicketAccess({
+      currentUser,
+      permissionKeys,
+      ticket,
+      fullPermission: 'maintenance.tickets.complete',
+      assignedPermission: 'maintenance.tickets.complete.assigned',
+    });
+    this.ensureTicketCanComplete(ticket);
+
+    const completionNotes = this.normalizeOptionalString(
+      completeMaintenanceTicketDto.completionNotes,
+    );
+    const completedTicket =
+      await this.maintenanceTicketsRepository.updateTicket(ticket.id, {
+        status: MaintenanceTicketStatus.COMPLETED,
+        completedAt: new Date(),
+        completedByUserId: currentUser.sub,
+        completionNotes,
+      });
+
+    await this.recordTicketAudit(
+      currentUser,
+      'maintenance.tickets.completed',
+      completedTicket,
+      {
+        ticketNumber: completedTicket.ticketNumber,
+        previousStatus: ticket.status,
+        status: completedTicket.status,
+        assignedToUserId: completedTicket.assignedToUserId,
+        completedByUserId: completedTicket.completedByUserId,
+        completionNotes,
+      },
+    );
+
+    return this.serializeTicket(completedTicket);
+  }
+
   private async ensureTicket(ticketId: number) {
     const ticket = await this.maintenanceTicketsRepository.findTicket(ticketId);
 
