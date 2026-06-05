@@ -280,5 +280,26 @@ export class MaintenanceController {
     );
   }
 
-
+  @Patch('tickets/:id/cancel')
+  @Permissions('maintenance.tickets.update')
+  @ApiOperation({ summary: 'Cancel a maintenance ticket' })
+  @ApiOkResponse({ description: 'Maintenance ticket cancelled.' })
+  @ApiBadRequestResponse({ description: 'Invalid cancellation payload.' })
+  @ApiConflictResponse({
+    description: 'Ticket cannot be cancelled in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Maintenance ticket was not found.' })
+  cancelTicket(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) ticketId: number,
+    @Body() cancelMaintenanceTicketDto: CancelMaintenanceTicketDto,
+  ) {
+    return this.maintenanceService.cancelTicket(
+      currentUser,
+      ticketId,
+      cancelMaintenanceTicketDto,
+    );
+  }
 }
