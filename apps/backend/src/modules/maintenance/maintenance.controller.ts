@@ -257,5 +257,28 @@ export class MaintenanceController {
     );
   }
 
+  @Patch('tickets/:id/reject')
+  @Permissions('maintenance.tickets.approve')
+  @ApiOperation({ summary: 'Reject a completed maintenance ticket' })
+  @ApiOkResponse({ description: 'Maintenance ticket rejected.' })
+  @ApiBadRequestResponse({ description: 'Invalid rejection payload.' })
+  @ApiConflictResponse({
+    description: 'Ticket cannot be rejected in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Maintenance ticket was not found.' })
+  rejectTicket(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) ticketId: number,
+    @Body() rejectMaintenanceTicketDto: RejectMaintenanceTicketDto,
+  ) {
+    return this.maintenanceService.rejectTicket(
+      currentUser,
+      ticketId,
+      rejectMaintenanceTicketDto,
+    );
+  }
+
 
 }
