@@ -894,4 +894,47 @@ describe('MaintenanceService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('marks a room out of order and records status log plus audit', async () => {
+    roomsRepository.findRoom.mockResolvedValue(createRoom());
+    roomsRepository.updateRoom.mockResolvedValue(
+      createRoom({
+        maintenanceStatus: RoomMaintenanceStatus.OUT_OF_ORDER,
+      }),
+    );
+
+    const result = await service.markRoomOutOfOrder(currentUser, 12, {
+      reason: ' Water leak. ',
+    });
+
+    expect(maintenanceTicketsRepository.runInTransaction).toHaveBeenCalled();
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      12,
+      {
+        maintenanceStatus: RoomMaintenanceStatus.OUT_OF_ORDER,
+      },
+      {},
+    );
+    expect(roomsRepository.createStatusLogs).toHaveBeenCalledWith(
+      [
+        {
+          roomId: 12,
+          actorUserId: currentUser.sub,
+          field: 'maintenanceStatus',
+          oldValue: RoomMaintenanceStatus.AVAILABLE,
+          newValue: RoomMaintenanceStatus.OUT_OF_ORDER,
+          reason: 'Water leak.',
+        },
+      ],
+      {},
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.rooms.marked_out_of_order',
+        entityType: 'Room',
+        entityId: '12',
+      }),
+    );
+    expect(result.maintenanceStatus).toBe(RoomMaintenanceStatus.OUT_OF_ORDER);
+  });
+
 });
