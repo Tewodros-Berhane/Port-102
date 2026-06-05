@@ -884,4 +884,14 @@ describe('MaintenanceService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('requires a cancellation reason', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(createTicket());
+
+    await expect(
+      service.cancelTicket(currentUser, 30, {
+        reason: '   ',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
 });
