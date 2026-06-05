@@ -645,6 +645,20 @@ export class MaintenanceService {
     return this.serializeTicket(cancelledTicket);
   }
 
+  markRoomOutOfOrder(
+    currentUser: CurrentUserPayload,
+    roomId: number,
+    markRoomOutOfOrderDto: MarkRoomOutOfOrderFromMaintenanceDto,
+  ) {
+    return this.setRoomMaintenanceStatus({
+      currentUser,
+      roomId,
+      maintenanceStatus: RoomMaintenanceStatus.OUT_OF_ORDER,
+      reason: this.normalizeOptionalString(markRoomOutOfOrderDto.reason),
+      auditAction: 'maintenance.rooms.marked_out_of_order',
+    });
+  }
+
   private async ensureTicket(ticketId: number) {
     const ticket = await this.maintenanceTicketsRepository.findTicket(ticketId);
 
