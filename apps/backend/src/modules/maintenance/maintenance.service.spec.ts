@@ -827,4 +827,18 @@ describe('MaintenanceService', () => {
     expect(result.status).toBe(MaintenanceTicketStatus.REJECTED);
   });
 
+  it('requires a rejection reason', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.COMPLETED,
+      }),
+    );
+
+    await expect(
+      service.rejectTicket(currentUser, 30, {
+        rejectionReason: '   ',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
 });
