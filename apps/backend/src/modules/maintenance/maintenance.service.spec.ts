@@ -937,4 +937,73 @@ describe('MaintenanceService', () => {
     expect(result.maintenanceStatus).toBe(RoomMaintenanceStatus.OUT_OF_ORDER);
   });
 
+  it('marks a room under maintenance', async () => {
+    roomsRepository.findRoom.mockResolvedValue(createRoom());
+    roomsRepository.updateRoom.mockResolvedValue(
+      createRoom({
+        maintenanceStatus: RoomMaintenanceStatus.UNDER_MAINTENANCE,
+      }),
+    );
+
+    const result = await service.markRoomUnderMaintenance(currentUser, 12, {
+      reason: 'Technician working.',
+    });
+
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      12,
+      {
+        maintenanceStatus: RoomMaintenanceStatus.UNDER_MAINTENANCE,
+      },
+      {},
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.rooms.marked_under_maintenance',
+      }),
+    );
+    expect(result.maintenanceStatus).toBe(
+      RoomMaintenanceStatus.UNDER_MAINTENANCE,
+    );
+  });
+
+  it('clears room maintenance status', async () => {
+    roomsRepository.findRoom.mockResolvedValue(
+      createRoom({
+        maintenanceStatus: RoomMaintenanceStatus.OUT_OF_ORDER,
+      }),
+    );
+    roomsRepository.updateRoom.mockResolvedValue(
+      createRoom({
+        maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+      }),
+    );
+
+    const result = await service.clearRoomMaintenance(currentUser, 12, {
+      reason: 'Repair completed.',
+    });
+
+    expect(roomsRepository.updateRoom).toHaveBeenCalledWith(
+      12,
+      {
+        maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+      },
+      {},
+    );
+    expect(roomsRepository.createStatusLogs).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          oldValue: RoomMaintenanceStatus.OUT_OF_ORDER,
+          newValue: RoomMaintenanceStatus.AVAILABLE,
+        }),
+      ],
+      {},
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.rooms.maintenance_cleared',
+      }),
+    );
+    expect(result.maintenanceStatus).toBe(RoomMaintenanceStatus.AVAILABLE);
+  });
+
 });
