@@ -545,4 +545,18 @@ describe('MaintenanceService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('rejects unsafe updates for approved tickets', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        status: MaintenanceTicketStatus.APPROVED,
+      }),
+    );
+
+    await expect(
+      service.updateTicket(currentUser, ['maintenance.tickets.update'], 30, {
+        priority: MaintenancePriority.HIGH,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
 });
