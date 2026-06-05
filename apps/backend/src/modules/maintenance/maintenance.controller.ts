@@ -22,6 +22,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 
+import { CurrentPermissions } from '../../common/decorators/current-permissions.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import {
   AnyPermissions,
@@ -31,8 +32,17 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { AssignMaintenanceTicketDto } from './dto/assign-maintenance-ticket.dto';
+import { ApproveMaintenanceTicketDto } from './dto/approve-maintenance-ticket.dto';
+import { CancelMaintenanceTicketDto } from './dto/cancel-maintenance-ticket.dto';
+import { ClearRoomMaintenanceDto } from './dto/clear-room-maintenance.dto';
+import { CompleteMaintenanceTicketDto } from './dto/complete-maintenance-ticket.dto';
 import { CreateMaintenanceTicketDto } from './dto/create-maintenance-ticket.dto';
 import { GetMaintenanceTicketsQueryDto } from './dto/get-maintenance-tickets-query.dto';
+import { MarkRoomOutOfOrderFromMaintenanceDto } from './dto/mark-room-out-of-order-from-maintenance.dto';
+import { MarkRoomUnderMaintenanceDto } from './dto/mark-room-under-maintenance.dto';
+import { RejectMaintenanceTicketDto } from './dto/reject-maintenance-ticket.dto';
+import { StartMaintenanceTicketDto } from './dto/start-maintenance-ticket.dto';
+import { UpdateMaintenanceTicketDto } from './dto/update-maintenance-ticket.dto';
 import { MaintenanceService } from './maintenance.service';
 
 @ApiTags('Maintenance')
@@ -105,6 +115,38 @@ export class MaintenanceController {
     return this.maintenanceService.getTicketById(currentUser, ticketId);
   }
 
+  @Patch('tickets/:id')
+  @AnyPermissions(
+    'maintenance.tickets.update',
+    'maintenance.tickets.update.assigned',
+  )
+  @ApiOperation({ summary: 'Update maintenance ticket details' })
+  @ApiOkResponse({ description: 'Maintenance ticket updated.' })
+  @ApiBadRequestResponse({ description: 'Invalid ticket update payload.' })
+  @ApiConflictResponse({
+    description: 'Ticket cannot be updated in its current state.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({
+    description: 'Missing permission or ticket is not assigned to current user.',
+  })
+  @ApiNotFoundResponse({
+    description: 'Maintenance ticket, room, or asset was not found.',
+  })
+  updateTicket(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @CurrentPermissions() permissionKeys: string[],
+    @Param('id', ParseIntPipe) ticketId: number,
+    @Body() updateMaintenanceTicketDto: UpdateMaintenanceTicketDto,
+  ) {
+    return this.maintenanceService.updateTicket(
+      currentUser,
+      permissionKeys,
+      ticketId,
+      updateMaintenanceTicketDto,
+    );
+  }
+
   @Patch('tickets/:id/assign')
   @Permissions('maintenance.tickets.assign')
   @ApiOperation({ summary: 'Assign a maintenance ticket to a technician' })
@@ -129,4 +171,6 @@ export class MaintenanceController {
       assignMaintenanceTicketDto,
     );
   }
+
+
 }
