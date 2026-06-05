@@ -142,6 +142,26 @@ export class MaintenanceController {
     );
   }
 
+  @Patch('rooms/:roomId/clear-maintenance')
+  @Permissions('rooms.out_of_order.clear')
+  @ApiOperation({ summary: 'Clear room maintenance status' })
+  @ApiOkResponse({ description: 'Room maintenance status cleared.' })
+  @ApiBadRequestResponse({ description: 'Invalid room maintenance payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Room was not found.' })
+  clearRoomMaintenance(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('roomId', ParseIntPipe) roomId: number,
+    @Body() clearRoomMaintenanceDto: ClearRoomMaintenanceDto,
+  ) {
+    return this.maintenanceService.clearRoomMaintenance(
+      currentUser,
+      roomId,
+      clearRoomMaintenanceDto,
+    );
+  }
+
   @Get('tickets/:id')
   @Permissions('maintenance.tickets.read')
   @ApiOperation({ summary: 'Get one maintenance ticket' })
