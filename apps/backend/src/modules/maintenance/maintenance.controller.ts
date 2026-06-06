@@ -63,6 +63,16 @@ import { MaintenanceService } from './maintenance.service';
 export class MaintenanceController {
   constructor(private readonly maintenanceService: MaintenanceService) {}
 
+  @Get('dashboard')
+  @Permissions('maintenance.dashboard.read')
+  @ApiOperation({ summary: 'Get maintenance operational dashboard counts' })
+  @ApiOkResponse({ description: 'Maintenance dashboard counts returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  getDashboard(@CurrentUser() currentUser: CurrentUserPayload) {
+    return this.maintenanceService.getDashboard(currentUser);
+  }
+
   @Post('tickets')
   @Permissions('maintenance.tickets.create')
   @ApiOperation({ summary: 'Create a maintenance ticket' })
