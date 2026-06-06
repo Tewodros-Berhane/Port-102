@@ -124,6 +124,234 @@ export class MaintenanceController {
     return this.maintenanceService.listAssignedToMe(currentUser, query);
   }
 
+  @Post('tickets/from-housekeeping-issue/:issueId')
+  @Permissions('maintenance.tickets.create')
+  @ApiOperation({
+    summary: 'Create a maintenance ticket from an open housekeeping issue',
+  })
+  @ApiCreatedResponse({
+    description: 'Maintenance ticket created from the housekeeping issue.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid request payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Housekeeping issue, room, or assigned user was not found.',
+  })
+  @ApiConflictResponse({
+    description:
+      'The issue is not open or already has an active maintenance ticket.',
+  })
+  createTicketFromHousekeepingIssue(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('issueId', ParseIntPipe) issueId: number,
+    @Body() createTicketDto: CreateTicketFromHousekeepingIssueDto,
+  ) {
+    return this.maintenanceService.createTicketFromHousekeepingIssue(
+      currentUser,
+      issueId,
+      createTicketDto,
+    );
+  }
+
+  @Post('assets')
+  @Permissions('assets.create')
+  @ApiOperation({ summary: 'Create a maintenance asset' })
+  @ApiCreatedResponse({ description: 'Asset created.' })
+  @ApiBadRequestResponse({ description: 'Invalid asset payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Linked room was not found.' })
+  @ApiConflictResponse({ description: 'Asset number already exists.' })
+  createAsset(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Body() createAssetDto: CreateAssetDto,
+  ) {
+    return this.maintenanceService.createAsset(currentUser, createAssetDto);
+  }
+
+  @Get('assets')
+  @Permissions('assets.read')
+  @ApiOperation({ summary: 'List maintenance assets' })
+  @ApiOkResponse({ description: 'Paginated assets returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listAssets(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: GetAssetsQueryDto,
+  ) {
+    return this.maintenanceService.listAssets(currentUser, query);
+  }
+
+  @Get('assets/:id')
+  @Permissions('assets.read')
+  @ApiOperation({ summary: 'Get one maintenance asset' })
+  @ApiOkResponse({ description: 'Asset returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Asset was not found.' })
+  getAssetById(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) assetId: number,
+  ) {
+    return this.maintenanceService.getAssetById(currentUser, assetId);
+  }
+
+  @Patch('assets/:id')
+  @Permissions('assets.update')
+  @ApiOperation({ summary: 'Update a maintenance asset' })
+  @ApiOkResponse({ description: 'Asset updated.' })
+  @ApiBadRequestResponse({ description: 'Invalid asset payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Asset or linked room was not found.' })
+  @ApiConflictResponse({
+    description:
+      'Asset number already exists or active tickets prevent status change.',
+  })
+  updateAsset(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) assetId: number,
+    @Body() updateAssetDto: UpdateAssetDto,
+  ) {
+    return this.maintenanceService.updateAsset(
+      currentUser,
+      assetId,
+      updateAssetDto,
+    );
+  }
+
+  @Delete('assets/:id')
+  @Permissions('assets.delete')
+  @ApiOperation({ summary: 'Deactivate a maintenance asset' })
+  @ApiOkResponse({ description: 'Asset deactivated.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Asset was not found.' })
+  @ApiConflictResponse({
+    description: 'Asset has active maintenance tickets.',
+  })
+  deactivateAsset(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) assetId: number,
+  ) {
+    return this.maintenanceService.deactivateAsset(currentUser, assetId);
+  }
+
+  @Post('preventive-plans')
+  @Permissions('preventive_maintenance.create')
+  @ApiOperation({ summary: 'Create a preventive maintenance plan' })
+  @ApiCreatedResponse({ description: 'Preventive maintenance plan created.' })
+  @ApiBadRequestResponse({ description: 'Invalid preventive plan payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Linked room or asset was not found.' })
+  createPreventivePlan(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Body() createPlanDto: CreatePreventiveMaintenancePlanDto,
+  ) {
+    return this.maintenanceService.createPreventivePlan(
+      currentUser,
+      createPlanDto,
+    );
+  }
+
+  @Get('preventive-plans')
+  @Permissions('preventive_maintenance.read')
+  @ApiOperation({ summary: 'List preventive maintenance plans' })
+  @ApiOkResponse({ description: 'Paginated preventive plans returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listPreventivePlans(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: GetPreventiveMaintenancePlansQueryDto,
+  ) {
+    return this.maintenanceService.listPreventivePlans(currentUser, query);
+  }
+
+  @Get('preventive-plans/:id')
+  @Permissions('preventive_maintenance.read')
+  @ApiOperation({ summary: 'Get one preventive maintenance plan' })
+  @ApiOkResponse({ description: 'Preventive maintenance plan returned.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Preventive maintenance plan was not found.',
+  })
+  getPreventivePlanById(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) planId: number,
+  ) {
+    return this.maintenanceService.getPreventivePlanById(currentUser, planId);
+  }
+
+  @Patch('preventive-plans/:id')
+  @Permissions('preventive_maintenance.update')
+  @ApiOperation({ summary: 'Update a preventive maintenance plan' })
+  @ApiOkResponse({ description: 'Preventive maintenance plan updated.' })
+  @ApiBadRequestResponse({ description: 'Invalid preventive plan payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Preventive plan, room, or asset was not found.',
+  })
+  updatePreventivePlan(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) planId: number,
+    @Body() updatePlanDto: UpdatePreventiveMaintenancePlanDto,
+  ) {
+    return this.maintenanceService.updatePreventivePlan(
+      currentUser,
+      planId,
+      updatePlanDto,
+    );
+  }
+
+  @Delete('preventive-plans/:id')
+  @Permissions('preventive_maintenance.delete')
+  @ApiOperation({ summary: 'Cancel a preventive maintenance plan' })
+  @ApiOkResponse({ description: 'Preventive maintenance plan cancelled.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Preventive maintenance plan was not found.',
+  })
+  deletePreventivePlan(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) planId: number,
+  ) {
+    return this.maintenanceService.deletePreventivePlan(currentUser, planId);
+  }
+
+  @Post('preventive-plans/:id/create-ticket')
+  @Permissions('maintenance.tickets.create')
+  @ApiOperation({
+    summary: 'Create a maintenance ticket from a preventive plan',
+  })
+  @ApiCreatedResponse({
+    description: 'Maintenance ticket created and next due date advanced.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid ticket options.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Preventive plan or assigned user was not found.',
+  })
+  @ApiConflictResponse({
+    description: 'Plan is inactive or already has an active ticket.',
+  })
+  createTicketFromPreventivePlan(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) planId: number,
+    @Body() createTicketDto: CreateTicketFromPreventivePlanDto,
+  ) {
+    return this.maintenanceService.createTicketFromPreventivePlan(
+      currentUser,
+      planId,
+      createTicketDto,
+    );
+  }
+
   @Patch('rooms/:roomId/mark-out-of-order')
   @Permissions('rooms.out_of_order.mark')
   @ApiOperation({ summary: 'Mark a room out of order from maintenance' })
