@@ -41,6 +41,8 @@ describe('MaintenanceController', () => {
     markRoomOutOfOrder: jest.Mock;
     markRoomUnderMaintenance: jest.Mock;
     clearRoomMaintenance: jest.Mock;
+    addTicketNote: jest.Mock;
+    addTicketPhoto: jest.Mock;
   };
 
   const currentUser = {
