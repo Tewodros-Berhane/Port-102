@@ -7,15 +7,19 @@ import {
 } from '@nestjs/common';
 
 import {
+  AssetStatus,
+  HousekeepingIssueStatus,
   MaintenanceIssueType,
   MaintenancePriority,
   MaintenanceTicketSource,
   MaintenanceTicketStatus,
+  PreventiveMaintenanceStatus,
   Prisma,
   RoomMaintenanceStatus,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
+import { HousekeepingIssuesRepository } from '../housekeeping/repositories/housekeeping-issues.repository';
 import type { RoomRecord } from '../rooms/repositories/rooms.repository';
 import { RoomsRepository } from '../rooms/repositories/rooms.repository';
 import { AssignMaintenanceTicketDto } from './dto/assign-maintenance-ticket.dto';
