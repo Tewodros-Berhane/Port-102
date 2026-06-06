@@ -224,14 +224,41 @@ describe('MaintenanceService', () => {
     runInTransaction: jest.Mock;
     listTickets: jest.Mock;
     findActiveUser: jest.Mock;
+    findActiveTicketBySource: jest.Mock;
+    countTickets: jest.Mock;
   };
   let assetsRepository: {
+    createAsset: jest.Mock;
+    findAsset: jest.Mock;
     findActiveAsset: jest.Mock;
+    findByAssetNumber: jest.Mock;
+    listAssets: jest.Mock;
+    updateAsset: jest.Mock;
+    countActiveTickets: jest.Mock;
+    countAssets: jest.Mock;
+  };
+  let maintenanceTicketNotesRepository: {
+    createNote: jest.Mock;
+  };
+  let maintenanceTicketPhotosRepository: {
+    createPhoto: jest.Mock;
+  };
+  let housekeepingIssuesRepository: {
+    findIssue: jest.Mock;
+  };
+  let preventiveMaintenancePlansRepository: {
+    createPlan: jest.Mock;
+    findPlan: jest.Mock;
+    findByPlanNumber: jest.Mock;
+    listPlans: jest.Mock;
+    updatePlan: jest.Mock;
+    countPlans: jest.Mock;
   };
   let roomsRepository: {
     findRoom: jest.Mock;
     updateRoom: jest.Mock;
     createStatusLogs: jest.Mock;
+    countRooms: jest.Mock;
   };
   let auditLogsService: {
     record: jest.Mock;
