@@ -14,7 +14,20 @@ import { MaintenanceService } from './maintenance.service';
 describe('MaintenanceController', () => {
   let controller: MaintenanceController;
   let maintenanceService: {
+    getDashboard: jest.Mock;
     createTicket: jest.Mock;
+    createTicketFromHousekeepingIssue: jest.Mock;
+    createAsset: jest.Mock;
+    listAssets: jest.Mock;
+    getAssetById: jest.Mock;
+    updateAsset: jest.Mock;
+    deactivateAsset: jest.Mock;
+    createPreventivePlan: jest.Mock;
+    listPreventivePlans: jest.Mock;
+    getPreventivePlanById: jest.Mock;
+    updatePreventivePlan: jest.Mock;
+    deletePreventivePlan: jest.Mock;
+    createTicketFromPreventivePlan: jest.Mock;
     listTickets: jest.Mock;
     listAssignedToMe: jest.Mock;
     getTicketById: jest.Mock;
