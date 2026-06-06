@@ -326,6 +326,10 @@ export class MaintenanceTicketsRepository {
     ]);
   }
 
+  countTickets(where: Prisma.MaintenanceTicketWhereInput) {
+    return this.prisma.maintenanceTicket.count({ where });
+  }
+
   findActiveUser(userId: number, client: UserClient = this.prisma) {
     return client.user.findFirst({
       where: {
