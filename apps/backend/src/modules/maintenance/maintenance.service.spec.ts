@@ -8,20 +8,26 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import {
   AssetStatus,
+  HousekeepingIssueStatus,
   MaintenanceIssueType,
   MaintenancePriority,
   MaintenanceTicketSource,
   MaintenanceTicketStatus,
+  PreventiveMaintenanceStatus,
   RoomCleaningStatus,
   RoomMaintenanceStatus,
   RoomOccupancyStatus,
   UserStatus,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { HousekeepingIssuesRepository } from '../housekeeping/repositories/housekeeping-issues.repository';
 import { RoomsRepository } from '../rooms/repositories/rooms.repository';
 import { MaintenanceService } from './maintenance.service';
 import { AssetsRepository } from './repositories/assets.repository';
+import { MaintenanceTicketNotesRepository } from './repositories/maintenance-ticket-notes.repository';
+import { MaintenanceTicketPhotosRepository } from './repositories/maintenance-ticket-photos.repository';
 import { MaintenanceTicketsRepository } from './repositories/maintenance-tickets.repository';
+import { PreventiveMaintenancePlansRepository } from './repositories/preventive-maintenance-plans.repository';
 
 const currentUser = {
   sub: 1,
