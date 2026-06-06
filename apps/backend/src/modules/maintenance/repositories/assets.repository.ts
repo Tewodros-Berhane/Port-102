@@ -41,6 +41,16 @@ type AssetClient = Pick<PrismaService | Prisma.TransactionClient, 'asset'>;
 export class AssetsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  createAsset(
+    data: Prisma.AssetUncheckedCreateInput,
+    client: AssetClient = this.prisma,
+  ) {
+    return client.asset.create({
+      data,
+      select: assetSelect,
+    });
+  }
+
   findAsset(assetId: number, client: AssetClient = this.prisma) {
     return client.asset.findUnique({
       where: {
