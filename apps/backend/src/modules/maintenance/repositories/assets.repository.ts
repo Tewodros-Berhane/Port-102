@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
-import { AssetStatus, Prisma } from '../../../generated/prisma/client';
+import {
+  AssetStatus,
+  MaintenanceTicketStatus,
+  Prisma,
+} from '../../../generated/prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 const assetSelect = {
