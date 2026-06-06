@@ -274,14 +274,41 @@ describe('MaintenanceService', () => {
       runInTransaction: jest.fn((callback) => callback({})),
       listTickets: jest.fn(),
       findActiveUser: jest.fn(),
+      findActiveTicketBySource: jest.fn(),
+      countTickets: jest.fn(),
     };
     assetsRepository = {
+      createAsset: jest.fn(),
+      findAsset: jest.fn(),
       findActiveAsset: jest.fn(),
+      findByAssetNumber: jest.fn(),
+      listAssets: jest.fn(),
+      updateAsset: jest.fn(),
+      countActiveTickets: jest.fn(),
+      countAssets: jest.fn(),
+    };
+    maintenanceTicketNotesRepository = {
+      createNote: jest.fn(),
+    };
+    maintenanceTicketPhotosRepository = {
+      createPhoto: jest.fn(),
+    };
+    housekeepingIssuesRepository = {
+      findIssue: jest.fn(),
+    };
+    preventiveMaintenancePlansRepository = {
+      createPlan: jest.fn(),
+      findPlan: jest.fn(),
+      findByPlanNumber: jest.fn(),
+      listPlans: jest.fn(),
+      updatePlan: jest.fn(),
+      countPlans: jest.fn(),
     };
     roomsRepository = {
       findRoom: jest.fn(),
       updateRoom: jest.fn(),
       createStatusLogs: jest.fn(),
+      countRooms: jest.fn(),
     };
     auditLogsService = {
       record: jest.fn(),
