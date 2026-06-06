@@ -97,6 +97,37 @@ const maintenanceTicketSelect = {
   cancelledBy: {
     select: userSummarySelect,
   },
+  notes: {
+    select: {
+      id: true,
+      ticketId: true,
+      authorUserId: true,
+      note: true,
+      createdAt: true,
+      author: {
+        select: userSummarySelect,
+      },
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  },
+  photos: {
+    select: {
+      id: true,
+      ticketId: true,
+      uploadedByUserId: true,
+      url: true,
+      description: true,
+      createdAt: true,
+      uploadedBy: {
+        select: userSummarySelect,
+      },
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  },
 } as const;
 
 export type MaintenanceTicketRecord = Prisma.MaintenanceTicketGetPayload<{
