@@ -63,6 +63,24 @@ describe('AssetsRepository', () => {
     );
   });
 
+  it('creates assets through PrismaService', async () => {
+    await repository.createAsset({
+      assetNumber: 'AST-0004',
+      name: 'Room 204 AC',
+      status: AssetStatus.ACTIVE,
+    });
+
+    expect(prisma.asset.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          assetNumber: 'AST-0004',
+          name: 'Room 204 AC',
+          status: AssetStatus.ACTIVE,
+        },
+      }),
+    );
+  });
+
   it('finds only active assets for ticket linking', async () => {
     await repository.findActiveAsset(4);
 
