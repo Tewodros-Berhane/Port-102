@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
-import { AssetStatus } from '../../../generated/prisma/client';
+import {
+  AssetStatus,
+  MaintenanceTicketStatus,
+} from '../../../generated/prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AssetsRepository } from './assets.repository';
 
