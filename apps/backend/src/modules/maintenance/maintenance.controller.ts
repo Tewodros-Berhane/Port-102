@@ -37,13 +37,23 @@ import { ApproveMaintenanceTicketDto } from './dto/approve-maintenance-ticket.dt
 import { CancelMaintenanceTicketDto } from './dto/cancel-maintenance-ticket.dto';
 import { ClearRoomMaintenanceDto } from './dto/clear-room-maintenance.dto';
 import { CompleteMaintenanceTicketDto } from './dto/complete-maintenance-ticket.dto';
+import { CreateAssetDto } from './dto/create-asset.dto';
 import { CreateMaintenanceTicketDto } from './dto/create-maintenance-ticket.dto';
+import { CreateMaintenanceTicketNoteDto } from './dto/create-maintenance-ticket-note.dto';
+import { CreatePreventiveMaintenancePlanDto } from './dto/create-preventive-maintenance-plan.dto';
+import { CreateTicketFromHousekeepingIssueDto } from './dto/create-ticket-from-housekeeping-issue.dto';
+import { CreateTicketFromPreventivePlanDto } from './dto/create-ticket-from-preventive-plan.dto';
+import { GetAssetsQueryDto } from './dto/get-assets-query.dto';
 import { GetMaintenanceTicketsQueryDto } from './dto/get-maintenance-tickets-query.dto';
+import { GetPreventiveMaintenancePlansQueryDto } from './dto/get-preventive-maintenance-plans-query.dto';
 import { MarkRoomOutOfOrderFromMaintenanceDto } from './dto/mark-room-out-of-order-from-maintenance.dto';
 import { MarkRoomUnderMaintenanceDto } from './dto/mark-room-under-maintenance.dto';
 import { RejectMaintenanceTicketDto } from './dto/reject-maintenance-ticket.dto';
 import { StartMaintenanceTicketDto } from './dto/start-maintenance-ticket.dto';
+import { UpdateAssetDto } from './dto/update-asset.dto';
 import { UpdateMaintenanceTicketDto } from './dto/update-maintenance-ticket.dto';
+import { UpdatePreventiveMaintenancePlanDto } from './dto/update-preventive-maintenance-plan.dto';
+import { UploadMaintenanceTicketPhotoDto } from './dto/upload-maintenance-ticket-photo.dto';
 import { MaintenanceService } from './maintenance.service';
 
 @ApiTags('Maintenance')
