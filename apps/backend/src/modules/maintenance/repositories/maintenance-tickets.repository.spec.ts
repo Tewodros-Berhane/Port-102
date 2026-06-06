@@ -33,6 +33,7 @@ describe('MaintenanceTicketsRepository', () => {
       maintenanceTicket: {
         create: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         update: jest.fn(),
         count: jest.fn(),
         findMany: jest.fn(),
