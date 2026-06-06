@@ -14,7 +14,7 @@ import { MaintenanceTicketsRepository } from './repositories/maintenance-tickets
 import { PreventiveMaintenancePlansRepository } from './repositories/preventive-maintenance-plans.repository';
 
 @Module({
-  imports: [PrismaModule, AuditLogsModule, RoomsModule],
+  imports: [PrismaModule, AuditLogsModule, RoomsModule, HousekeepingModule],
   controllers: [MaintenanceController],
   providers: [
     MaintenanceService,
