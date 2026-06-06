@@ -56,7 +56,20 @@ describe('MaintenanceController', () => {
 
   beforeEach(async () => {
     maintenanceService = {
+      getDashboard: jest.fn(),
       createTicket: jest.fn(),
+      createTicketFromHousekeepingIssue: jest.fn(),
+      createAsset: jest.fn(),
+      listAssets: jest.fn(),
+      getAssetById: jest.fn(),
+      updateAsset: jest.fn(),
+      deactivateAsset: jest.fn(),
+      createPreventivePlan: jest.fn(),
+      listPreventivePlans: jest.fn(),
+      getPreventivePlanById: jest.fn(),
+      updatePreventivePlan: jest.fn(),
+      deletePreventivePlan: jest.fn(),
+      createTicketFromPreventivePlan: jest.fn(),
       listTickets: jest.fn(),
       listAssignedToMe: jest.fn(),
       getTicketById: jest.fn(),
