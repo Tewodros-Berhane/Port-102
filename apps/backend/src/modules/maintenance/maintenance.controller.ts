@@ -111,7 +111,9 @@ export class MaintenanceController {
     'maintenance.tickets.read',
     'maintenance.tickets.read.assigned',
   )
-  @ApiOperation({ summary: 'List maintenance tickets assigned to current user' })
+  @ApiOperation({
+    summary: 'List maintenance tickets assigned to current user',
+  })
   @ApiOkResponse({ description: 'Assigned maintenance tickets returned.' })
   @ApiUnauthorizedResponse({ description: 'Authentication required.' })
   @ApiForbiddenResponse({ description: 'Missing required permission.' })
