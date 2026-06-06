@@ -83,6 +83,8 @@ describe('MaintenanceController', () => {
       markRoomOutOfOrder: jest.fn(),
       markRoomUnderMaintenance: jest.fn(),
       clearRoomMaintenance: jest.fn(),
+      addTicketNote: jest.fn(),
+      addTicketPhoto: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
