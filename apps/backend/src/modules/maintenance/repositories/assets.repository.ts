@@ -69,4 +69,144 @@ export class AssetsRepository {
       select: assetSelect,
     });
   }
+
+  findByAssetNumber(
+    assetNumber: string,
+    excludeAssetId?: number,
+    client: AssetClient = this.prisma,
+  ) {
+    return client.asset.findFirst({
+      where: {
+        assetNumber,
+        ...(excludeAssetId ? { id: { not: excludeAssetId } } : {}),
+      },
+      select: assetSelect,
+    });
+  }
+
+  listAssets({
+    skip,
+    take,
+    search,
+    status,
+    category,
+    roomId,
+  }: {
+    skip: number;
+    take: number;
+    search?: string;
+    status?: AssetStatus;
+    category?: string;
+    roomId?: number;
+  }) {
+    const where: Prisma.AssetWhereInput = {
+      ...(status ? { status } : {}),
+      ...(category
+        ? {
+            category: {
+              equals: category,
+              mode: 'insensitive',
+            },
+          }
+        : {}),
+      ...(roomId === undefined ? {} : { roomId }),
+      ...(search
+        ? {
+            OR: [
+              {
+                assetNumber: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                name: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                category: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                location: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                description: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                room: {
+                  OR: [
+                    {
+                      roomNumber: {
+                        contains: search,
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      displayName: {
+                        contains: search,
+                        mode: 'insensitive',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    return Promise.all([
+      this.prisma.asset.count({ where }),
+      this.prisma.asset.findMany({
+        where,
+        skip,
+        take,
+        select: assetSelect,
+        orderBy: [{ assetNumber: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
+  }
+
+  updateAsset(
+    assetId: number,
+    data: Prisma.AssetUncheckedUpdateInput,
+    client: AssetClient = this.prisma,
+  ) {
+    return client.asset.update({
+      where: {
+        id: assetId,
+      },
+      data,
+      select: assetSelect,
+    });
+  }
+
+  countActiveTickets(assetId: number) {
+    return this.prisma.maintenanceTicket.count({
+      where: {
+        assetId,
+        status: {
+          notIn: [
+            MaintenanceTicketStatus.APPROVED,
+            MaintenanceTicketStatus.CANCELLED,
+          ],
+        },
+      },
+    });
+  }
+
+  countAssets(where: Prisma.AssetWhereInput) {
+    return this.prisma.asset.count({ where });
+  }
 }
