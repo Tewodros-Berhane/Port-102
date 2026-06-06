@@ -17,6 +17,7 @@ describe('MaintenanceTicketsRepository', () => {
     maintenanceTicket: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      findFirst: jest.Mock;
       update: jest.Mock;
       count: jest.Mock;
       findMany: jest.Mock;
