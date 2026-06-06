@@ -328,6 +328,22 @@ describe('MaintenanceService', () => {
           useValue: assetsRepository,
         },
         {
+          provide: MaintenanceTicketNotesRepository,
+          useValue: maintenanceTicketNotesRepository,
+        },
+        {
+          provide: MaintenanceTicketPhotosRepository,
+          useValue: maintenanceTicketPhotosRepository,
+        },
+        {
+          provide: HousekeepingIssuesRepository,
+          useValue: housekeepingIssuesRepository,
+        },
+        {
+          provide: PreventiveMaintenancePlansRepository,
+          useValue: preventiveMaintenancePlansRepository,
+        },
+        {
           provide: RoomsRepository,
           useValue: roomsRepository,
         },
@@ -344,6 +360,71 @@ describe('MaintenanceService', () => {
   afterEach(() => {
     randomSpy.mockRestore();
     jest.useRealTimers();
+  });
+
+  it('returns maintenance dashboard counts', async () => {
+    maintenanceTicketsRepository.countTickets
+      .mockResolvedValueOnce(5)
+      .mockResolvedValueOnce(4)
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(2);
+    roomsRepository.countRooms
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(3);
+    assetsRepository.countAssets.mockResolvedValue(4);
+    preventiveMaintenancePlansRepository.countPlans.mockResolvedValue(5);
+
+    const result = await service.getDashboard(currentUser);
+
+    expect(result).toEqual({
+      openTickets: 5,
+      assignedTickets: 4,
+      inProgressTickets: 3,
+      completedPendingApproval: 2,
+      approvedToday: 1,
+      rejectedToday: 1,
+      urgentTickets: 2,
+      outOfOrderRooms: 2,
+      underMaintenanceRooms: 3,
+      assetsUnderMaintenance: 4,
+      overduePreventivePlans: 5,
+    });
+    expect(maintenanceTicketsRepository.countTickets).toHaveBeenNthCalledWith(
+      1,
+      {
+        status: MaintenanceTicketStatus.OPEN,
+      },
+    );
+    expect(maintenanceTicketsRepository.countTickets).toHaveBeenNthCalledWith(
+      7,
+      {
+        priority: MaintenancePriority.URGENT,
+        status: {
+          notIn: [
+            MaintenanceTicketStatus.APPROVED,
+            MaintenanceTicketStatus.CANCELLED,
+          ],
+        },
+      },
+    );
+    expect(roomsRepository.countRooms).toHaveBeenCalledWith({
+      isActive: true,
+      maintenanceStatus: RoomMaintenanceStatus.OUT_OF_ORDER,
+    });
+    expect(assetsRepository.countAssets).toHaveBeenCalledWith({
+      status: AssetStatus.UNDER_MAINTENANCE,
+    });
+    expect(
+      preventiveMaintenancePlansRepository.countPlans,
+    ).toHaveBeenCalledWith({
+      status: PreventiveMaintenanceStatus.ACTIVE,
+      nextDueDate: {
+        lt: now,
+      },
+    });
   });
 
   it('creates an open maintenance ticket', async () => {
@@ -408,6 +489,501 @@ describe('MaintenanceService', () => {
         assignedAt: expect.any(Date),
       }),
     );
+  });
+
+  it('creates a maintenance ticket from an open housekeeping issue', async () => {
+    const issue = createHousekeepingIssue();
+    housekeepingIssuesRepository.findIssue.mockResolvedValue(issue);
+    roomsRepository.findRoom.mockResolvedValue(createRoom());
+    maintenanceTicketsRepository.findActiveTicketBySource.mockResolvedValue(
+      null,
+    );
+    maintenanceTicketsRepository.findActiveUser.mockResolvedValue(createUser());
+    maintenanceTicketsRepository.findByTicketNumber.mockResolvedValue(null);
+    maintenanceTicketsRepository.createTicket.mockResolvedValue(
+      createTicket({
+        source: MaintenanceTicketSource.HOUSEKEEPING,
+        sourceType: 'HOUSEKEEPING_ISSUE',
+        sourceId: issue.id,
+        title: issue.title,
+        description: issue.description,
+        status: MaintenanceTicketStatus.ASSIGNED,
+        priority: MaintenancePriority.HIGH,
+        assignedToUserId: 9,
+        assignedByUserId: currentUser.sub,
+        assignedAt: now,
+        assignedTo: createUser(),
+        assignedBy: createUser({ id: currentUser.sub }),
+      }),
+    );
+
+    const result = await service.createTicketFromHousekeepingIssue(
+      currentUser,
+      issue.id,
+      {
+        priority: MaintenancePriority.HIGH,
+        assignedToUserId: 9,
+      },
+    );
+
+    expect(
+      maintenanceTicketsRepository.findActiveTicketBySource,
+    ).toHaveBeenCalledWith({
+      sourceType: 'HOUSEKEEPING_ISSUE',
+      sourceId: issue.id,
+    });
+    expect(maintenanceTicketsRepository.createTicket).toHaveBeenCalledWith(
+      expect.objectContaining({
+        roomId: issue.roomId,
+        source: MaintenanceTicketSource.HOUSEKEEPING,
+        sourceType: 'HOUSEKEEPING_ISSUE',
+        sourceId: issue.id,
+        title: issue.title,
+        description: issue.description,
+        status: MaintenanceTicketStatus.ASSIGNED,
+        priority: MaintenancePriority.HIGH,
+        reportedByUserId: currentUser.sub,
+        assignedToUserId: 9,
+      }),
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.tickets.created_from_housekeeping_issue',
+        entityType: 'MaintenanceTicket',
+        entityId: '30',
+      }),
+    );
+    expect(result.sourceType).toBe('HOUSEKEEPING_ISSUE');
+  });
+
+  it('rejects duplicate active tickets for a housekeeping issue', async () => {
+    const issue = createHousekeepingIssue();
+    housekeepingIssuesRepository.findIssue.mockResolvedValue(issue);
+    roomsRepository.findRoom.mockResolvedValue(createRoom());
+    maintenanceTicketsRepository.findActiveTicketBySource.mockResolvedValue(
+      createTicket({
+        source: MaintenanceTicketSource.HOUSEKEEPING,
+        sourceType: 'HOUSEKEEPING_ISSUE',
+        sourceId: issue.id,
+      }),
+    );
+
+    await expect(
+      service.createTicketFromHousekeepingIssue(currentUser, issue.id, {}),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(maintenanceTicketsRepository.createTicket).not.toHaveBeenCalled();
+  });
+
+  it('rejects housekeeping issues that are not open', async () => {
+    housekeepingIssuesRepository.findIssue.mockResolvedValue(
+      createHousekeepingIssue({
+        status: HousekeepingIssueStatus.RESOLVED,
+      }),
+    );
+
+    await expect(
+      service.createTicketFromHousekeepingIssue(currentUser, 19, {}),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('rejects missing housekeeping issues', async () => {
+    housekeepingIssuesRepository.findIssue.mockResolvedValue(null);
+
+    await expect(
+      service.createTicketFromHousekeepingIssue(currentUser, 404, {}),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('creates an asset linked to an active room', async () => {
+    roomsRepository.findRoom.mockResolvedValue(createRoom());
+    assetsRepository.findByAssetNumber.mockResolvedValue(null);
+    assetsRepository.createAsset.mockResolvedValue(createAsset());
+
+    const result = await service.createAsset(currentUser, {
+      assetNumber: ' AST-0004 ',
+      name: ' Room 204 AC ',
+      category: ' HVAC ',
+      roomId: 12,
+      purchaseDate: '2024-05-20',
+    });
+
+    expect(assetsRepository.createAsset).toHaveBeenCalledWith({
+      assetNumber: 'AST-0004',
+      name: 'Room 204 AC',
+      category: 'HVAC',
+      location: null,
+      roomId: 12,
+      status: AssetStatus.ACTIVE,
+      description: null,
+      purchaseDate: new Date('2024-05-20'),
+      warrantyUntil: null,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.assets.created',
+        entityType: 'Asset',
+        entityId: '4',
+      }),
+    );
+    expect(result.assetNumber).toBe('AST-0004');
+  });
+
+  it('rejects duplicate asset numbers', async () => {
+    assetsRepository.findByAssetNumber.mockResolvedValue(createAsset());
+
+    await expect(
+      service.createAsset(currentUser, {
+        assetNumber: 'AST-0004',
+        name: 'Duplicate asset',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(assetsRepository.createAsset).not.toHaveBeenCalled();
+  });
+
+  it('lists assets with pagination and filters', async () => {
+    assetsRepository.listAssets.mockResolvedValue([1, [createAsset()]]);
+
+    const result = await service.listAssets(currentUser, {
+      page: 2,
+      limit: 10,
+      search: ' AC ',
+      status: AssetStatus.ACTIVE,
+      category: ' HVAC ',
+      roomId: 12,
+    });
+
+    expect(assetsRepository.listAssets).toHaveBeenCalledWith({
+      skip: 10,
+      take: 10,
+      search: 'AC',
+      status: AssetStatus.ACTIVE,
+      category: 'HVAC',
+      roomId: 12,
+    });
+    expect(result.pagination).toEqual({
+      page: 2,
+      limit: 10,
+      total: 1,
+      totalPages: 1,
+    });
+  });
+
+  it('returns asset details and rejects missing assets', async () => {
+    assetsRepository.findAsset.mockResolvedValueOnce(createAsset());
+
+    await expect(service.getAssetById(currentUser, 4)).resolves.toEqual(
+      expect.objectContaining({
+        id: 4,
+        assetNumber: 'AST-0004',
+      }),
+    );
+
+    assetsRepository.findAsset.mockResolvedValueOnce(null);
+
+    await expect(service.getAssetById(currentUser, 404)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('updates asset details and room linkage', async () => {
+    assetsRepository.findAsset.mockResolvedValue(createAsset());
+    assetsRepository.findByAssetNumber.mockResolvedValue(null);
+    roomsRepository.findRoom.mockResolvedValue(createRoom({ id: 13 }));
+    assetsRepository.updateAsset.mockResolvedValue(
+      createAsset({
+        assetNumber: 'AST-HVAC-0004',
+        name: 'Updated AC',
+        roomId: 13,
+        status: AssetStatus.UNDER_MAINTENANCE,
+      }),
+    );
+
+    const result = await service.updateAsset(currentUser, 4, {
+      assetNumber: 'AST-HVAC-0004',
+      name: ' Updated AC ',
+      roomId: 13,
+      status: AssetStatus.UNDER_MAINTENANCE,
+    });
+
+    expect(assetsRepository.updateAsset).toHaveBeenCalledWith(4, {
+      assetNumber: 'AST-HVAC-0004',
+      name: 'Updated AC',
+      roomId: 13,
+      status: AssetStatus.UNDER_MAINTENANCE,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.assets.updated',
+        entityType: 'Asset',
+      }),
+    );
+    expect(result.status).toBe(AssetStatus.UNDER_MAINTENANCE);
+  });
+
+  it('soft-deactivates an asset without active tickets', async () => {
+    assetsRepository.findAsset.mockResolvedValue(createAsset());
+    assetsRepository.countActiveTickets.mockResolvedValue(0);
+    assetsRepository.updateAsset.mockResolvedValue(
+      createAsset({ status: AssetStatus.INACTIVE }),
+    );
+
+    const result = await service.deactivateAsset(currentUser, 4);
+
+    expect(assetsRepository.updateAsset).toHaveBeenCalledWith(4, {
+      status: AssetStatus.INACTIVE,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.assets.deactivated',
+        entityType: 'Asset',
+      }),
+    );
+    expect(result.status).toBe(AssetStatus.INACTIVE);
+  });
+
+  it('rejects asset deactivation while active tickets exist', async () => {
+    assetsRepository.findAsset.mockResolvedValue(createAsset());
+    assetsRepository.countActiveTickets.mockResolvedValue(1);
+
+    await expect(
+      service.deactivateAsset(currentUser, 4),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(assetsRepository.updateAsset).not.toHaveBeenCalled();
+  });
+
+  it('creates a preventive maintenance plan linked to an asset and room', async () => {
+    assetsRepository.findActiveAsset.mockResolvedValue(createAsset());
+    roomsRepository.findRoom.mockResolvedValue(createRoom());
+    preventiveMaintenancePlansRepository.findByPlanNumber.mockResolvedValue(
+      null,
+    );
+    preventiveMaintenancePlansRepository.createPlan.mockResolvedValue(
+      createPreventivePlan(),
+    );
+
+    const result = await service.createPreventivePlan(currentUser, {
+      title: ' Quarterly AC service ',
+      description: ' Inspect filters and drain line. ',
+      assetId: 4,
+      roomId: 12,
+      intervalDays: 90,
+      nextDueDate: '2026-09-01',
+    });
+
+    expect(
+      preventiveMaintenancePlansRepository.createPlan,
+    ).toHaveBeenCalledWith({
+      planNumber: 'PMP-20260604-123450',
+      assetId: 4,
+      roomId: 12,
+      title: 'Quarterly AC service',
+      description: 'Inspect filters and drain line.',
+      status: PreventiveMaintenanceStatus.ACTIVE,
+      intervalDays: 90,
+      nextDueDate: new Date('2026-09-01'),
+      createdByUserId: 1,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.preventive_plans.created',
+        entityType: 'PreventiveMaintenancePlan',
+        entityId: '6',
+      }),
+    );
+    expect(result.planNumber).toBe('PMP-20260604-123450');
+  });
+
+  it('requires a preventive plan to link to an asset or room', async () => {
+    await expect(
+      service.createPreventivePlan(currentUser, {
+        title: 'General inspection',
+        intervalDays: 30,
+        nextDueDate: '2026-07-01',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('lists and returns preventive maintenance plans', async () => {
+    const plan = createPreventivePlan();
+    preventiveMaintenancePlansRepository.listPlans.mockResolvedValue([
+      1,
+      [plan],
+    ]);
+    preventiveMaintenancePlansRepository.findPlan.mockResolvedValue(plan);
+
+    const result = await service.listPreventivePlans(currentUser, {
+      page: 2,
+      limit: 10,
+      search: ' AC ',
+      status: PreventiveMaintenanceStatus.ACTIVE,
+      assetId: 4,
+      roomId: 12,
+      dueFrom: '2026-06-01',
+      dueTo: '2026-09-30',
+    });
+
+    expect(preventiveMaintenancePlansRepository.listPlans).toHaveBeenCalledWith(
+      {
+        skip: 10,
+        take: 10,
+        search: 'AC',
+        status: PreventiveMaintenanceStatus.ACTIVE,
+        assetId: 4,
+        roomId: 12,
+        dueFrom: new Date('2026-06-01'),
+        dueTo: new Date('2026-09-30'),
+      },
+    );
+    expect(result.pagination.total).toBe(1);
+    await expect(
+      service.getPreventivePlanById(currentUser, 6),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 6,
+        planNumber: 'PMP-20260604-123450',
+      }),
+    );
+  });
+
+  it('updates and soft-deletes a preventive maintenance plan', async () => {
+    preventiveMaintenancePlansRepository.findPlan.mockResolvedValue(
+      createPreventivePlan(),
+    );
+    preventiveMaintenancePlansRepository.updatePlan
+      .mockResolvedValueOnce(
+        createPreventivePlan({
+          intervalDays: 60,
+          status: PreventiveMaintenanceStatus.PAUSED,
+        }),
+      )
+      .mockResolvedValueOnce(
+        createPreventivePlan({
+          status: PreventiveMaintenanceStatus.CANCELLED,
+        }),
+      );
+
+    const updated = await service.updatePreventivePlan(currentUser, 6, {
+      intervalDays: 60,
+      status: PreventiveMaintenanceStatus.PAUSED,
+    });
+    const deleted = await service.deletePreventivePlan(currentUser, 6);
+
+    expect(
+      preventiveMaintenancePlansRepository.updatePlan,
+    ).toHaveBeenCalledWith(6, {
+      intervalDays: 60,
+      status: PreventiveMaintenanceStatus.PAUSED,
+    });
+    expect(
+      preventiveMaintenancePlansRepository.updatePlan,
+    ).toHaveBeenCalledWith(6, {
+      status: PreventiveMaintenanceStatus.CANCELLED,
+    });
+    expect(updated.status).toBe(PreventiveMaintenanceStatus.PAUSED);
+    expect(deleted.status).toBe(PreventiveMaintenanceStatus.CANCELLED);
+  });
+
+  it('prevents updates that remove every preventive plan linkage', async () => {
+    preventiveMaintenancePlansRepository.findPlan.mockResolvedValue(
+      createPreventivePlan({
+        assetId: 4,
+        roomId: null,
+        room: null,
+      }),
+    );
+
+    await expect(
+      service.updatePreventivePlan(currentUser, 6, {
+        assetId: null,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('creates a ticket from an active preventive plan and advances its due date', async () => {
+    const plan = createPreventivePlan();
+    const advancedPlan = createPreventivePlan({
+      nextDueDate: new Date('2026-11-30T00:00:00.000Z'),
+    });
+    const ticket = createTicket({
+      source: MaintenanceTicketSource.PREVENTIVE,
+      sourceType: 'PREVENTIVE_PLAN',
+      sourceId: plan.id,
+      assetId: plan.assetId,
+      roomId: plan.roomId,
+      title: plan.title,
+      description: plan.description,
+    });
+    preventiveMaintenancePlansRepository.findPlan.mockResolvedValue(plan);
+    maintenanceTicketsRepository.findActiveTicketBySource.mockResolvedValue(
+      null,
+    );
+    maintenanceTicketsRepository.findByTicketNumber.mockResolvedValue(null);
+    maintenanceTicketsRepository.createTicket.mockResolvedValue(ticket);
+    preventiveMaintenancePlansRepository.updatePlan.mockResolvedValue(
+      advancedPlan,
+    );
+
+    const result = await service.createTicketFromPreventivePlan(
+      currentUser,
+      6,
+      {
+        issueType: MaintenanceIssueType.HVAC,
+        priority: MaintenancePriority.NORMAL,
+      },
+    );
+
+    expect(maintenanceTicketsRepository.runInTransaction).toHaveBeenCalled();
+    expect(maintenanceTicketsRepository.createTicket).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: MaintenanceTicketSource.PREVENTIVE,
+        sourceType: 'PREVENTIVE_PLAN',
+        sourceId: 6,
+        assetId: 4,
+        roomId: 12,
+        title: plan.title,
+      }),
+      {},
+    );
+    expect(
+      preventiveMaintenancePlansRepository.updatePlan,
+    ).toHaveBeenCalledWith(
+      6,
+      {
+        nextDueDate: new Date('2026-11-30T00:00:00.000Z'),
+      },
+      {},
+    );
+    expect(result.ticket.sourceType).toBe('PREVENTIVE_PLAN');
+    expect(result.preventivePlan.nextDueDate).toEqual(
+      new Date('2026-11-30T00:00:00.000Z'),
+    );
+  });
+
+  it('rejects ticket creation for inactive or already-ticketed preventive plans', async () => {
+    preventiveMaintenancePlansRepository.findPlan.mockResolvedValueOnce(
+      createPreventivePlan({
+        status: PreventiveMaintenanceStatus.PAUSED,
+      }),
+    );
+
+    await expect(
+      service.createTicketFromPreventivePlan(currentUser, 6, {}),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    preventiveMaintenancePlansRepository.findPlan.mockResolvedValueOnce(
+      createPreventivePlan(),
+    );
+    maintenanceTicketsRepository.findActiveTicketBySource.mockResolvedValue(
+      createTicket({
+        source: MaintenanceTicketSource.PREVENTIVE,
+        sourceType: 'PREVENTIVE_PLAN',
+        sourceId: 6,
+      }),
+    );
+
+    await expect(
+      service.createTicketFromPreventivePlan(currentUser, 6, {}),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('rejects inactive rooms', async () => {
@@ -520,9 +1096,9 @@ describe('MaintenanceService', () => {
   it('throws when ticket details are missing', async () => {
     maintenanceTicketsRepository.findTicket.mockResolvedValue(null);
 
-    await expect(service.getTicketById(currentUser, 404)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.getTicketById(currentUser, 404),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('assigns a ticket to an active user', async () => {
@@ -1151,5 +1727,124 @@ describe('MaintenanceService', () => {
     await expect(
       service.markRoomUnderMaintenance(currentUser, 12, {}),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('adds a note to an assigned maintenance ticket', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        assignedToUserId: currentUser.sub,
+      }),
+    );
+    maintenanceTicketNotesRepository.createNote.mockResolvedValue({
+      id: 71,
+      ticketId: 30,
+      authorUserId: currentUser.sub,
+      note: 'Pump is blocked.',
+      createdAt: now,
+      author: createUser({ id: currentUser.sub }),
+    });
+
+    const result = await service.addTicketNote(
+      currentUser,
+      ['maintenance.tickets.update.assigned'],
+      30,
+      {
+        note: ' Pump is blocked. ',
+      },
+    );
+
+    expect(maintenanceTicketNotesRepository.createNote).toHaveBeenCalledWith({
+      ticketId: 30,
+      authorUserId: currentUser.sub,
+      note: 'Pump is blocked.',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.tickets.note_added',
+        entityType: 'MaintenanceTicketNote',
+        entityId: '71',
+      }),
+    );
+    expect(result.note).toBe('Pump is blocked.');
+  });
+
+  it('rejects assigned-only notes for unassigned users', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        assignedToUserId: 9,
+      }),
+    );
+
+    await expect(
+      service.addTicketNote(
+        currentUser,
+        ['maintenance.tickets.update.assigned'],
+        30,
+        {
+          note: 'Diagnostic note.',
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('adds a photo to an assigned maintenance ticket', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        assignedToUserId: currentUser.sub,
+      }),
+    );
+    maintenanceTicketPhotosRepository.createPhoto.mockResolvedValue({
+      id: 81,
+      ticketId: 30,
+      uploadedByUserId: currentUser.sub,
+      url: 'https://files.example.com/leak.jpg',
+      description: 'Leak below the AC.',
+      createdAt: now,
+      uploadedBy: createUser({ id: currentUser.sub }),
+    });
+
+    const result = await service.addTicketPhoto(
+      currentUser,
+      ['maintenance.photos.upload', 'maintenance.tickets.update.assigned'],
+      30,
+      {
+        url: 'https://files.example.com/leak.jpg',
+        description: ' Leak below the AC. ',
+      },
+    );
+
+    expect(maintenanceTicketPhotosRepository.createPhoto).toHaveBeenCalledWith({
+      ticketId: 30,
+      uploadedByUserId: currentUser.sub,
+      url: 'https://files.example.com/leak.jpg',
+      description: 'Leak below the AC.',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.tickets.photo_added',
+        entityType: 'MaintenanceTicketPhoto',
+        entityId: '81',
+      }),
+    );
+    expect(result.url).toBe('https://files.example.com/leak.jpg');
+  });
+
+  it('rejects assigned-only photos for unassigned users', async () => {
+    maintenanceTicketsRepository.findTicket.mockResolvedValue(
+      createTicket({
+        assignedToUserId: 9,
+      }),
+    );
+
+    await expect(
+      service.addTicketPhoto(
+        currentUser,
+        ['maintenance.photos.upload', 'maintenance.tickets.update.assigned'],
+        30,
+        {
+          url: 'https://files.example.com/leak.jpg',
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

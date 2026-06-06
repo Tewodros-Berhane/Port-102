@@ -93,4 +93,97 @@ describe('AssetsRepository', () => {
       }),
     );
   });
+
+  it('finds assets by unique asset number with an optional exclusion', async () => {
+    await repository.findByAssetNumber('AST-0004', 4);
+
+    expect(prisma.asset.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          assetNumber: 'AST-0004',
+          id: {
+            not: 4,
+          },
+        },
+      }),
+    );
+  });
+
+  it('lists assets with pagination and filters', async () => {
+    prisma.asset.count.mockResolvedValue(0);
+    prisma.asset.findMany.mockResolvedValue([]);
+
+    await repository.listAssets({
+      skip: 10,
+      take: 10,
+      search: 'AC',
+      status: AssetStatus.ACTIVE,
+      category: 'HVAC',
+      roomId: 12,
+    });
+
+    expect(prisma.asset.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        status: AssetStatus.ACTIVE,
+        roomId: 12,
+        category: {
+          equals: 'HVAC',
+          mode: 'insensitive',
+        },
+        OR: expect.any(Array),
+      }),
+    });
+    expect(prisma.asset.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 10,
+        take: 10,
+        orderBy: [{ assetNumber: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
+  it('updates assets through PrismaService', async () => {
+    await repository.updateAsset(4, {
+      status: AssetStatus.INACTIVE,
+    });
+
+    expect(prisma.asset.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 4,
+        },
+        data: {
+          status: AssetStatus.INACTIVE,
+        },
+      }),
+    );
+  });
+
+  it('counts non-terminal tickets linked to an asset', async () => {
+    await repository.countActiveTickets(4);
+
+    expect(prisma.maintenanceTicket.count).toHaveBeenCalledWith({
+      where: {
+        assetId: 4,
+        status: {
+          notIn: [
+            MaintenanceTicketStatus.APPROVED,
+            MaintenanceTicketStatus.CANCELLED,
+          ],
+        },
+      },
+    });
+  });
+
+  it('counts assets for dashboard summaries', async () => {
+    await repository.countAssets({
+      status: AssetStatus.UNDER_MAINTENANCE,
+    });
+
+    expect(prisma.asset.count).toHaveBeenCalledWith({
+      where: {
+        status: AssetStatus.UNDER_MAINTENANCE,
+      },
+    });
+  });
 });

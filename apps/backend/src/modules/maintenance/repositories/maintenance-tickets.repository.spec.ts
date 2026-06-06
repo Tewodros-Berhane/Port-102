@@ -116,6 +116,29 @@ describe('MaintenanceTicketsRepository', () => {
     );
   });
 
+  it('finds active tickets by external source', async () => {
+    await repository.findActiveTicketBySource({
+      sourceType: 'HOUSEKEEPING_ISSUE',
+      sourceId: 19,
+    });
+
+    expect(prisma.maintenanceTicket.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          sourceType: 'HOUSEKEEPING_ISSUE',
+          sourceId: 19,
+          status: {
+            notIn: [
+              MaintenanceTicketStatus.APPROVED,
+              MaintenanceTicketStatus.CANCELLED,
+            ],
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
   it('updates tickets through PrismaService', async () => {
     await repository.updateTicket(30, {
       assignedToUserId: 9,
@@ -190,5 +213,17 @@ describe('MaintenanceTicketsRepository', () => {
         },
       }),
     );
+  });
+
+  it('counts tickets for dashboard summaries', async () => {
+    await repository.countTickets({
+      status: MaintenanceTicketStatus.OPEN,
+    });
+
+    expect(prisma.maintenanceTicket.count).toHaveBeenCalledWith({
+      where: {
+        status: MaintenanceTicketStatus.OPEN,
+      },
+    });
   });
 });

@@ -427,6 +427,59 @@ export class MaintenanceController {
     return this.maintenanceService.getTicketById(currentUser, ticketId);
   }
 
+  @Post('tickets/:id/notes')
+  @AnyPermissions(
+    'maintenance.tickets.update',
+    'maintenance.tickets.update.assigned',
+  )
+  @ApiOperation({ summary: 'Add a note to a maintenance ticket' })
+  @ApiCreatedResponse({ description: 'Maintenance ticket note added.' })
+  @ApiBadRequestResponse({ description: 'Invalid maintenance note payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({
+    description:
+      'Missing permission or ticket is not assigned to current user.',
+  })
+  @ApiNotFoundResponse({ description: 'Maintenance ticket was not found.' })
+  addTicketNote(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @CurrentPermissions() permissionKeys: string[],
+    @Param('id', ParseIntPipe) ticketId: number,
+    @Body() createMaintenanceTicketNoteDto: CreateMaintenanceTicketNoteDto,
+  ) {
+    return this.maintenanceService.addTicketNote(
+      currentUser,
+      permissionKeys,
+      ticketId,
+      createMaintenanceTicketNoteDto,
+    );
+  }
+
+  @Post('tickets/:id/photos')
+  @Permissions('maintenance.photos.upload')
+  @ApiOperation({ summary: 'Attach a photo URL to a maintenance ticket' })
+  @ApiCreatedResponse({ description: 'Maintenance ticket photo added.' })
+  @ApiBadRequestResponse({ description: 'Invalid maintenance photo payload.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({
+    description:
+      'Missing photo permission or ticket is not assigned to current user.',
+  })
+  @ApiNotFoundResponse({ description: 'Maintenance ticket was not found.' })
+  addTicketPhoto(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @CurrentPermissions() permissionKeys: string[],
+    @Param('id', ParseIntPipe) ticketId: number,
+    @Body() uploadMaintenanceTicketPhotoDto: UploadMaintenanceTicketPhotoDto,
+  ) {
+    return this.maintenanceService.addTicketPhoto(
+      currentUser,
+      permissionKeys,
+      ticketId,
+      uploadMaintenanceTicketPhotoDto,
+    );
+  }
+
   @Patch('tickets/:id')
   @AnyPermissions(
     'maintenance.tickets.update',
@@ -440,7 +493,8 @@ export class MaintenanceController {
   })
   @ApiUnauthorizedResponse({ description: 'Authentication required.' })
   @ApiForbiddenResponse({
-    description: 'Missing permission or ticket is not assigned to current user.',
+    description:
+      'Missing permission or ticket is not assigned to current user.',
   })
   @ApiNotFoundResponse({
     description: 'Maintenance ticket, room, or asset was not found.',
@@ -497,7 +551,8 @@ export class MaintenanceController {
   })
   @ApiUnauthorizedResponse({ description: 'Authentication required.' })
   @ApiForbiddenResponse({
-    description: 'Missing permission or ticket is not assigned to current user.',
+    description:
+      'Missing permission or ticket is not assigned to current user.',
   })
   @ApiNotFoundResponse({ description: 'Maintenance ticket was not found.' })
   startTicket(
@@ -529,7 +584,8 @@ export class MaintenanceController {
   })
   @ApiUnauthorizedResponse({ description: 'Authentication required.' })
   @ApiForbiddenResponse({
-    description: 'Missing permission or ticket is not assigned to current user.',
+    description:
+      'Missing permission or ticket is not assigned to current user.',
   })
   @ApiNotFoundResponse({ description: 'Maintenance ticket was not found.' })
   completeTicket(

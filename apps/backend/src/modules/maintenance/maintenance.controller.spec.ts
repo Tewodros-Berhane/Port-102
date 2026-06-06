@@ -224,6 +224,87 @@ describe('MaintenanceController', () => {
         MaintenanceController.prototype.clearRoomMaintenance,
       ),
     ).toEqual(['rooms.out_of_order.clear']);
+    expect(
+      Reflect.getMetadata(
+        ANY_REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.addTicketNote,
+      ),
+    ).toEqual([
+      'maintenance.tickets.update',
+      'maintenance.tickets.update.assigned',
+    ]);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.addTicketPhoto,
+      ),
+    ).toEqual(['maintenance.photos.upload']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.createAsset,
+      ),
+    ).toEqual(['assets.create']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.listAssets,
+      ),
+    ).toEqual(['assets.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.getAssetById,
+      ),
+    ).toEqual(['assets.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.updateAsset,
+      ),
+    ).toEqual(['assets.update']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.deactivateAsset,
+      ),
+    ).toEqual(['assets.delete']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.createPreventivePlan,
+      ),
+    ).toEqual(['preventive_maintenance.create']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.listPreventivePlans,
+      ),
+    ).toEqual(['preventive_maintenance.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.getPreventivePlanById,
+      ),
+    ).toEqual(['preventive_maintenance.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.updatePreventivePlan,
+      ),
+    ).toEqual(['preventive_maintenance.update']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.deletePreventivePlan,
+      ),
+    ).toEqual(['preventive_maintenance.delete']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.createTicketFromPreventivePlan,
+      ),
+    ).toEqual(['maintenance.tickets.create']);
   });
 
   it('delegates ticket creation to the service', async () => {
@@ -244,6 +325,17 @@ describe('MaintenanceController', () => {
       currentUser,
       dto,
     );
+  });
+
+  it('delegates dashboard retrieval to the service', async () => {
+    const response = {
+      openTickets: 4,
+      assignedTickets: 3,
+    };
+    maintenanceService.getDashboard.mockResolvedValue(response);
+
+    await expect(controller.getDashboard(currentUser)).resolves.toBe(response);
+    expect(maintenanceService.getDashboard).toHaveBeenCalledWith(currentUser);
   });
 
   it('delegates ticket listing to the service', async () => {
@@ -269,6 +361,219 @@ describe('MaintenanceController', () => {
       currentUser,
       query,
     );
+  });
+
+  it('delegates housekeeping issue conversion to the service', async () => {
+    const dto = {
+      priority: 'HIGH' as const,
+    };
+    const response = {
+      id: 44,
+      sourceType: 'HOUSEKEEPING_ISSUE',
+    };
+    maintenanceService.createTicketFromHousekeepingIssue.mockResolvedValue(
+      response,
+    );
+
+    await expect(
+      controller.createTicketFromHousekeepingIssue(currentUser, 19, dto),
+    ).resolves.toBe(response);
+    expect(
+      maintenanceService.createTicketFromHousekeepingIssue,
+    ).toHaveBeenCalledWith(currentUser, 19, dto);
+  });
+
+  it('delegates asset creation to the service', async () => {
+    const dto = {
+      assetNumber: 'AST-0004',
+      name: 'Room 204 AC',
+      roomId: 12,
+    };
+    const response = {
+      id: 4,
+      assetNumber: dto.assetNumber,
+    };
+    maintenanceService.createAsset.mockResolvedValue(response);
+
+    await expect(controller.createAsset(currentUser, dto)).resolves.toBe(
+      response,
+    );
+    expect(maintenanceService.createAsset).toHaveBeenCalledWith(
+      currentUser,
+      dto,
+    );
+  });
+
+  it('delegates asset listing and detail lookup to the service', async () => {
+    const query = {
+      page: 1,
+      limit: 20,
+    };
+    const listResponse = {
+      items: [],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0,
+      },
+    };
+    const detailResponse = {
+      id: 4,
+      assetNumber: 'AST-0004',
+    };
+    maintenanceService.listAssets.mockResolvedValue(listResponse);
+    maintenanceService.getAssetById.mockResolvedValue(detailResponse);
+
+    await expect(controller.listAssets(currentUser, query)).resolves.toBe(
+      listResponse,
+    );
+    await expect(controller.getAssetById(currentUser, 4)).resolves.toBe(
+      detailResponse,
+    );
+    expect(maintenanceService.listAssets).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+    expect(maintenanceService.getAssetById).toHaveBeenCalledWith(
+      currentUser,
+      4,
+    );
+  });
+
+  it('delegates asset update and deactivation to the service', async () => {
+    const dto = {
+      name: 'Updated AC',
+    };
+    const updateResponse = {
+      id: 4,
+      name: dto.name,
+    };
+    const deactivateResponse = {
+      id: 4,
+      status: 'INACTIVE',
+    };
+    maintenanceService.updateAsset.mockResolvedValue(updateResponse);
+    maintenanceService.deactivateAsset.mockResolvedValue(deactivateResponse);
+
+    await expect(controller.updateAsset(currentUser, 4, dto)).resolves.toBe(
+      updateResponse,
+    );
+    await expect(controller.deactivateAsset(currentUser, 4)).resolves.toBe(
+      deactivateResponse,
+    );
+    expect(maintenanceService.updateAsset).toHaveBeenCalledWith(
+      currentUser,
+      4,
+      dto,
+    );
+    expect(maintenanceService.deactivateAsset).toHaveBeenCalledWith(
+      currentUser,
+      4,
+    );
+  });
+
+  it('delegates preventive plan creation and listing to the service', async () => {
+    const dto = {
+      title: 'Quarterly AC service',
+      assetId: 4,
+      intervalDays: 90,
+      nextDueDate: '2026-09-01',
+    };
+    const query = {
+      page: 1,
+      limit: 20,
+    };
+    const plan = {
+      id: 6,
+      planNumber: 'PMP-20260604-123450',
+    };
+    const listResponse = {
+      items: [plan],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    };
+    maintenanceService.createPreventivePlan.mockResolvedValue(plan);
+    maintenanceService.listPreventivePlans.mockResolvedValue(listResponse);
+
+    await expect(
+      controller.createPreventivePlan(currentUser, dto),
+    ).resolves.toBe(plan);
+    await expect(
+      controller.listPreventivePlans(currentUser, query),
+    ).resolves.toBe(listResponse);
+    expect(maintenanceService.createPreventivePlan).toHaveBeenCalledWith(
+      currentUser,
+      dto,
+    );
+    expect(maintenanceService.listPreventivePlans).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+  });
+
+  it('delegates preventive plan detail, update, and deletion', async () => {
+    const dto = {
+      intervalDays: 60,
+    };
+    const plan = {
+      id: 6,
+      intervalDays: 60,
+    };
+    maintenanceService.getPreventivePlanById.mockResolvedValue(plan);
+    maintenanceService.updatePreventivePlan.mockResolvedValue(plan);
+    maintenanceService.deletePreventivePlan.mockResolvedValue({
+      ...plan,
+      status: 'CANCELLED',
+    });
+
+    await expect(
+      controller.getPreventivePlanById(currentUser, 6),
+    ).resolves.toBe(plan);
+    await expect(
+      controller.updatePreventivePlan(currentUser, 6, dto),
+    ).resolves.toBe(plan);
+    await controller.deletePreventivePlan(currentUser, 6);
+
+    expect(maintenanceService.getPreventivePlanById).toHaveBeenCalledWith(
+      currentUser,
+      6,
+    );
+    expect(maintenanceService.updatePreventivePlan).toHaveBeenCalledWith(
+      currentUser,
+      6,
+      dto,
+    );
+    expect(maintenanceService.deletePreventivePlan).toHaveBeenCalledWith(
+      currentUser,
+      6,
+    );
+  });
+
+  it('delegates preventive plan ticket creation', async () => {
+    const dto = {
+      priority: 'HIGH' as const,
+    };
+    const response = {
+      ticket: {
+        id: 30,
+        sourceType: 'PREVENTIVE_PLAN',
+      },
+    };
+    maintenanceService.createTicketFromPreventivePlan.mockResolvedValue(
+      response,
+    );
+
+    await expect(
+      controller.createTicketFromPreventivePlan(currentUser, 6, dto),
+    ).resolves.toBe(response);
+    expect(
+      maintenanceService.createTicketFromPreventivePlan,
+    ).toHaveBeenCalledWith(currentUser, 6, dto);
   });
 
   it('delegates ticket detail lookup to the service', async () => {
@@ -514,6 +819,55 @@ describe('MaintenanceController', () => {
     expect(maintenanceService.clearRoomMaintenance).toHaveBeenCalledWith(
       currentUser,
       12,
+      dto,
+    );
+  });
+
+  it('delegates maintenance ticket notes to the service', async () => {
+    const permissionKeys = ['maintenance.tickets.update.assigned'];
+    const dto = {
+      note: 'Pump is blocked.',
+    };
+    const response = {
+      id: 71,
+      ticketId: 30,
+      note: 'Pump is blocked.',
+    };
+    maintenanceService.addTicketNote.mockResolvedValue(response);
+
+    await expect(
+      controller.addTicketNote(currentUser, permissionKeys, 30, dto),
+    ).resolves.toBe(response);
+    expect(maintenanceService.addTicketNote).toHaveBeenCalledWith(
+      currentUser,
+      permissionKeys,
+      30,
+      dto,
+    );
+  });
+
+  it('delegates maintenance ticket photos to the service', async () => {
+    const permissionKeys = [
+      'maintenance.photos.upload',
+      'maintenance.tickets.update.assigned',
+    ];
+    const dto = {
+      url: 'https://files.example.com/leak.jpg',
+    };
+    const response = {
+      id: 81,
+      ticketId: 30,
+      url: dto.url,
+    };
+    maintenanceService.addTicketPhoto.mockResolvedValue(response);
+
+    await expect(
+      controller.addTicketPhoto(currentUser, permissionKeys, 30, dto),
+    ).resolves.toBe(response);
+    expect(maintenanceService.addTicketPhoto).toHaveBeenCalledWith(
+      currentUser,
+      permissionKeys,
+      30,
       dto,
     );
   });

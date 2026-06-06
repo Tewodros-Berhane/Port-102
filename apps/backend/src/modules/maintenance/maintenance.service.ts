@@ -768,6 +768,678 @@ export class MaintenanceService {
     return this.serializeTicket(cancelledTicket);
   }
 
+  async addTicketNote(
+    currentUser: CurrentUserPayload,
+    permissionKeys: string[],
+    ticketId: number,
+    createMaintenanceTicketNoteDto: CreateMaintenanceTicketNoteDto,
+  ) {
+    const ticket = await this.ensureTicket(ticketId);
+
+    this.ensureAssignedOnlyTicketAccess({
+      currentUser,
+      permissionKeys,
+      ticket,
+      fullPermission: 'maintenance.tickets.update',
+      assignedPermission: 'maintenance.tickets.update.assigned',
+    });
+
+    const noteText = this.normalizeRequiredString(
+      createMaintenanceTicketNoteDto.note,
+      'Maintenance ticket note is required.',
+    );
+    const note = await this.maintenanceTicketNotesRepository.createNote({
+      ticketId: ticket.id,
+      authorUserId: currentUser.sub,
+      note: noteText,
+    });
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'maintenance.tickets.note_added',
+      entityType: 'MaintenanceTicketNote',
+      entityId: String(note.id),
+      metadata: {
+        ticketId: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        authorUserId: note.authorUserId,
+      },
+    });
+
+    return this.serializeTicketNote(note);
+  }
+
+  async addTicketPhoto(
+    currentUser: CurrentUserPayload,
+    permissionKeys: string[],
+    ticketId: number,
+    uploadMaintenanceTicketPhotoDto: UploadMaintenanceTicketPhotoDto,
+  ) {
+    const ticket = await this.ensureTicket(ticketId);
+
+    this.ensureAssignedOnlyTicketAccess({
+      currentUser,
+      permissionKeys,
+      ticket,
+      fullPermission: 'maintenance.tickets.update',
+      assignedPermission: 'maintenance.tickets.update.assigned',
+    });
+
+    const photo = await this.maintenanceTicketPhotosRepository.createPhoto({
+      ticketId: ticket.id,
+      uploadedByUserId: currentUser.sub,
+      url: uploadMaintenanceTicketPhotoDto.url.trim(),
+      description: this.normalizeOptionalString(
+        uploadMaintenanceTicketPhotoDto.description,
+      ),
+    });
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'maintenance.tickets.photo_added',
+      entityType: 'MaintenanceTicketPhoto',
+      entityId: String(photo.id),
+      metadata: {
+        ticketId: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        uploadedByUserId: photo.uploadedByUserId,
+        url: photo.url,
+      },
+    });
+
+    return this.serializeTicketPhoto(photo);
+  }
+
+  async createTicketFromHousekeepingIssue(
+    currentUser: CurrentUserPayload,
+    issueId: number,
+    createTicketDto: CreateTicketFromHousekeepingIssueDto,
+  ) {
+    const issue = await this.housekeepingIssuesRepository.findIssue(issueId);
+
+    if (!issue) {
+      throw new NotFoundException('Housekeeping issue was not found.');
+    }
+
+    if (issue.status !== HousekeepingIssueStatus.OPEN) {
+      throw new ConflictException(
+        'Only open housekeeping issues can create maintenance tickets.',
+      );
+    }
+
+    await this.ensureActiveRoom(issue.roomId);
+
+    const existingTicket =
+      await this.maintenanceTicketsRepository.findActiveTicketBySource({
+        sourceType: 'HOUSEKEEPING_ISSUE',
+        sourceId: issue.id,
+      });
+
+    if (existingTicket) {
+      throw new ConflictException(
+        'An active maintenance ticket already exists for this housekeeping issue.',
+      );
+    }
+
+    const assignedUser =
+      createTicketDto.assignedToUserId === undefined
+        ? null
+        : await this.ensureActiveUser(createTicketDto.assignedToUserId);
+    const ticketNumber = await this.generateTicketNumber();
+    const ticket = await this.maintenanceTicketsRepository.createTicket({
+      ticketNumber,
+      roomId: issue.roomId,
+      source: MaintenanceTicketSource.HOUSEKEEPING,
+      sourceType: 'HOUSEKEEPING_ISSUE',
+      sourceId: issue.id,
+      issueType: createTicketDto.issueType ?? MaintenanceIssueType.OTHER,
+      status: assignedUser
+        ? MaintenanceTicketStatus.ASSIGNED
+        : MaintenanceTicketStatus.OPEN,
+      priority: createTicketDto.priority ?? MaintenancePriority.NORMAL,
+      title: issue.title,
+      description: issue.description,
+      reportedByUserId: currentUser.sub,
+      assignedToUserId: assignedUser?.id ?? null,
+      assignedByUserId: assignedUser ? currentUser.sub : null,
+      assignedAt: assignedUser ? new Date() : null,
+    });
+
+    await this.recordTicketAudit(
+      currentUser,
+      'maintenance.tickets.created_from_housekeeping_issue',
+      ticket,
+      {
+        ticketNumber: ticket.ticketNumber,
+        housekeepingIssueId: issue.id,
+        housekeepingIssueNumber: issue.issueNumber,
+        roomId: ticket.roomId,
+        status: ticket.status,
+        assignedToUserId: ticket.assignedToUserId,
+      },
+    );
+
+    return this.serializeTicket(ticket);
+  }
+
+  async createAsset(
+    currentUser: CurrentUserPayload,
+    createAssetDto: CreateAssetDto,
+  ) {
+    const assetNumber = this.normalizeRequiredString(
+      createAssetDto.assetNumber,
+      'Asset number is required.',
+    );
+    const existingAsset =
+      await this.assetsRepository.findByAssetNumber(assetNumber);
+
+    if (existingAsset) {
+      throw new ConflictException('Asset number already exists.');
+    }
+
+    const room =
+      createAssetDto.roomId === null || createAssetDto.roomId === undefined
+        ? null
+        : await this.ensureActiveRoom(createAssetDto.roomId);
+    const asset = await this.assetsRepository.createAsset({
+      assetNumber,
+      name: this.normalizeRequiredString(
+        createAssetDto.name,
+        'Asset name is required.',
+      ),
+      category: this.normalizeOptionalString(createAssetDto.category),
+      location: this.normalizeOptionalString(createAssetDto.location),
+      roomId: room?.id ?? null,
+      status: createAssetDto.status ?? AssetStatus.ACTIVE,
+      description: this.normalizeOptionalString(createAssetDto.description),
+      purchaseDate: this.parseNullableDate(
+        createAssetDto.purchaseDate,
+        'purchase date',
+      ),
+      warrantyUntil: this.parseNullableDate(
+        createAssetDto.warrantyUntil,
+        'warranty date',
+      ),
+    });
+
+    await this.recordAssetAudit(
+      currentUser,
+      'maintenance.assets.created',
+      asset,
+      {
+        assetNumber: asset.assetNumber,
+        roomId: asset.roomId,
+        status: asset.status,
+      },
+    );
+
+    return this.serializeAsset(asset);
+  }
+
+  async listAssets(_currentUser: CurrentUserPayload, query: GetAssetsQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const [total, assets] = await this.assetsRepository.listAssets({
+      skip: (page - 1) * limit,
+      take: limit,
+      search: this.normalizeOptionalString(query.search) ?? undefined,
+      status: query.status,
+      category: this.normalizeOptionalString(query.category) ?? undefined,
+      roomId: query.roomId,
+    });
+
+    return {
+      items: assets.map((asset) => this.serializeAsset(asset)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getAssetById(_currentUser: CurrentUserPayload, assetId: number) {
+    return this.serializeAsset(await this.ensureAsset(assetId));
+  }
+
+  async updateAsset(
+    currentUser: CurrentUserPayload,
+    assetId: number,
+    updateAssetDto: UpdateAssetDto,
+  ) {
+    const asset = await this.ensureAsset(assetId);
+    const data: Prisma.AssetUncheckedUpdateInput = {};
+
+    if (updateAssetDto.assetNumber !== undefined) {
+      const assetNumber = this.normalizeRequiredString(
+        updateAssetDto.assetNumber,
+        'Asset number is required.',
+      );
+
+      if (assetNumber !== asset.assetNumber) {
+        const duplicate = await this.assetsRepository.findByAssetNumber(
+          assetNumber,
+          asset.id,
+        );
+
+        if (duplicate) {
+          throw new ConflictException('Asset number already exists.');
+        }
+      }
+
+      data.assetNumber = assetNumber;
+    }
+
+    if (updateAssetDto.name !== undefined) {
+      data.name = this.normalizeRequiredString(
+        updateAssetDto.name,
+        'Asset name is required.',
+      );
+    }
+
+    if (updateAssetDto.category !== undefined) {
+      data.category = this.normalizeOptionalString(updateAssetDto.category);
+    }
+
+    if (updateAssetDto.location !== undefined) {
+      data.location = this.normalizeOptionalString(updateAssetDto.location);
+    }
+
+    if (updateAssetDto.roomId !== undefined) {
+      data.roomId =
+        updateAssetDto.roomId === null
+          ? null
+          : (await this.ensureActiveRoom(updateAssetDto.roomId)).id;
+    }
+
+    if (updateAssetDto.status !== undefined) {
+      if (
+        updateAssetDto.status === AssetStatus.INACTIVE ||
+        updateAssetDto.status === AssetStatus.RETIRED
+      ) {
+        await this.ensureAssetHasNoActiveTickets(asset.id);
+      }
+
+      data.status = updateAssetDto.status;
+    }
+
+    if (updateAssetDto.description !== undefined) {
+      data.description = this.normalizeOptionalString(
+        updateAssetDto.description,
+      );
+    }
+
+    if (updateAssetDto.purchaseDate !== undefined) {
+      data.purchaseDate = this.parseNullableDate(
+        updateAssetDto.purchaseDate,
+        'purchase date',
+      );
+    }
+
+    if (updateAssetDto.warrantyUntil !== undefined) {
+      data.warrantyUntil = this.parseNullableDate(
+        updateAssetDto.warrantyUntil,
+        'warranty date',
+      );
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.serializeAsset(asset);
+    }
+
+    const updatedAsset = await this.assetsRepository.updateAsset(
+      asset.id,
+      data,
+    );
+
+    await this.recordAssetAudit(
+      currentUser,
+      'maintenance.assets.updated',
+      updatedAsset,
+      {
+        previous: this.assetAuditSnapshot(asset),
+        current: this.assetAuditSnapshot(updatedAsset),
+      },
+    );
+
+    return this.serializeAsset(updatedAsset);
+  }
+
+  async deactivateAsset(currentUser: CurrentUserPayload, assetId: number) {
+    const asset = await this.ensureAsset(assetId);
+
+    if (
+      asset.status === AssetStatus.INACTIVE ||
+      asset.status === AssetStatus.RETIRED
+    ) {
+      return this.serializeAsset(asset);
+    }
+
+    await this.ensureAssetHasNoActiveTickets(asset.id);
+
+    const updatedAsset = await this.assetsRepository.updateAsset(asset.id, {
+      status: AssetStatus.INACTIVE,
+    });
+
+    await this.recordAssetAudit(
+      currentUser,
+      'maintenance.assets.deactivated',
+      updatedAsset,
+      {
+        previousStatus: asset.status,
+        status: updatedAsset.status,
+      },
+    );
+
+    return this.serializeAsset(updatedAsset);
+  }
+
+  async createPreventivePlan(
+    currentUser: CurrentUserPayload,
+    createPlanDto: CreatePreventiveMaintenancePlanDto,
+  ) {
+    if (
+      (createPlanDto.assetId === undefined || createPlanDto.assetId === null) &&
+      (createPlanDto.roomId === undefined || createPlanDto.roomId === null)
+    ) {
+      throw new BadRequestException(
+        'Preventive maintenance plan must link to an asset, a room, or both.',
+      );
+    }
+
+    const asset =
+      createPlanDto.assetId === undefined || createPlanDto.assetId === null
+        ? null
+        : await this.ensureActiveAsset(createPlanDto.assetId);
+    const room =
+      createPlanDto.roomId === undefined || createPlanDto.roomId === null
+        ? null
+        : await this.ensureActiveRoom(createPlanDto.roomId);
+    const planNumber = await this.generatePreventivePlanNumber();
+    const plan = await this.preventiveMaintenancePlansRepository.createPlan({
+      planNumber,
+      assetId: asset?.id ?? null,
+      roomId: room?.id ?? null,
+      title: this.normalizeRequiredString(
+        createPlanDto.title,
+        'Preventive maintenance plan title is required.',
+      ),
+      description: this.normalizeOptionalString(createPlanDto.description),
+      status: PreventiveMaintenanceStatus.ACTIVE,
+      intervalDays: createPlanDto.intervalDays,
+      nextDueDate: this.parseRequiredDate(
+        createPlanDto.nextDueDate,
+        'next due date',
+      ),
+      createdByUserId: currentUser.sub,
+    });
+
+    await this.recordPreventivePlanAudit(
+      currentUser,
+      'maintenance.preventive_plans.created',
+      plan,
+      {
+        planNumber: plan.planNumber,
+        assetId: plan.assetId,
+        roomId: plan.roomId,
+        intervalDays: plan.intervalDays,
+        nextDueDate: plan.nextDueDate.toISOString(),
+      },
+    );
+
+    return this.serializePreventivePlan(plan);
+  }
+
+  async listPreventivePlans(
+    _currentUser: CurrentUserPayload,
+    query: GetPreventiveMaintenancePlansQueryDto,
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const [total, plans] =
+      await this.preventiveMaintenancePlansRepository.listPlans({
+        skip: (page - 1) * limit,
+        take: limit,
+        search: this.normalizeOptionalString(query.search) ?? undefined,
+        status: query.status,
+        assetId: query.assetId,
+        roomId: query.roomId,
+        dueFrom: this.parseOptionalDate(query.dueFrom),
+        dueTo: this.parseOptionalDate(query.dueTo),
+      });
+
+    return {
+      items: plans.map((plan) => this.serializePreventivePlan(plan)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getPreventivePlanById(
+    _currentUser: CurrentUserPayload,
+    planId: number,
+  ) {
+    return this.serializePreventivePlan(
+      await this.ensurePreventivePlan(planId),
+    );
+  }
+
+  async updatePreventivePlan(
+    currentUser: CurrentUserPayload,
+    planId: number,
+    updatePlanDto: UpdatePreventiveMaintenancePlanDto,
+  ) {
+    const plan = await this.ensurePreventivePlan(planId);
+    const data: Prisma.PreventiveMaintenancePlanUncheckedUpdateInput = {};
+
+    if (updatePlanDto.title !== undefined) {
+      data.title = this.normalizeRequiredString(
+        updatePlanDto.title,
+        'Preventive maintenance plan title is required.',
+      );
+    }
+
+    if (updatePlanDto.description !== undefined) {
+      data.description = this.normalizeOptionalString(
+        updatePlanDto.description,
+      );
+    }
+
+    if (updatePlanDto.assetId !== undefined) {
+      data.assetId =
+        updatePlanDto.assetId === null
+          ? null
+          : (await this.ensureActiveAsset(updatePlanDto.assetId)).id;
+    }
+
+    if (updatePlanDto.roomId !== undefined) {
+      data.roomId =
+        updatePlanDto.roomId === null
+          ? null
+          : (await this.ensureActiveRoom(updatePlanDto.roomId)).id;
+    }
+
+    const resultingAssetId =
+      updatePlanDto.assetId === undefined
+        ? plan.assetId
+        : updatePlanDto.assetId;
+    const resultingRoomId =
+      updatePlanDto.roomId === undefined ? plan.roomId : updatePlanDto.roomId;
+
+    if (resultingAssetId === null && resultingRoomId === null) {
+      throw new BadRequestException(
+        'Preventive maintenance plan must link to an asset, a room, or both.',
+      );
+    }
+
+    if (updatePlanDto.intervalDays !== undefined) {
+      data.intervalDays = updatePlanDto.intervalDays;
+    }
+
+    if (updatePlanDto.nextDueDate !== undefined) {
+      data.nextDueDate = this.parseRequiredDate(
+        updatePlanDto.nextDueDate,
+        'next due date',
+      );
+    }
+
+    if (updatePlanDto.status !== undefined) {
+      data.status = updatePlanDto.status;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.serializePreventivePlan(plan);
+    }
+
+    const updatedPlan =
+      await this.preventiveMaintenancePlansRepository.updatePlan(plan.id, data);
+
+    await this.recordPreventivePlanAudit(
+      currentUser,
+      'maintenance.preventive_plans.updated',
+      updatedPlan,
+      {
+        previous: this.preventivePlanAuditSnapshot(plan),
+        current: this.preventivePlanAuditSnapshot(updatedPlan),
+      },
+    );
+
+    return this.serializePreventivePlan(updatedPlan);
+  }
+
+  async deletePreventivePlan(currentUser: CurrentUserPayload, planId: number) {
+    const plan = await this.ensurePreventivePlan(planId);
+
+    if (plan.status === PreventiveMaintenanceStatus.CANCELLED) {
+      return this.serializePreventivePlan(plan);
+    }
+
+    const updatedPlan =
+      await this.preventiveMaintenancePlansRepository.updatePlan(plan.id, {
+        status: PreventiveMaintenanceStatus.CANCELLED,
+      });
+
+    await this.recordPreventivePlanAudit(
+      currentUser,
+      'maintenance.preventive_plans.deleted',
+      updatedPlan,
+      {
+        previousStatus: plan.status,
+        status: updatedPlan.status,
+      },
+    );
+
+    return this.serializePreventivePlan(updatedPlan);
+  }
+
+  async createTicketFromPreventivePlan(
+    currentUser: CurrentUserPayload,
+    planId: number,
+    createTicketDto: CreateTicketFromPreventivePlanDto,
+  ) {
+    const plan = await this.ensurePreventivePlan(planId);
+
+    if (plan.status !== PreventiveMaintenanceStatus.ACTIVE) {
+      throw new ConflictException(
+        'Only active preventive maintenance plans can create tickets.',
+      );
+    }
+
+    const existingTicket =
+      await this.maintenanceTicketsRepository.findActiveTicketBySource({
+        sourceType: 'PREVENTIVE_PLAN',
+        sourceId: plan.id,
+      });
+
+    if (existingTicket) {
+      throw new ConflictException(
+        'An active maintenance ticket already exists for this preventive plan.',
+      );
+    }
+
+    const assignedUser =
+      createTicketDto.assignedToUserId === undefined
+        ? null
+        : await this.ensureActiveUser(createTicketDto.assignedToUserId);
+    const ticketNumber = await this.generateTicketNumber();
+    const nextDueDate = new Date(plan.nextDueDate);
+    nextDueDate.setUTCDate(nextDueDate.getUTCDate() + plan.intervalDays);
+
+    const { ticket, updatedPlan } =
+      await this.maintenanceTicketsRepository.runInTransaction(async (tx) => {
+        const createdTicket =
+          await this.maintenanceTicketsRepository.createTicket(
+            {
+              ticketNumber,
+              roomId: plan.roomId,
+              assetId: plan.assetId,
+              source: MaintenanceTicketSource.PREVENTIVE,
+              sourceType: 'PREVENTIVE_PLAN',
+              sourceId: plan.id,
+              issueType:
+                createTicketDto.issueType ?? MaintenanceIssueType.OTHER,
+              status: assignedUser
+                ? MaintenanceTicketStatus.ASSIGNED
+                : MaintenanceTicketStatus.OPEN,
+              priority: createTicketDto.priority ?? MaintenancePriority.NORMAL,
+              title: plan.title,
+              description: plan.description,
+              reportedByUserId: currentUser.sub,
+              assignedToUserId: assignedUser?.id ?? null,
+              assignedByUserId: assignedUser ? currentUser.sub : null,
+              assignedAt: assignedUser ? new Date() : null,
+            },
+            tx,
+          );
+        const advancedPlan =
+          await this.preventiveMaintenancePlansRepository.updatePlan(
+            plan.id,
+            {
+              nextDueDate,
+            },
+            tx,
+          );
+
+        return {
+          ticket: createdTicket,
+          updatedPlan: advancedPlan,
+        };
+      });
+
+    await this.recordTicketAudit(
+      currentUser,
+      'maintenance.tickets.created_from_preventive_plan',
+      ticket,
+      {
+        ticketNumber: ticket.ticketNumber,
+        preventivePlanId: plan.id,
+        preventivePlanNumber: plan.planNumber,
+        nextDueDate: updatedPlan.nextDueDate.toISOString(),
+      },
+    );
+    await this.recordPreventivePlanAudit(
+      currentUser,
+      'maintenance.preventive_plans.ticket_created',
+      updatedPlan,
+      {
+        ticketId: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        previousNextDueDate: plan.nextDueDate.toISOString(),
+        nextDueDate: updatedPlan.nextDueDate.toISOString(),
+      },
+    );
+
+    return {
+      ticket: this.serializeTicket(ticket),
+      preventivePlan: this.serializePreventivePlan(updatedPlan),
+    };
+  }
+
   markRoomOutOfOrder(
     currentUser: CurrentUserPayload,
     roomId: number,
@@ -818,6 +1490,38 @@ export class MaintenanceService {
     }
 
     return ticket;
+  }
+
+  private async ensureAsset(assetId: number) {
+    const asset = await this.assetsRepository.findAsset(assetId);
+
+    if (!asset) {
+      throw new NotFoundException('Asset was not found.');
+    }
+
+    return asset;
+  }
+
+  private async ensurePreventivePlan(planId: number) {
+    const plan =
+      await this.preventiveMaintenancePlansRepository.findPlan(planId);
+
+    if (!plan) {
+      throw new NotFoundException('Preventive maintenance plan was not found.');
+    }
+
+    return plan;
+  }
+
+  private async ensureAssetHasNoActiveTickets(assetId: number) {
+    const activeTicketCount =
+      await this.assetsRepository.countActiveTickets(assetId);
+
+    if (activeTicketCount > 0) {
+      throw new ConflictException(
+        'Asset cannot be deactivated or retired while it has active maintenance tickets.',
+      );
+    }
   }
 
   private ensureAssignedOnlyTicketAccess({
@@ -920,33 +1624,34 @@ export class MaintenanceService {
       return this.serializeRoom(room);
     }
 
-    const updatedRoom = await this.maintenanceTicketsRepository.runInTransaction(
-      async (client) => {
-        const changedRoom = await this.roomsRepository.updateRoom(
-          room.id,
-          {
-            maintenanceStatus,
-          },
-          client,
-        );
-
-        await this.roomsRepository.createStatusLogs(
-          [
+    const updatedRoom =
+      await this.maintenanceTicketsRepository.runInTransaction(
+        async (client) => {
+          const changedRoom = await this.roomsRepository.updateRoom(
+            room.id,
             {
-              roomId: room.id,
-              actorUserId: currentUser.sub,
-              field: 'maintenanceStatus',
-              oldValue: room.maintenanceStatus,
-              newValue: maintenanceStatus,
-              reason,
+              maintenanceStatus,
             },
-          ],
-          client,
-        );
+            client,
+          );
 
-        return changedRoom;
-      },
-    );
+          await this.roomsRepository.createStatusLogs(
+            [
+              {
+                roomId: room.id,
+                actorUserId: currentUser.sub,
+                field: 'maintenanceStatus',
+                oldValue: room.maintenanceStatus,
+                newValue: maintenanceStatus,
+                reason,
+              },
+            ],
+            client,
+          );
+
+          return changedRoom;
+        },
+      );
 
     await this.auditLogsService.record({
       actorUserId: currentUser.sub,
@@ -1010,6 +1715,34 @@ export class MaintenanceService {
     throw new BadRequestException('Unable to generate maintenance ticket.');
   }
 
+  private async generatePreventivePlanNumber() {
+    const today = new Date();
+    const datePart = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getDate()).padStart(2, '0'),
+    ].join('');
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const randomPart = Math.floor(Math.random() * 1_000_000)
+        .toString()
+        .padStart(6, '0');
+      const planNumber = `PMP-${datePart}-${randomPart}`;
+      const existing =
+        await this.preventiveMaintenancePlansRepository.findByPlanNumber(
+          planNumber,
+        );
+
+      if (!existing) {
+        return planNumber;
+      }
+    }
+
+    throw new BadRequestException(
+      'Unable to generate preventive maintenance plan.',
+    );
+  }
+
   private recordTicketAudit(
     currentUser: CurrentUserPayload,
     action: string,
@@ -1023,6 +1756,105 @@ export class MaintenanceService {
       entityId: String(ticket.id),
       metadata,
     });
+  }
+
+  private recordAssetAudit(
+    currentUser: CurrentUserPayload,
+    action: string,
+    asset: AssetRecord,
+    metadata?: Prisma.InputJsonValue,
+  ) {
+    return this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action,
+      entityType: 'Asset',
+      entityId: String(asset.id),
+      metadata,
+    });
+  }
+
+  private recordPreventivePlanAudit(
+    currentUser: CurrentUserPayload,
+    action: string,
+    plan: PreventiveMaintenancePlanRecord,
+    metadata?: Prisma.InputJsonValue,
+  ) {
+    return this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action,
+      entityType: 'PreventiveMaintenancePlan',
+      entityId: String(plan.id),
+      metadata,
+    });
+  }
+
+  private assetAuditSnapshot(asset: AssetRecord): Prisma.InputJsonObject {
+    return {
+      assetNumber: asset.assetNumber,
+      name: asset.name,
+      category: asset.category,
+      location: asset.location,
+      roomId: asset.roomId,
+      status: asset.status,
+      description: asset.description,
+      purchaseDate: asset.purchaseDate?.toISOString() ?? null,
+      warrantyUntil: asset.warrantyUntil?.toISOString() ?? null,
+    };
+  }
+
+  private serializeAsset(asset: AssetRecord) {
+    return {
+      id: asset.id,
+      assetNumber: asset.assetNumber,
+      name: asset.name,
+      category: asset.category,
+      location: asset.location,
+      roomId: asset.roomId,
+      status: asset.status,
+      description: asset.description,
+      purchaseDate: asset.purchaseDate,
+      warrantyUntil: asset.warrantyUntil,
+      createdAt: asset.createdAt,
+      updatedAt: asset.updatedAt,
+      room: asset.room,
+    };
+  }
+
+  private preventivePlanAuditSnapshot(
+    plan: PreventiveMaintenancePlanRecord,
+  ): Prisma.InputJsonObject {
+    return {
+      planNumber: plan.planNumber,
+      assetId: plan.assetId,
+      roomId: plan.roomId,
+      title: plan.title,
+      description: plan.description,
+      status: plan.status,
+      intervalDays: plan.intervalDays,
+      nextDueDate: plan.nextDueDate.toISOString(),
+      lastCompletedAt: plan.lastCompletedAt?.toISOString() ?? null,
+    };
+  }
+
+  private serializePreventivePlan(plan: PreventiveMaintenancePlanRecord) {
+    return {
+      id: plan.id,
+      planNumber: plan.planNumber,
+      assetId: plan.assetId,
+      roomId: plan.roomId,
+      title: plan.title,
+      description: plan.description,
+      status: plan.status,
+      intervalDays: plan.intervalDays,
+      nextDueDate: plan.nextDueDate,
+      lastCompletedAt: plan.lastCompletedAt,
+      createdByUserId: plan.createdByUserId,
+      createdAt: plan.createdAt,
+      updatedAt: plan.updatedAt,
+      asset: plan.asset,
+      room: plan.room,
+      createdBy: plan.createdBy,
+    };
   }
 
   private serializeTicket(ticket: MaintenanceTicketRecord) {
@@ -1067,6 +1899,31 @@ export class MaintenanceService {
       approvedBy: ticket.approvedBy,
       rejectedBy: ticket.rejectedBy,
       cancelledBy: ticket.cancelledBy,
+      notes: ticket.notes.map((note) => this.serializeTicketNote(note)),
+      photos: ticket.photos.map((photo) => this.serializeTicketPhoto(photo)),
+    };
+  }
+
+  private serializeTicketNote(note: MaintenanceTicketNoteRecord) {
+    return {
+      id: note.id,
+      ticketId: note.ticketId,
+      authorUserId: note.authorUserId,
+      note: note.note,
+      createdAt: note.createdAt,
+      author: note.author,
+    };
+  }
+
+  private serializeTicketPhoto(photo: MaintenanceTicketPhotoRecord) {
+    return {
+      id: photo.id,
+      ticketId: photo.ticketId,
+      uploadedByUserId: photo.uploadedByUserId,
+      url: photo.url,
+      description: photo.description,
+      createdAt: photo.createdAt,
+      uploadedBy: photo.uploadedBy,
     };
   }
 
@@ -1114,6 +1971,30 @@ export class MaintenanceService {
 
     if (Number.isNaN(date.getTime())) {
       throw new BadRequestException('Invalid date filter.');
+    }
+
+    return date;
+  }
+
+  private parseNullableDate(value: string | null | undefined, label: string) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`Invalid ${label}.`);
+    }
+
+    return date;
+  }
+
+  private parseRequiredDate(value: string, label: string) {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`Invalid ${label}.`);
     }
 
     return date;
