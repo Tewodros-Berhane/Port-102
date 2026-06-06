@@ -150,6 +150,66 @@ function createTicket(overrides: Record<string, unknown> = {}) {
     approvedBy: null,
     rejectedBy: null,
     cancelledBy: null,
+    notes: [],
+    photos: [],
+    ...overrides,
+  };
+}
+
+function createHousekeepingIssue(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 19,
+    issueNumber: 'HKI-20260604-123450',
+    taskId: null,
+    roomId: 12,
+    reportedByUserId: 7,
+    status: HousekeepingIssueStatus.OPEN,
+    title: 'Bathroom exhaust fan is not working',
+    description: 'Fan does not start from the wall switch.',
+    photoUrl: null,
+    resolvedAt: null,
+    resolvedByUserId: null,
+    resolutionNotes: null,
+    createdAt: now,
+    updatedAt: now,
+    room: createRoom(),
+    task: null,
+    reportedBy: createUser({ id: 7 }),
+    resolvedBy: null,
+    ...overrides,
+  };
+}
+
+function createPreventivePlan(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 6,
+    planNumber: 'PMP-20260604-123450',
+    assetId: 4,
+    roomId: 12,
+    title: 'Quarterly AC service',
+    description: 'Inspect filters and drain line.',
+    status: PreventiveMaintenanceStatus.ACTIVE,
+    intervalDays: 90,
+    nextDueDate: new Date('2026-09-01T00:00:00.000Z'),
+    lastCompletedAt: null,
+    createdByUserId: 1,
+    createdAt: now,
+    updatedAt: now,
+    asset: {
+      id: 4,
+      assetNumber: 'AST-0004',
+      name: 'Room 204 AC',
+      category: 'HVAC',
+      status: AssetStatus.ACTIVE,
+    },
+    room: {
+      id: 12,
+      roomNumber: '204',
+      displayName: 'Deluxe 204',
+      maintenanceStatus: RoomMaintenanceStatus.AVAILABLE,
+      isActive: true,
+    },
+    createdBy: createUser({ id: 1 }),
     ...overrides,
   };
 }
