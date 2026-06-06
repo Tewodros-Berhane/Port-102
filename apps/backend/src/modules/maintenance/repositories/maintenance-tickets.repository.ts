@@ -184,6 +184,32 @@ export class MaintenanceTicketsRepository {
     });
   }
 
+  findActiveTicketBySource(
+    {
+      sourceType,
+      sourceId,
+    }: {
+      sourceType: string;
+      sourceId: number;
+    },
+    client: MaintenanceTicketClient = this.prisma,
+  ) {
+    return client.maintenanceTicket.findFirst({
+      where: {
+        sourceType,
+        sourceId,
+        status: {
+          notIn: [
+            MaintenanceTicketStatus.APPROVED,
+            MaintenanceTicketStatus.CANCELLED,
+          ],
+        },
+      },
+      select: maintenanceTicketSelect,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+  }
+
   updateTicket(
     ticketId: number,
     data: Prisma.MaintenanceTicketUncheckedUpdateInput,
