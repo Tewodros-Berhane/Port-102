@@ -151,6 +151,95 @@ export class MaintenanceService {
     return this.serializeTicket(ticket);
   }
 
+  async getDashboard(_currentUser: CurrentUserPayload) {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
+    const [
+      openTickets,
+      assignedTickets,
+      inProgressTickets,
+      completedPendingApproval,
+      approvedToday,
+      rejectedToday,
+      urgentTickets,
+      outOfOrderRooms,
+      underMaintenanceRooms,
+      assetsUnderMaintenance,
+      overduePreventivePlans,
+    ] = await Promise.all([
+      this.maintenanceTicketsRepository.countTickets({
+        status: MaintenanceTicketStatus.OPEN,
+      }),
+      this.maintenanceTicketsRepository.countTickets({
+        status: MaintenanceTicketStatus.ASSIGNED,
+      }),
+      this.maintenanceTicketsRepository.countTickets({
+        status: MaintenanceTicketStatus.IN_PROGRESS,
+      }),
+      this.maintenanceTicketsRepository.countTickets({
+        status: MaintenanceTicketStatus.COMPLETED,
+      }),
+      this.maintenanceTicketsRepository.countTickets({
+        status: MaintenanceTicketStatus.APPROVED,
+        approvedAt: {
+          gte: startOfToday,
+          lt: startOfTomorrow,
+        },
+      }),
+      this.maintenanceTicketsRepository.countTickets({
+        status: MaintenanceTicketStatus.REJECTED,
+        rejectedAt: {
+          gte: startOfToday,
+          lt: startOfTomorrow,
+        },
+      }),
+      this.maintenanceTicketsRepository.countTickets({
+        priority: MaintenancePriority.URGENT,
+        status: {
+          notIn: [
+            MaintenanceTicketStatus.APPROVED,
+            MaintenanceTicketStatus.CANCELLED,
+          ],
+        },
+      }),
+      this.roomsRepository.countRooms({
+        isActive: true,
+        maintenanceStatus: RoomMaintenanceStatus.OUT_OF_ORDER,
+      }),
+      this.roomsRepository.countRooms({
+        isActive: true,
+        maintenanceStatus: RoomMaintenanceStatus.UNDER_MAINTENANCE,
+      }),
+      this.assetsRepository.countAssets({
+        status: AssetStatus.UNDER_MAINTENANCE,
+      }),
+      this.preventiveMaintenancePlansRepository.countPlans({
+        status: PreventiveMaintenanceStatus.ACTIVE,
+        nextDueDate: {
+          lt: now,
+        },
+      }),
+    ]);
+
+    return {
+      openTickets,
+      assignedTickets,
+      inProgressTickets,
+      completedPendingApproval,
+      approvedToday,
+      rejectedToday,
+      urgentTickets,
+      outOfOrderRooms,
+      underMaintenanceRooms,
+      assetsUnderMaintenance,
+      overduePreventivePlans,
+    };
+  }
+
   async listTickets(
     _currentUser: CurrentUserPayload,
     query: GetMaintenanceTicketsQueryDto,
