@@ -735,7 +735,9 @@ export class MaintenanceService {
     }
 
     if (ticket.status === MaintenanceTicketStatus.APPROVED) {
-      throw new ConflictException('Approved maintenance tickets cannot be cancelled.');
+      throw new ConflictException(
+        'Approved maintenance tickets cannot be cancelled.',
+      );
     }
 
     const cancellationReason = this.normalizeRequiredString(
