@@ -11,16 +11,30 @@ describe('AssetsRepository', () => {
   let repository: AssetsRepository;
   let prisma: {
     asset: {
+      create: jest.Mock;
       findUnique: jest.Mock;
       findFirst: jest.Mock;
+      count: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+    };
+    maintenanceTicket: {
+      count: jest.Mock;
     };
   };
 
   beforeEach(async () => {
     prisma = {
       asset: {
+        create: jest.fn(),
         findUnique: jest.fn(),
         findFirst: jest.fn(),
+        count: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
+      maintenanceTicket: {
+        count: jest.fn(),
       },
     };
 
