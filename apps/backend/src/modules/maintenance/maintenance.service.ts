@@ -100,36 +100,35 @@ export class MaintenanceService {
             createMaintenanceTicketDto.assignedToUserId,
           );
     const ticketNumber = await this.generateTicketNumber();
-    const ticket =
-      await this.maintenanceTicketsRepository.createTicket({
-        ticketNumber,
-        roomId: room?.id ?? null,
-        assetId: asset?.id ?? null,
-        source:
-          createMaintenanceTicketDto.source ?? MaintenanceTicketSource.MANUAL,
-        sourceType: this.normalizeOptionalString(
-          createMaintenanceTicketDto.sourceType,
-        ),
-        sourceId: createMaintenanceTicketDto.sourceId ?? null,
-        issueType:
-          createMaintenanceTicketDto.issueType ?? MaintenanceIssueType.OTHER,
-        status: assignedUser
-          ? MaintenanceTicketStatus.ASSIGNED
-          : MaintenanceTicketStatus.OPEN,
-        priority:
-          createMaintenanceTicketDto.priority ?? MaintenancePriority.NORMAL,
-        title: this.normalizeRequiredString(
-          createMaintenanceTicketDto.title,
-          'Ticket title is required.',
-        ),
-        description: this.normalizeOptionalString(
-          createMaintenanceTicketDto.description,
-        ),
-        reportedByUserId: currentUser.sub,
-        assignedToUserId: assignedUser?.id ?? null,
-        assignedByUserId: assignedUser ? currentUser.sub : null,
-        assignedAt: assignedUser ? new Date() : null,
-      });
+    const ticket = await this.maintenanceTicketsRepository.createTicket({
+      ticketNumber,
+      roomId: room?.id ?? null,
+      assetId: asset?.id ?? null,
+      source:
+        createMaintenanceTicketDto.source ?? MaintenanceTicketSource.MANUAL,
+      sourceType: this.normalizeOptionalString(
+        createMaintenanceTicketDto.sourceType,
+      ),
+      sourceId: createMaintenanceTicketDto.sourceId ?? null,
+      issueType:
+        createMaintenanceTicketDto.issueType ?? MaintenanceIssueType.OTHER,
+      status: assignedUser
+        ? MaintenanceTicketStatus.ASSIGNED
+        : MaintenanceTicketStatus.OPEN,
+      priority:
+        createMaintenanceTicketDto.priority ?? MaintenancePriority.NORMAL,
+      title: this.normalizeRequiredString(
+        createMaintenanceTicketDto.title,
+        'Ticket title is required.',
+      ),
+      description: this.normalizeOptionalString(
+        createMaintenanceTicketDto.description,
+      ),
+      reportedByUserId: currentUser.sub,
+      assignedToUserId: assignedUser?.id ?? null,
+      assignedByUserId: assignedUser ? currentUser.sub : null,
+      assignedAt: assignedUser ? new Date() : null,
+    });
 
     await this.recordTicketAudit(
       currentUser,
