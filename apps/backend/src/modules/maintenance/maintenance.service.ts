@@ -27,24 +27,53 @@ import { ApproveMaintenanceTicketDto } from './dto/approve-maintenance-ticket.dt
 import { CancelMaintenanceTicketDto } from './dto/cancel-maintenance-ticket.dto';
 import { ClearRoomMaintenanceDto } from './dto/clear-room-maintenance.dto';
 import { CompleteMaintenanceTicketDto } from './dto/complete-maintenance-ticket.dto';
+import { CreateAssetDto } from './dto/create-asset.dto';
 import { CreateMaintenanceTicketDto } from './dto/create-maintenance-ticket.dto';
+import { CreateMaintenanceTicketNoteDto } from './dto/create-maintenance-ticket-note.dto';
+import { CreatePreventiveMaintenancePlanDto } from './dto/create-preventive-maintenance-plan.dto';
+import { CreateTicketFromHousekeepingIssueDto } from './dto/create-ticket-from-housekeeping-issue.dto';
+import { CreateTicketFromPreventivePlanDto } from './dto/create-ticket-from-preventive-plan.dto';
+import { GetAssetsQueryDto } from './dto/get-assets-query.dto';
 import { GetMaintenanceTicketsQueryDto } from './dto/get-maintenance-tickets-query.dto';
+import { GetPreventiveMaintenancePlansQueryDto } from './dto/get-preventive-maintenance-plans-query.dto';
 import { MarkRoomOutOfOrderFromMaintenanceDto } from './dto/mark-room-out-of-order-from-maintenance.dto';
 import { MarkRoomUnderMaintenanceDto } from './dto/mark-room-under-maintenance.dto';
 import { RejectMaintenanceTicketDto } from './dto/reject-maintenance-ticket.dto';
 import { StartMaintenanceTicketDto } from './dto/start-maintenance-ticket.dto';
+import { UpdateAssetDto } from './dto/update-asset.dto';
 import { UpdateMaintenanceTicketDto } from './dto/update-maintenance-ticket.dto';
-import { AssetsRepository } from './repositories/assets.repository';
+import { UpdatePreventiveMaintenancePlanDto } from './dto/update-preventive-maintenance-plan.dto';
+import { UploadMaintenanceTicketPhotoDto } from './dto/upload-maintenance-ticket-photo.dto';
+import {
+  AssetRecord,
+  AssetsRepository,
+} from './repositories/assets.repository';
+import {
+  MaintenanceTicketNoteRecord,
+  MaintenanceTicketNotesRepository,
+} from './repositories/maintenance-ticket-notes.repository';
+import {
+  MaintenanceTicketPhotoRecord,
+  MaintenanceTicketPhotosRepository,
+} from './repositories/maintenance-ticket-photos.repository';
 import {
   MaintenanceTicketRecord,
   MaintenanceTicketsRepository,
 } from './repositories/maintenance-tickets.repository';
+import {
+  PreventiveMaintenancePlanRecord,
+  PreventiveMaintenancePlansRepository,
+} from './repositories/preventive-maintenance-plans.repository';
 
 @Injectable()
 export class MaintenanceService {
   constructor(
     private readonly maintenanceTicketsRepository: MaintenanceTicketsRepository,
+    private readonly maintenanceTicketNotesRepository: MaintenanceTicketNotesRepository,
+    private readonly maintenanceTicketPhotosRepository: MaintenanceTicketPhotosRepository,
     private readonly assetsRepository: AssetsRepository,
+    private readonly preventiveMaintenancePlansRepository: PreventiveMaintenancePlansRepository,
+    private readonly housekeepingIssuesRepository: HousekeepingIssuesRepository,
     private readonly roomsRepository: RoomsRepository,
     private readonly auditLogsService: AuditLogsService,
   ) {}
