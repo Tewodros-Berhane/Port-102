@@ -101,6 +101,10 @@ describe('MaintenanceTicketsRepository', () => {
         where: {
           id: 30,
         },
+        select: expect.objectContaining({
+          notes: expect.any(Object),
+          photos: expect.any(Object),
+        }),
       }),
     );
     expect(prisma.maintenanceTicket.findUnique).toHaveBeenCalledWith(
