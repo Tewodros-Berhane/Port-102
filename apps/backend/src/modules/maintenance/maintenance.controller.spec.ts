@@ -119,7 +119,19 @@ describe('MaintenanceController', () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.getDashboard,
+      ),
+    ).toEqual(['maintenance.dashboard.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
         MaintenanceController.prototype.createTicket,
+      ),
+    ).toEqual(['maintenance.tickets.create']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        MaintenanceController.prototype.createTicketFromHousekeepingIssue,
       ),
     ).toEqual(['maintenance.tickets.create']);
     expect(
