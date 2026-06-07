@@ -245,4 +245,15 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'source')).toBe(true);
   });
 
+  it('rejects an oversized POS table number', async () => {
+    const errors = await validationErrors(CreatePosOrderDto, {
+      outletId: 4,
+      tableNumber: 'T'.repeat(81),
+    });
+
+    expect(errors.some((error) => error.property === 'tableNumber')).toBe(
+      true,
+    );
+  });
+
 });
