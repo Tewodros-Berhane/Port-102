@@ -91,4 +91,16 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'price')).toBe(true);
   });
 
+  it('rejects an unknown menu item status', async () => {
+    const errors = await validationErrors(CreateMenuItemDto, {
+      outletId: 1,
+      name: 'Special Tibs',
+      code: 'TIBS-01',
+      price: 450,
+      status: 'DISCONTINUED',
+    });
+
+    expect(errors.some((error) => error.property === 'status')).toBe(true);
+  });
+
 });
