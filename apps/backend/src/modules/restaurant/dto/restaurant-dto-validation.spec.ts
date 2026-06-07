@@ -236,4 +236,13 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'outletId')).toBe(true);
   });
 
+  it('rejects an unknown POS order source', async () => {
+    const errors = await validationErrors(CreatePosOrderDto, {
+      outletId: 4,
+      source: 'PHONE',
+    });
+
+    expect(errors.some((error) => error.property === 'source')).toBe(true);
+  });
+
 });
