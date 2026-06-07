@@ -210,4 +210,12 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'isActive')).toBe(true);
   });
 
+  it('rejects outlet query limits above 100', async () => {
+    const errors = await validationErrors(GetOutletsQueryDto, {
+      limit: 101,
+    });
+
+    expect(errors.some((error) => error.property === 'limit')).toBe(true);
+  });
+
 });
