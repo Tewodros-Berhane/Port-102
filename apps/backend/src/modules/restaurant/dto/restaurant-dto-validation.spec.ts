@@ -218,4 +218,14 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'limit')).toBe(true);
   });
 
+  it('accepts a valid POS order creation payload', async () => {
+    await expect(
+      validationErrors(CreatePosOrderDto, {
+        outletId: 4,
+        source: PosOrderSource.TABLE_SERVICE,
+        tableNumber: 'T-12',
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
 });
