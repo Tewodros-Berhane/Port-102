@@ -80,4 +80,15 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'price')).toBe(true);
   });
 
+  it('rejects a menu item price with more than two decimal places', async () => {
+    const errors = await validationErrors(CreateMenuItemDto, {
+      outletId: 1,
+      name: 'Special Tibs',
+      code: 'TIBS-01',
+      price: 450.123,
+    });
+
+    expect(errors.some((error) => error.property === 'price')).toBe(true);
+  });
+
 });
