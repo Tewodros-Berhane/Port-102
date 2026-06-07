@@ -256,4 +256,13 @@ describe('Restaurant DTO validation', () => {
     );
   });
 
+  it('accepts nullable POS order update metadata', async () => {
+    await expect(
+      validationErrors(UpdatePosOrderDto, {
+        tableNumber: null,
+        notes: null,
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
 });
