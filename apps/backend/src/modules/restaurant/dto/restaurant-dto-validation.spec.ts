@@ -47,4 +47,15 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'outletId')).toBe(true);
   });
 
+  it('rejects a blank menu item name', async () => {
+    const errors = await validationErrors(CreateMenuItemDto, {
+      outletId: 1,
+      name: '',
+      code: 'TIBS-01',
+      price: 450,
+    });
+
+    expect(errors.some((error) => error.property === 'name')).toBe(true);
+  });
+
 });
