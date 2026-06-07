@@ -202,4 +202,12 @@ describe('Restaurant DTO validation', () => {
     await expect(validate(query)).resolves.toHaveLength(0);
   });
 
+  it('rejects an invalid outlet activity filter', async () => {
+    const errors = await validationErrors(GetOutletsQueryDto, {
+      isActive: 'yes',
+    });
+
+    expect(errors.some((error) => error.property === 'isActive')).toBe(true);
+  });
+
 });
