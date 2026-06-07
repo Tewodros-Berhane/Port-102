@@ -111,4 +111,12 @@ describe('Restaurant DTO validation', () => {
     ).resolves.toHaveLength(0);
   });
 
+  it('rejects an invalid outlet ID on a menu item update', async () => {
+    const errors = await validationErrors(UpdateMenuItemDto, {
+      outletId: -1,
+    });
+
+    expect(errors.some((error) => error.property === 'outletId')).toBe(true);
+  });
+
 });
