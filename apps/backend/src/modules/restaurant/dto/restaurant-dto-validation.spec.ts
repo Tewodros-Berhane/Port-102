@@ -146,4 +146,12 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'limit')).toBe(true);
   });
 
+  it('rejects an unknown menu item status filter', async () => {
+    const errors = await validationErrors(GetMenuItemsQueryDto, {
+      status: 'DISCONTINUED',
+    });
+
+    expect(errors.some((error) => error.property === 'status')).toBe(true);
+  });
+
 });
