@@ -273,4 +273,21 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'notes')).toBe(true);
   });
 
+  it('transforms POS order pagination and outlet filters', async () => {
+    const query = plainToInstance(GetPosOrdersQueryDto, {
+      page: '3',
+      limit: '50',
+      outletId: '4',
+      status: PosOrderStatus.OPEN,
+    });
+
+    expect(query).toMatchObject({
+      page: 3,
+      limit: 50,
+      outletId: 4,
+      status: PosOrderStatus.OPEN,
+    });
+    await expect(validate(query)).resolves.toHaveLength(0);
+  });
+
 });
