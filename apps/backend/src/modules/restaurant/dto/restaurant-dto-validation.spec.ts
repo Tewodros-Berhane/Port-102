@@ -193,4 +193,13 @@ describe('Restaurant DTO validation', () => {
     await expect(validate(query)).resolves.toHaveLength(0);
   });
 
+  it('transforms a false outlet activity filter', async () => {
+    const query = plainToInstance(GetOutletsQueryDto, {
+      isActive: 'false',
+    });
+
+    expect(query.isActive).toBe(false);
+    await expect(validate(query)).resolves.toHaveLength(0);
+  });
+
 });
