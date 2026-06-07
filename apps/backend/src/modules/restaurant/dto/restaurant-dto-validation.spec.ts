@@ -103,4 +103,12 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'status')).toBe(true);
   });
 
+  it('accepts a partial menu item update', async () => {
+    await expect(
+      validationErrors(UpdateMenuItemDto, {
+        price: 475,
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
 });
