@@ -138,4 +138,12 @@ describe('Restaurant DTO validation', () => {
     await expect(validate(query)).resolves.toHaveLength(0);
   });
 
+  it('rejects menu item query limits above 100', async () => {
+    const errors = await validationErrors(GetMenuItemsQueryDto, {
+      limit: 101,
+    });
+
+    expect(errors.some((error) => error.property === 'limit')).toBe(true);
+  });
+
 });
