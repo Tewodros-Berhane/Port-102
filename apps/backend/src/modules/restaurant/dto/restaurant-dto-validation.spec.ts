@@ -251,9 +251,7 @@ describe('Restaurant DTO validation', () => {
       tableNumber: 'T'.repeat(81),
     });
 
-    expect(errors.some((error) => error.property === 'tableNumber')).toBe(
-      true,
-    );
+    expect(errors.some((error) => error.property === 'tableNumber')).toBe(true);
   });
 
   it('accepts nullable POS order update metadata', async () => {
@@ -290,4 +288,13 @@ describe('Restaurant DTO validation', () => {
     await expect(validate(query)).resolves.toHaveLength(0);
   });
 
+  it('rejects invalid POS order date and status filters', async () => {
+    const errors = await validationErrors(GetPosOrdersQueryDto, {
+      createdFrom: 'not-a-date',
+      status: 'PENDING',
+    });
+
+    expect(errors.some((error) => error.property === 'createdFrom')).toBe(true);
+    expect(errors.some((error) => error.property === 'status')).toBe(true);
+  });
 });
