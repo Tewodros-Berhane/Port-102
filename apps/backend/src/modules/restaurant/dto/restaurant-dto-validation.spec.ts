@@ -164,4 +164,14 @@ describe('Restaurant DTO validation', () => {
     ).resolves.toHaveLength(0);
   });
 
+  it('rejects an outlet code containing spaces', async () => {
+    const errors = await validationErrors(CreateOutletDto, {
+      name: 'Main Restaurant',
+      code: 'MAIN RESTAURANT',
+      type: OutletType.RESTAURANT,
+    });
+
+    expect(errors.some((error) => error.property === 'code')).toBe(true);
+  });
+
 });
