@@ -248,59 +248,109 @@ enum PreventiveMaintenanceStatus {
   CANCELLED
 }
 
+enum OutletType {
+  RESTAURANT
+  CAFE
+  BAR
+  STORE
+  ROOM_SERVICE
+  OTHER
+}
+
+enum PosOrderStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+enum PosOrderPaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  CHARGED_TO_ROOM
+  VOIDED
+}
+
+enum PosOrderSource {
+  WALK_IN
+  TABLE_SERVICE
+  ROOM_SERVICE
+  MANUAL
+}
+
+enum MenuItemStatus {
+  ACTIVE
+  INACTIVE
+  OUT_OF_STOCK
+}
+
+enum PosPaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  MOBILE_MONEY
+  QR_PAYMENT
+  ROOM_CHARGE
+  OTHER
+}
+
 model User {
-  id                          Int                  @id @default(autoincrement())
-  email                       String               @unique
+  id                          Int                         @id @default(autoincrement())
+  email                       String                      @unique
   passwordHash                String
   fullName                    String
   phone                       String?
-  status                      UserStatus           @default(ACTIVE)
-  tokenVersion                Int                  @default(0)
+  status                      UserStatus                  @default(ACTIVE)
+  tokenVersion                Int                         @default(0)
   lastLoginAt                 DateTime?
   roleId                      Int
   departmentId                Int?
-  createdAt                   DateTime             @default(now())
-  updatedAt                   DateTime             @updatedAt
-  role                        Role                 @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  department                  Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
+  role                        Role                        @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  department                  Department?                 @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   refreshTokens               RefreshToken[]
   employees                   Employee[]
   guests                      Guest[]
-  auditLogs                   AuditLog[]           @relation("AuditActor")
-  requestedApprovalRequests   ApprovalRequest[]    @relation("ApprovalRequester")
-  approvedApprovalRequests    ApprovalRequest[]    @relation("ApprovalApprover")
+  auditLogs                   AuditLog[]                  @relation("AuditActor")
+  requestedApprovalRequests   ApprovalRequest[]           @relation("ApprovalRequester")
+  approvedApprovalRequests    ApprovalRequest[]           @relation("ApprovalApprover")
   roomStatusLogs              RoomStatusLog[]
-  createdReservations         Reservation[]        @relation("ReservationCreator")
-  cancelledReservations       Reservation[]        @relation("ReservationCanceller")
-  checkedInStays              Stay[]               @relation("StayCheckedInBy")
-  checkedOutStays             Stay[]               @relation("StayCheckedOutBy")
-  assignedStayRooms           StayRoomAssignment[] @relation("StayRoomAssignedBy")
-  releasedStayRooms           StayRoomAssignment[] @relation("StayRoomReleasedBy")
-  openedFolios                Folio[]              @relation("FolioOpenedBy")
-  closedFolios                Folio[]              @relation("FolioClosedBy")
-  postedFolioLineItems        FolioLineItem[]      @relation("FolioLineItemPostedBy")
-  recordedPayments            Payment[]            @relation("PaymentRecordedBy")
-  issuedInvoices              Invoice[]            @relation("InvoiceIssuedBy")
-  issuedReceipts              Receipt[]            @relation("ReceiptIssuedBy")
-  assignedHousekeepingTasks   HousekeepingTask[]   @relation("HousekeepingTaskAssignedTo")
-  assignedByHousekeepingTasks HousekeepingTask[]   @relation("HousekeepingTaskAssignedBy")
-  completedHousekeepingTasks  HousekeepingTask[]   @relation("HousekeepingTaskCompletedBy")
-  inspectedHousekeepingTasks  HousekeepingTask[]   @relation("HousekeepingTaskInspectedBy")
-  approvedHousekeepingTasks   HousekeepingTask[]   @relation("HousekeepingTaskApprovedBy")
-  rejectedHousekeepingTasks   HousekeepingTask[]   @relation("HousekeepingTaskRejectedBy")
-  cancelledHousekeepingTasks  HousekeepingTask[]   @relation("HousekeepingTaskCancelledBy")
-  reportedHousekeepingIssues  HousekeepingIssue[]  @relation("HousekeepingIssueReportedBy")
-  resolvedHousekeepingIssues  HousekeepingIssue[]  @relation("HousekeepingIssueResolvedBy")
-  reportedMaintenanceTickets  MaintenanceTicket[]  @relation("MaintenanceTicketReportedBy")
-  assignedMaintenanceTickets  MaintenanceTicket[]  @relation("MaintenanceTicketAssignedTo")
-  assignedByMaintenanceTasks  MaintenanceTicket[]  @relation("MaintenanceTicketAssignedBy")
-  completedMaintenanceTickets MaintenanceTicket[]  @relation("MaintenanceTicketCompletedBy")
-  approvedMaintenanceTickets  MaintenanceTicket[]  @relation("MaintenanceTicketApprovedBy")
-  rejectedMaintenanceTickets  MaintenanceTicket[]  @relation("MaintenanceTicketRejectedBy")
-  cancelledMaintenanceTickets MaintenanceTicket[]  @relation("MaintenanceTicketCancelledBy")
-  maintenanceTicketNotes      MaintenanceTicketNote[] @relation("MaintenanceTicketNoteAuthor")
-  maintenanceTicketPhotos     MaintenanceTicketPhoto[] @relation("MaintenanceTicketPhotoUploadedBy")
+  createdReservations         Reservation[]               @relation("ReservationCreator")
+  cancelledReservations       Reservation[]               @relation("ReservationCanceller")
+  checkedInStays              Stay[]                      @relation("StayCheckedInBy")
+  checkedOutStays             Stay[]                      @relation("StayCheckedOutBy")
+  assignedStayRooms           StayRoomAssignment[]        @relation("StayRoomAssignedBy")
+  releasedStayRooms           StayRoomAssignment[]        @relation("StayRoomReleasedBy")
+  openedFolios                Folio[]                     @relation("FolioOpenedBy")
+  closedFolios                Folio[]                     @relation("FolioClosedBy")
+  postedFolioLineItems        FolioLineItem[]             @relation("FolioLineItemPostedBy")
+  recordedPayments            Payment[]                   @relation("PaymentRecordedBy")
+  issuedInvoices              Invoice[]                   @relation("InvoiceIssuedBy")
+  issuedReceipts              Receipt[]                   @relation("ReceiptIssuedBy")
+  assignedHousekeepingTasks   HousekeepingTask[]          @relation("HousekeepingTaskAssignedTo")
+  assignedByHousekeepingTasks HousekeepingTask[]          @relation("HousekeepingTaskAssignedBy")
+  completedHousekeepingTasks  HousekeepingTask[]          @relation("HousekeepingTaskCompletedBy")
+  inspectedHousekeepingTasks  HousekeepingTask[]          @relation("HousekeepingTaskInspectedBy")
+  approvedHousekeepingTasks   HousekeepingTask[]          @relation("HousekeepingTaskApprovedBy")
+  rejectedHousekeepingTasks   HousekeepingTask[]          @relation("HousekeepingTaskRejectedBy")
+  cancelledHousekeepingTasks  HousekeepingTask[]          @relation("HousekeepingTaskCancelledBy")
+  reportedHousekeepingIssues  HousekeepingIssue[]         @relation("HousekeepingIssueReportedBy")
+  resolvedHousekeepingIssues  HousekeepingIssue[]         @relation("HousekeepingIssueResolvedBy")
+  reportedMaintenanceTickets  MaintenanceTicket[]         @relation("MaintenanceTicketReportedBy")
+  assignedMaintenanceTickets  MaintenanceTicket[]         @relation("MaintenanceTicketAssignedTo")
+  assignedByMaintenanceTasks  MaintenanceTicket[]         @relation("MaintenanceTicketAssignedBy")
+  completedMaintenanceTickets MaintenanceTicket[]         @relation("MaintenanceTicketCompletedBy")
+  approvedMaintenanceTickets  MaintenanceTicket[]         @relation("MaintenanceTicketApprovedBy")
+  rejectedMaintenanceTickets  MaintenanceTicket[]         @relation("MaintenanceTicketRejectedBy")
+  cancelledMaintenanceTickets MaintenanceTicket[]         @relation("MaintenanceTicketCancelledBy")
+  maintenanceTicketNotes      MaintenanceTicketNote[]     @relation("MaintenanceTicketNoteAuthor")
+  maintenanceTicketPhotos     MaintenanceTicketPhoto[]    @relation("MaintenanceTicketPhotoUploadedBy")
   preventiveMaintenancePlans  PreventiveMaintenancePlan[] @relation("PreventiveMaintenanceCreatedBy")
+  createdPosOrders            PosOrder[]                  @relation("PosOrderCreatedBy")
+  closedPosOrders             PosOrder[]                  @relation("PosOrderClosedBy")
+  cancelledPosOrders          PosOrder[]                  @relation("PosOrderCancelledBy")
+  recordedPosOrderPayments    PosOrderPayment[]           @relation("PosOrderPaymentRecordedBy")
 
   @@index([roleId])
   @@index([departmentId])
@@ -461,28 +511,29 @@ model RoomTypeAmenity {
 }
 
 model Room {
-  id                 Int                   @id @default(autoincrement())
-  roomNumber         String                @unique
-  displayName        String?
-  floorId            Int?
-  roomTypeId         Int
-  occupancyStatus    RoomOccupancyStatus   @default(VACANT)
-  cleaningStatus     RoomCleaningStatus    @default(CLEAN)
-  maintenanceStatus  RoomMaintenanceStatus @default(AVAILABLE)
-  notes              String?
-  isActive           Boolean               @default(true)
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  floor              Floor?                @relation(fields: [floorId], references: [id], onDelete: SetNull)
-  roomType           RoomType              @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
-  statusLogs         RoomStatusLog[]
-  reservationRooms   ReservationRoom[]
-  stayAssignments    StayRoomAssignment[]
-  housekeepingTasks  HousekeepingTask[]
-  housekeepingIssues HousekeepingIssue[]
-  maintenanceTickets MaintenanceTicket[]
-  assets             Asset[]
+  id                         Int                         @id @default(autoincrement())
+  roomNumber                 String                      @unique
+  displayName                String?
+  floorId                    Int?
+  roomTypeId                 Int
+  occupancyStatus            RoomOccupancyStatus         @default(VACANT)
+  cleaningStatus             RoomCleaningStatus          @default(CLEAN)
+  maintenanceStatus          RoomMaintenanceStatus       @default(AVAILABLE)
+  notes                      String?
+  isActive                   Boolean                     @default(true)
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  floor                      Floor?                      @relation(fields: [floorId], references: [id], onDelete: SetNull)
+  roomType                   RoomType                    @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  statusLogs                 RoomStatusLog[]
+  reservationRooms           ReservationRoom[]
+  stayAssignments            StayRoomAssignment[]
+  housekeepingTasks          HousekeepingTask[]
+  housekeepingIssues         HousekeepingIssue[]
+  maintenanceTickets         MaintenanceTicket[]
+  assets                     Asset[]
   preventiveMaintenancePlans PreventiveMaintenancePlan[]
+  posOrders                  PosOrder[]
 
   @@index([floorId])
   @@index([roomTypeId])
@@ -584,6 +635,7 @@ model Stay {
   checkedOutBy         User?                @relation("StayCheckedOutBy", fields: [checkedOutByUserId], references: [id], onDelete: SetNull)
   roomAssignments      StayRoomAssignment[]
   folio                Folio?
+  posOrders            PosOrder[]
 
   @@index([guestId])
   @@index([status])
@@ -688,6 +740,7 @@ model Folio {
   payments       Payment[]
   invoices       Invoice[]
   receipts       Receipt[]
+  posOrders      PosOrder[]
 
   @@index([stayId])
   @@index([guestId])
@@ -871,16 +924,16 @@ model HousekeepingIssue {
 }
 
 model MaintenanceTicket {
-  id                 Int                     @id @default(autoincrement())
-  ticketNumber       String                  @unique
+  id                 Int                      @id @default(autoincrement())
+  ticketNumber       String                   @unique
   roomId             Int?
   assetId            Int?
-  source             MaintenanceTicketSource @default(MANUAL)
+  source             MaintenanceTicketSource  @default(MANUAL)
   sourceType         String?
   sourceId           Int?
-  issueType          MaintenanceIssueType    @default(OTHER)
-  status             MaintenanceTicketStatus @default(OPEN)
-  priority           MaintenancePriority     @default(NORMAL)
+  issueType          MaintenanceIssueType     @default(OTHER)
+  status             MaintenanceTicketStatus  @default(OPEN)
+  priority           MaintenancePriority      @default(NORMAL)
   title              String
   description        String?
   reportedByUserId   Int?
@@ -900,17 +953,17 @@ model MaintenanceTicket {
   approvalNotes      String?
   rejectionReason    String?
   cancellationReason String?
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  room               Room?                   @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  asset              Asset?                  @relation(fields: [assetId], references: [id], onDelete: SetNull)
-  reportedBy         User?                   @relation("MaintenanceTicketReportedBy", fields: [reportedByUserId], references: [id], onDelete: SetNull)
-  assignedTo         User?                   @relation("MaintenanceTicketAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
-  assignedBy         User?                   @relation("MaintenanceTicketAssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
-  completedBy        User?                   @relation("MaintenanceTicketCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
-  approvedBy         User?                   @relation("MaintenanceTicketApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
-  rejectedBy         User?                   @relation("MaintenanceTicketRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
-  cancelledBy        User?                   @relation("MaintenanceTicketCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  room               Room?                    @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  asset              Asset?                   @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  reportedBy         User?                    @relation("MaintenanceTicketReportedBy", fields: [reportedByUserId], references: [id], onDelete: SetNull)
+  assignedTo         User?                    @relation("MaintenanceTicketAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  assignedBy         User?                    @relation("MaintenanceTicketAssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+  completedBy        User?                    @relation("MaintenanceTicketCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  approvedBy         User?                    @relation("MaintenanceTicketApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejectedBy         User?                    @relation("MaintenanceTicketRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  cancelledBy        User?                    @relation("MaintenanceTicketCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
   notes              MaintenanceTicketNote[]
   photos             MaintenanceTicketPhoto[]
 
@@ -925,11 +978,11 @@ model MaintenanceTicket {
 }
 
 model MaintenanceTicketNote {
-  id           Int      @id @default(autoincrement())
+  id           Int               @id @default(autoincrement())
   ticketId     Int
   authorUserId Int?
   note         String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime          @default(now())
   ticket       MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   author       User?             @relation("MaintenanceTicketNoteAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
 
@@ -939,12 +992,12 @@ model MaintenanceTicketNote {
 }
 
 model MaintenanceTicketPhoto {
-  id               Int      @id @default(autoincrement())
+  id               Int               @id @default(autoincrement())
   ticketId         Int
   uploadedByUserId Int?
   url              String
   description      String?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime          @default(now())
   ticket           MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   uploadedBy       User?             @relation("MaintenanceTicketPhotoUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
 
@@ -954,21 +1007,21 @@ model MaintenanceTicketPhoto {
 }
 
 model Asset {
-  id               Int          @id @default(autoincrement())
-  assetNumber      String       @unique
-  name             String
-  category         String?
-  location         String?
-  roomId           Int?
-  status           AssetStatus  @default(ACTIVE)
-  description      String?
-  purchaseDate     DateTime?
-  warrantyUntil    DateTime?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  room             Room?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  tickets          MaintenanceTicket[]
-  preventivePlans  PreventiveMaintenancePlan[]
+  id              Int                         @id @default(autoincrement())
+  assetNumber     String                      @unique
+  name            String
+  category        String?
+  location        String?
+  roomId          Int?
+  status          AssetStatus                 @default(ACTIVE)
+  description     String?
+  purchaseDate    DateTime?
+  warrantyUntil   DateTime?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  room            Room?                       @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  tickets         MaintenanceTicket[]
+  preventivePlans PreventiveMaintenancePlan[]
 
   @@index([roomId])
   @@index([status])
@@ -999,6 +1052,137 @@ model PreventiveMaintenancePlan {
   @@index([status])
   @@index([nextDueDate])
   @@map("preventive_maintenance_plans")
+}
+
+model Outlet {
+  id          Int        @id @default(autoincrement())
+  name        String
+  code        String     @unique
+  type        OutletType
+  description String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  menuItems   MenuItem[]
+  orders      PosOrder[]
+
+  @@index([type])
+  @@index([isActive])
+  @@map("outlets")
+}
+
+model MenuItem {
+  id          Int            @id @default(autoincrement())
+  outletId    Int
+  name        String
+  code        String
+  category    String?
+  description String?
+  price       Decimal        @db.Decimal(12, 2)
+  status      MenuItemStatus @default(ACTIVE)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  outlet      Outlet         @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  orderItems  PosOrderItem[]
+
+  @@unique([outletId, code])
+  @@index([outletId])
+  @@index([status])
+  @@index([category])
+  @@map("menu_items")
+}
+
+model PosOrder {
+  id                Int                   @id @default(autoincrement())
+  orderNumber       String                @unique
+  outletId          Int
+  status            PosOrderStatus        @default(OPEN)
+  paymentStatus     PosOrderPaymentStatus @default(UNPAID)
+  source            PosOrderSource        @default(MANUAL)
+  tableNumber       String?
+  roomId            Int?
+  stayId            Int?
+  folioId           Int?
+  subtotalAmount    Decimal               @default(0) @db.Decimal(12, 2)
+  discountAmount    Decimal               @default(0) @db.Decimal(12, 2)
+  taxAmount         Decimal               @default(0) @db.Decimal(12, 2)
+  serviceAmount     Decimal               @default(0) @db.Decimal(12, 2)
+  totalAmount       Decimal               @default(0) @db.Decimal(12, 2)
+  paidAmount        Decimal               @default(0) @db.Decimal(12, 2)
+  balanceAmount     Decimal               @default(0) @db.Decimal(12, 2)
+  notes             String?
+  cancelledReason   String?
+  createdByUserId   Int?
+  closedByUserId    Int?
+  cancelledByUserId Int?
+  closedAt          DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  outlet            Outlet                @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  room              Room?                 @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  stay              Stay?                 @relation(fields: [stayId], references: [id], onDelete: SetNull)
+  folio             Folio?                @relation(fields: [folioId], references: [id], onDelete: SetNull)
+  createdBy         User?                 @relation("PosOrderCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  closedBy          User?                 @relation("PosOrderClosedBy", fields: [closedByUserId], references: [id], onDelete: SetNull)
+  cancelledBy       User?                 @relation("PosOrderCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+  items             PosOrderItem[]
+  payments          PosOrderPayment[]
+
+  @@index([outletId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([source])
+  @@index([roomId])
+  @@index([stayId])
+  @@index([folioId])
+  @@index([createdAt])
+  @@map("pos_orders")
+}
+
+model PosOrderItem {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  menuItemId  Int
+  description String?
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  totalAmount Decimal  @db.Decimal(12, 2)
+  notes       String?
+  isVoided    Boolean  @default(false)
+  voidReason  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  order       PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([menuItemId])
+  @@map("pos_order_items")
+}
+
+model PosOrderPayment {
+  id               Int              @id @default(autoincrement())
+  paymentNumber    String           @unique
+  orderId          Int
+  amount           Decimal          @db.Decimal(12, 2)
+  method           PosPaymentMethod
+  reference        String?
+  notes            String?
+  recordedByUserId Int?
+  recordedAt       DateTime         @default(now())
+  isVoided         Boolean          @default(false)
+  voidReason       String?
+  voidedAt         DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  order            PosOrder         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  recordedBy       User?            @relation("PosOrderPaymentRecordedBy", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([method])
+  @@index([recordedAt])
+  @@map("pos_order_payments")
 }
 
 model AuditLog {
