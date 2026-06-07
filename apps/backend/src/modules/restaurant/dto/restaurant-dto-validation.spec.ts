@@ -69,4 +69,15 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'code')).toBe(true);
   });
 
+  it('rejects a non-positive menu item price', async () => {
+    const errors = await validationErrors(CreateMenuItemDto, {
+      outletId: 1,
+      name: 'Special Tibs',
+      code: 'TIBS-01',
+      price: 0,
+    });
+
+    expect(errors.some((error) => error.property === 'price')).toBe(true);
+  });
+
 });
