@@ -228,4 +228,12 @@ describe('Restaurant DTO validation', () => {
     ).resolves.toHaveLength(0);
   });
 
+  it('rejects an invalid POS order outlet ID', async () => {
+    const errors = await validationErrors(CreatePosOrderDto, {
+      outletId: 0,
+    });
+
+    expect(errors.some((error) => error.property === 'outletId')).toBe(true);
+  });
+
 });
