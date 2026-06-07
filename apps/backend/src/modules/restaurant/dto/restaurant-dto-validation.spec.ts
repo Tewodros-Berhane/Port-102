@@ -127,4 +127,15 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'price')).toBe(true);
   });
 
+  it('transforms menu item pagination and outlet filters', async () => {
+    const query = plainToInstance(GetMenuItemsQueryDto, {
+      page: '2',
+      limit: '25',
+      outletId: '4',
+    });
+
+    expect(query).toMatchObject({ page: 2, limit: 25, outletId: 4 });
+    await expect(validate(query)).resolves.toHaveLength(0);
+  });
+
 });
