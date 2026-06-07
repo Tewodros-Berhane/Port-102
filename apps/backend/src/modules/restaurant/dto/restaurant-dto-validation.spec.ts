@@ -154,4 +154,14 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'status')).toBe(true);
   });
 
+  it('accepts a valid outlet creation payload', async () => {
+    await expect(
+      validationErrors(CreateOutletDto, {
+        name: 'Main Restaurant',
+        code: 'MAIN-RESTAURANT',
+        type: OutletType.RESTAURANT,
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
 });
