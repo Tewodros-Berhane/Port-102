@@ -174,4 +174,14 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'code')).toBe(true);
   });
 
+  it('rejects an unknown outlet type', async () => {
+    const errors = await validationErrors(CreateOutletDto, {
+      name: 'Main Restaurant',
+      code: 'MAIN-RESTAURANT',
+      type: 'DINING_ROOM',
+    });
+
+    expect(errors.some((error) => error.property === 'type')).toBe(true);
+  });
+
 });
