@@ -119,4 +119,12 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'outletId')).toBe(true);
   });
 
+  it('rejects a zero price on a menu item update', async () => {
+    const errors = await validationErrors(UpdateMenuItemDto, {
+      price: 0,
+    });
+
+    expect(errors.some((error) => error.property === 'price')).toBe(true);
+  });
+
 });
