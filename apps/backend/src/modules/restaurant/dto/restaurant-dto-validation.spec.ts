@@ -36,4 +36,15 @@ describe('Restaurant DTO validation', () => {
     ).resolves.toHaveLength(0);
   });
 
+  it('rejects a menu item with an invalid outlet ID', async () => {
+    const errors = await validationErrors(CreateMenuItemDto, {
+      outletId: 0,
+      name: 'Special Tibs',
+      code: 'TIBS-01',
+      price: 450,
+    });
+
+    expect(errors.some((error) => error.property === 'outletId')).toBe(true);
+  });
+
 });
