@@ -312,4 +312,13 @@ describe('Restaurant DTO validation', () => {
     ).resolves.toHaveLength(0);
   });
 
+  it('rejects invalid POS order item quantities', async () => {
+    const errors = await validationErrors(AddPosOrderItemDto, {
+      menuItemId: 7,
+      quantity: 0,
+    });
+
+    expect(errors.some((error) => error.property === 'quantity')).toBe(true);
+  });
+
 });
