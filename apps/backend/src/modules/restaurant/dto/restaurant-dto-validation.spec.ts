@@ -330,4 +330,13 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'menuItemId')).toBe(true);
   });
 
+  it('rejects oversized POS order item notes', async () => {
+    const errors = await validationErrors(AddPosOrderItemDto, {
+      menuItemId: 7,
+      notes: 'N'.repeat(501),
+    });
+
+    expect(errors.some((error) => error.property === 'notes')).toBe(true);
+  });
+
 });
