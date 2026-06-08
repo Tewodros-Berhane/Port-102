@@ -364,4 +364,13 @@ describe('Restaurant DTO validation', () => {
     ).resolves.toHaveLength(0);
   });
 
+  it('rejects an unknown direct POS payment method', async () => {
+    const errors = await validationErrors(RecordPosOrderPaymentDto, {
+      amount: 450,
+      method: 'CHEQUE',
+    });
+
+    expect(errors.some((error) => error.property === 'method')).toBe(true);
+  });
+
 });
