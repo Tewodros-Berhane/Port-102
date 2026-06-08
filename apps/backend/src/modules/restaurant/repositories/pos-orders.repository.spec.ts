@@ -12,6 +12,7 @@ import { PosOrdersRepository } from './pos-orders.repository';
 describe('PosOrdersRepository', () => {
   let repository: PosOrdersRepository;
   let prisma: {
+    $transaction: jest.Mock;
     posOrder: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -23,6 +24,7 @@ describe('PosOrdersRepository', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
       posOrder: {
         create: jest.fn(),
         findUnique: jest.fn(),
@@ -43,6 +45,17 @@ describe('PosOrdersRepository', () => {
     }).compile();
 
     repository = module.get<PosOrdersRepository>(PosOrdersRepository);
+  });
+
+  it('runs grouped POS writes in a transaction', async () => {
+    const operation = jest.fn().mockResolvedValue('done');
+    prisma.$transaction.mockResolvedValue('done');
+
+    await repository.runInTransaction(operation);
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(operation, {
+      isolationLevel: 'Serializable',
+    });
   });
 
   it('creates and finds orders through PrismaService', async () => {
