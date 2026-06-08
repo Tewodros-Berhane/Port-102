@@ -7,21 +7,27 @@ import {
 
 import {
   MenuItemStatus,
+  PosOrderPaymentStatus,
   PosOrderSource,
   PosOrderStatus,
+  PosPaymentMethod,
   Prisma,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
+import { AddPosOrderItemDto } from './dto/add-pos-order-item.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { CreateOutletDto } from './dto/create-outlet.dto';
 import { CreatePosOrderDto } from './dto/create-pos-order.dto';
 import { GetMenuItemsQueryDto } from './dto/get-menu-items-query.dto';
 import { GetOutletsQueryDto } from './dto/get-outlets-query.dto';
 import { GetPosOrdersQueryDto } from './dto/get-pos-orders-query.dto';
+import { RecordPosOrderPaymentDto } from './dto/record-pos-order-payment.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
 import { UpdateOutletDto } from './dto/update-outlet.dto';
+import { UpdatePosOrderItemDto } from './dto/update-pos-order-item.dto';
 import { UpdatePosOrderDto } from './dto/update-pos-order.dto';
+import { VoidPosOrderItemDto } from './dto/void-pos-order-item.dto';
 import {
   MenuItemRecord,
   MenuItemsRepository,
@@ -30,6 +36,11 @@ import {
   OutletRecord,
   OutletsRepository,
 } from './repositories/outlets.repository';
+import { PosOrderItemsRepository } from './repositories/pos-order-items.repository';
+import {
+  PosOrderPaymentRecord,
+  PosOrderPaymentsRepository,
+} from './repositories/pos-order-payments.repository';
 import {
   PosOrderRecord,
   PosOrdersRepository,
@@ -41,6 +52,8 @@ export class RestaurantService {
     private readonly outletsRepository: OutletsRepository,
     private readonly menuItemsRepository: MenuItemsRepository,
     private readonly posOrdersRepository: PosOrdersRepository,
+    private readonly posOrderItemsRepository: PosOrderItemsRepository,
+    private readonly posOrderPaymentsRepository: PosOrderPaymentsRepository,
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
@@ -535,6 +548,294 @@ export class RestaurantService {
     return this.serializeOrder(updatedOrder);
   }
 
+  async addOrderItem(
+    currentUser: CurrentUserPayload,
+    orderId: number,
+    addPosOrderItemDto: AddPosOrderItemDto,
+  ) {
+    const order = await this.findRequiredOrder(orderId);
+    this.ensureOrderIsOpen(order);
+
+    const menuItem = await this.findRequiredMenuItem(
+      addPosOrderItemDto.menuItemId,
+    );
+    this.ensureMenuItemCanBeOrdered(menuItem, order);
+
+    const quantity = addPosOrderItemDto.quantity ?? 1;
+    const totalAmount = menuItem.price.mul(quantity);
+    const result = await this.posOrdersRepository.runInTransaction(
+      async (client) => {
+        const item = await this.posOrderItemsRepository.createOrderItem(
+          {
+            orderId: order.id,
+            menuItemId: menuItem.id,
+            description: menuItem.name,
+            quantity,
+            unitPrice: menuItem.price,
+            totalAmount,
+            notes: this.normalizeOptionalString(addPosOrderItemDto.notes),
+          },
+          client,
+        );
+        const currentOrder = await this.posOrdersRepository.findOrder(
+          order.id,
+          client,
+        );
+
+        if (!currentOrder) {
+          throw new NotFoundException('POS order was not found.');
+        }
+
+        return {
+          item,
+          order: await this.recalculateOrder(currentOrder, client),
+        };
+      },
+    );
+
+    await this.recordOrderAudit(
+      currentUser,
+      'restaurant.order_items.added',
+      result.order,
+      {
+        itemId: result.item.id,
+        menuItemId: result.item.menuItemId,
+        quantity: result.item.quantity,
+        unitPrice: this.serializeDecimal(result.item.unitPrice),
+        totalAmount: this.serializeDecimal(result.item.totalAmount),
+      },
+    );
+
+    return this.serializeOrder(result.order);
+  }
+
+  async updateOrderItem(
+    currentUser: CurrentUserPayload,
+    orderId: number,
+    itemId: number,
+    updatePosOrderItemDto: UpdatePosOrderItemDto,
+  ) {
+    const order = await this.findRequiredOrder(orderId);
+    this.ensureOrderIsOpen(order);
+    const item = await this.findRequiredOrderItem(order.id, itemId);
+
+    if (item.isVoided) {
+      throw new ConflictException('Voided POS order items cannot be updated.');
+    }
+
+    const quantity = updatePosOrderItemDto.quantity ?? item.quantity;
+    const data: Prisma.PosOrderItemUncheckedUpdateInput = {};
+
+    if (updatePosOrderItemDto.quantity !== undefined) {
+      data.quantity = quantity;
+      data.totalAmount = item.unitPrice.mul(quantity);
+    }
+
+    if (updatePosOrderItemDto.notes !== undefined) {
+      data.notes = this.normalizeOptionalString(updatePosOrderItemDto.notes);
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.serializeOrder(order);
+    }
+
+    const result = await this.posOrdersRepository.runInTransaction(
+      async (client) => {
+        const updatedItem = await this.posOrderItemsRepository.updateOrderItem(
+          item.id,
+          data,
+          client,
+        );
+        const currentOrder = await this.posOrdersRepository.findOrder(
+          order.id,
+          client,
+        );
+
+        if (!currentOrder) {
+          throw new NotFoundException('POS order was not found.');
+        }
+
+        return {
+          item: updatedItem,
+          order: await this.recalculateOrder(currentOrder, client),
+        };
+      },
+    );
+
+    await this.recordOrderAudit(
+      currentUser,
+      'restaurant.order_items.updated',
+      result.order,
+      {
+        itemId: result.item.id,
+        previousQuantity: item.quantity,
+        quantity: result.item.quantity,
+        totalAmount: this.serializeDecimal(result.item.totalAmount),
+      },
+    );
+
+    return this.serializeOrder(result.order);
+  }
+
+  async voidOrderItem(
+    currentUser: CurrentUserPayload,
+    orderId: number,
+    itemId: number,
+    voidPosOrderItemDto: VoidPosOrderItemDto,
+  ) {
+    const order = await this.findRequiredOrder(orderId);
+    this.ensureOrderIsOpen(order);
+    const item = await this.findRequiredOrderItem(order.id, itemId);
+
+    if (item.isVoided) {
+      throw new ConflictException('POS order item is already voided.');
+    }
+
+    const reason = this.normalizeRequiredString(
+      voidPosOrderItemDto.reason,
+      'Void reason is required.',
+    );
+    const result = await this.posOrdersRepository.runInTransaction(
+      async (client) => {
+        const voidedItem = await this.posOrderItemsRepository.updateOrderItem(
+          item.id,
+          {
+            isVoided: true,
+            voidReason: reason,
+          },
+          client,
+        );
+        const currentOrder = await this.posOrdersRepository.findOrder(
+          order.id,
+          client,
+        );
+
+        if (!currentOrder) {
+          throw new NotFoundException('POS order was not found.');
+        }
+
+        return {
+          item: voidedItem,
+          order: await this.recalculateOrder(currentOrder, client),
+        };
+      },
+    );
+
+    await this.recordOrderAudit(
+      currentUser,
+      'restaurant.order_items.voided',
+      result.order,
+      {
+        itemId: result.item.id,
+        reason,
+        removedAmount: this.serializeDecimal(item.totalAmount),
+      },
+    );
+
+    return this.serializeOrder(result.order);
+  }
+
+  async recordOrderPayment(
+    currentUser: CurrentUserPayload,
+    orderId: number,
+    recordPosOrderPaymentDto: RecordPosOrderPaymentDto,
+  ) {
+    const order = await this.findRequiredOrder(orderId);
+    this.ensureOrderIsOpen(order);
+
+    if (recordPosOrderPaymentDto.method === PosPaymentMethod.ROOM_CHARGE) {
+      throw new BadRequestException(
+        'Use the charge-to-room workflow for room charges.',
+      );
+    }
+
+    if (order.balanceAmount.lte(0)) {
+      throw new ConflictException('POS order has no outstanding balance.');
+    }
+
+    const amount = new Prisma.Decimal(recordPosOrderPaymentDto.amount);
+
+    if (amount.gt(order.balanceAmount)) {
+      throw new BadRequestException(
+        'Payment amount cannot exceed the POS order balance.',
+      );
+    }
+
+    const paymentNumber = await this.generatePaymentNumber();
+    const result = await this.posOrdersRepository.runInTransaction(
+      async (client) => {
+        const currentOrder = await this.posOrdersRepository.findOrder(
+          order.id,
+          client,
+        );
+
+        if (!currentOrder) {
+          throw new NotFoundException('POS order was not found.');
+        }
+
+        this.ensureOrderIsOpen(currentOrder);
+
+        if (currentOrder.balanceAmount.lte(0)) {
+          throw new ConflictException('POS order has no outstanding balance.');
+        }
+
+        if (amount.gt(currentOrder.balanceAmount)) {
+          throw new BadRequestException(
+            'Payment amount cannot exceed the POS order balance.',
+          );
+        }
+
+        const payment = await this.posOrderPaymentsRepository.createPayment(
+          {
+            paymentNumber,
+            orderId: order.id,
+            amount,
+            method: recordPosOrderPaymentDto.method,
+            reference: this.normalizeOptionalString(
+              recordPosOrderPaymentDto.reference,
+            ),
+            notes: this.normalizeOptionalString(recordPosOrderPaymentDto.notes),
+            recordedByUserId: currentUser.sub,
+          },
+          client,
+        );
+        const paidAmount = currentOrder.paidAmount.add(amount);
+        const balanceAmount = currentOrder.balanceAmount.sub(amount);
+        const updatedOrder = await this.posOrdersRepository.updateOrder(
+          order.id,
+          {
+            paidAmount,
+            balanceAmount,
+            paymentStatus: balanceAmount.eq(0)
+              ? PosOrderPaymentStatus.PAID
+              : PosOrderPaymentStatus.PARTIALLY_PAID,
+          },
+          client,
+        );
+
+        return { payment, order: updatedOrder };
+      },
+    );
+
+    await this.recordOrderAudit(
+      currentUser,
+      'restaurant.payments.recorded',
+      result.order,
+      {
+        paymentId: result.payment.id,
+        paymentNumber: result.payment.paymentNumber,
+        amount: this.serializeDecimal(result.payment.amount),
+        method: result.payment.method,
+        balanceAmount: this.serializeDecimal(result.order.balanceAmount),
+      },
+    );
+
+    return {
+      payment: this.serializePayment(result.payment),
+      order: this.serializeOrder(result.order),
+    };
+  }
+
   private async findRequiredOutlet(outletId: number) {
     const outlet = await this.outletsRepository.findOutlet(outletId);
 
@@ -565,10 +866,82 @@ export class RestaurantService {
     return order;
   }
 
+  private async findRequiredOrderItem(orderId: number, itemId: number) {
+    const item = await this.posOrderItemsRepository.findOrderItem(
+      orderId,
+      itemId,
+    );
+
+    if (!item) {
+      throw new NotFoundException('POS order item was not found.');
+    }
+
+    return item;
+  }
+
   private ensureOutletIsActive(outlet: OutletRecord) {
     if (!outlet.isActive) {
       throw new ConflictException('Outlet is inactive.');
     }
+  }
+
+  private ensureOrderIsOpen(order: PosOrderRecord) {
+    if (order.status !== PosOrderStatus.OPEN) {
+      throw new ConflictException('Only open POS orders can be modified.');
+    }
+  }
+
+  private ensureMenuItemCanBeOrdered(
+    menuItem: MenuItemRecord,
+    order: PosOrderRecord,
+  ) {
+    if (menuItem.outletId !== order.outletId) {
+      throw new BadRequestException('Menu item belongs to a different outlet.');
+    }
+
+    if (menuItem.status !== MenuItemStatus.ACTIVE) {
+      throw new ConflictException(
+        'Only active menu items can be added to an order.',
+      );
+    }
+  }
+
+  private async recalculateOrder(
+    order: PosOrderRecord,
+    client: Prisma.TransactionClient,
+  ) {
+    const subtotalAmount = order.items.reduce(
+      (total, item) => (item.isVoided ? total : total.add(item.totalAmount)),
+      new Prisma.Decimal(0),
+    );
+    const totalAmount = subtotalAmount
+      .sub(order.discountAmount)
+      .add(order.taxAmount)
+      .add(order.serviceAmount);
+
+    if (totalAmount.lt(order.paidAmount)) {
+      throw new ConflictException(
+        'Order items cannot reduce the total below the amount already paid.',
+      );
+    }
+
+    const balanceAmount = totalAmount.sub(order.paidAmount);
+    const paymentStatus = order.paidAmount.eq(0)
+      ? PosOrderPaymentStatus.UNPAID
+      : balanceAmount.eq(0)
+        ? PosOrderPaymentStatus.PAID
+        : PosOrderPaymentStatus.PARTIALLY_PAID;
+
+    return this.posOrdersRepository.updateOrder(
+      order.id,
+      {
+        subtotalAmount,
+        totalAmount,
+        balanceAmount,
+        paymentStatus,
+      },
+      client,
+    );
   }
 
   private async changeMenuItemStatus(
@@ -671,6 +1044,13 @@ export class RestaurantService {
     };
   }
 
+  private serializePayment(payment: PosOrderPaymentRecord) {
+    return {
+      ...payment,
+      amount: this.serializeDecimal(payment.amount),
+    };
+  }
+
   private outletAuditSnapshot(outlet: OutletRecord): Prisma.InputJsonObject {
     return {
       name: outlet.name,
@@ -766,6 +1146,27 @@ export class RestaurantService {
 
     throw new ConflictException(
       'Could not generate a unique POS order number.',
+    );
+  }
+
+  private async generatePaymentNumber() {
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const sequence = `${Date.now().toString().slice(-6)}${attempt}`.slice(-6);
+      const paymentNumber = `POS-PAY-${datePart}-${sequence}`;
+      const existingPayment =
+        await this.posOrderPaymentsRepository.findByPaymentNumber(
+          paymentNumber,
+        );
+
+      if (!existingPayment) {
+        return paymentNumber;
+      }
+    }
+
+    throw new ConflictException(
+      'Could not generate a unique POS payment number.',
     );
   }
 
