@@ -115,19 +115,35 @@ export type PosOrderRecord = Prisma.PosOrderGetPayload<{
   select: typeof posOrderSelect;
 }>;
 
+type PosOrderClient = Pick<
+  PrismaService | Prisma.TransactionClient,
+  'posOrder'
+>;
+
 @Injectable()
 export class PosOrdersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  createOrder(data: Prisma.PosOrderUncheckedCreateInput) {
-    return this.prisma.posOrder.create({
+  runInTransaction<T>(
+    operation: (client: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return this.prisma.$transaction(operation, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+  }
+
+  createOrder(
+    data: Prisma.PosOrderUncheckedCreateInput,
+    client: PosOrderClient = this.prisma,
+  ) {
+    return client.posOrder.create({
       data,
       select: posOrderSelect,
     });
   }
 
-  findOrder(orderId: number) {
-    return this.prisma.posOrder.findUnique({
+  findOrder(orderId: number, client: PosOrderClient = this.prisma) {
+    return client.posOrder.findUnique({
       where: {
         id: orderId,
       },
@@ -211,8 +227,12 @@ export class PosOrdersRepository {
     ]);
   }
 
-  updateOrder(orderId: number, data: Prisma.PosOrderUncheckedUpdateInput) {
-    return this.prisma.posOrder.update({
+  updateOrder(
+    orderId: number,
+    data: Prisma.PosOrderUncheckedUpdateInput,
+    client: PosOrderClient = this.prisma,
+  ) {
+    return client.posOrder.update({
       where: {
         id: orderId,
       },
