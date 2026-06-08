@@ -339,4 +339,12 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'notes')).toBe(true);
   });
 
+  it('accepts a partial POS order item update', async () => {
+    await expect(
+      validationErrors(UpdatePosOrderItemDto, {
+        notes: 'Extra spicy.',
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
 });
