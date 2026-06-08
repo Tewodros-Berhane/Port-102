@@ -28,6 +28,10 @@ describe('RestaurantController', () => {
     listOrders: jest.Mock;
     getOrderById: jest.Mock;
     updateOrder: jest.Mock;
+    addOrderItem: jest.Mock;
+    updateOrderItem: jest.Mock;
+    voidOrderItem: jest.Mock;
+    recordOrderPayment: jest.Mock;
   };
 
   const currentUser = {
@@ -57,6 +61,10 @@ describe('RestaurantController', () => {
       listOrders: jest.fn(),
       getOrderById: jest.fn(),
       updateOrder: jest.fn(),
+      addOrderItem: jest.fn(),
+      updateOrderItem: jest.fn(),
+      voidOrderItem: jest.fn(),
+      recordOrderPayment: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -178,6 +186,30 @@ describe('RestaurantController', () => {
         RestaurantController.prototype.updateOrder,
       ),
     ).toEqual(['pos.orders.update']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.addOrderItem,
+      ),
+    ).toEqual(['pos.orders.update']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.updateOrderItem,
+      ),
+    ).toEqual(['pos.orders.update']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.voidOrderItem,
+      ),
+    ).toEqual(['pos.orders.update']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.recordOrderPayment,
+      ),
+    ).toEqual(['pos.payments.record']);
   });
 
   it('delegates outlet operations to the service', async () => {
@@ -310,11 +342,30 @@ describe('RestaurantController', () => {
     });
     restaurantService.getOrderById.mockResolvedValue(order);
     restaurantService.updateOrder.mockResolvedValue(order);
+    restaurantService.addOrderItem.mockResolvedValue(order);
+    restaurantService.updateOrderItem.mockResolvedValue(order);
+    restaurantService.voidOrderItem.mockResolvedValue(order);
+    restaurantService.recordOrderPayment.mockResolvedValue({
+      payment: { id: 15 },
+      order,
+    });
 
     await controller.createOrder(currentUser, createDto);
     await controller.listOrders(currentUser, query);
     await controller.getOrderById(currentUser, 9);
     await controller.updateOrder(currentUser, 9, { tableNumber: 'T-14' });
+    await controller.addOrderItem(currentUser, 9, {
+      menuItemId: 7,
+      quantity: 2,
+    });
+    await controller.updateOrderItem(currentUser, 9, 12, { quantity: 3 });
+    await controller.voidOrderItem(currentUser, 9, 12, {
+      reason: 'Guest cancelled.',
+    });
+    await controller.recordOrderPayment(currentUser, 9, {
+      amount: 450,
+      method: 'CASH',
+    });
 
     expect(restaurantService.createOrder).toHaveBeenCalledWith(
       currentUser,
@@ -328,5 +379,27 @@ describe('RestaurantController', () => {
     expect(restaurantService.updateOrder).toHaveBeenCalledWith(currentUser, 9, {
       tableNumber: 'T-14',
     });
+    expect(restaurantService.addOrderItem).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      { menuItemId: 7, quantity: 2 },
+    );
+    expect(restaurantService.updateOrderItem).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      12,
+      { quantity: 3 },
+    );
+    expect(restaurantService.voidOrderItem).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      12,
+      { reason: 'Guest cancelled.' },
+    );
+    expect(restaurantService.recordOrderPayment).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      { amount: 450, method: 'CASH' },
+    );
   });
 });
