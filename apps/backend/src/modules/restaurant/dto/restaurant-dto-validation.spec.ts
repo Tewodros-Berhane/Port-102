@@ -321,4 +321,13 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'quantity')).toBe(true);
   });
 
+  it('rejects an invalid POS order item menu ID', async () => {
+    const errors = await validationErrors(AddPosOrderItemDto, {
+      menuItemId: 0,
+      quantity: 1,
+    });
+
+    expect(errors.some((error) => error.property === 'menuItemId')).toBe(true);
+  });
+
 });
