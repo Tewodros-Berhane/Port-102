@@ -6,15 +6,20 @@ import {
   OutletType,
   PosOrderSource,
   PosOrderStatus,
+  PosPaymentMethod,
 } from '../../../generated/prisma/client';
+import { AddPosOrderItemDto } from './add-pos-order-item.dto';
 import { CreateMenuItemDto } from './create-menu-item.dto';
 import { CreateOutletDto } from './create-outlet.dto';
 import { CreatePosOrderDto } from './create-pos-order.dto';
 import { GetMenuItemsQueryDto } from './get-menu-items-query.dto';
 import { GetOutletsQueryDto } from './get-outlets-query.dto';
 import { GetPosOrdersQueryDto } from './get-pos-orders-query.dto';
+import { RecordPosOrderPaymentDto } from './record-pos-order-payment.dto';
 import { UpdateMenuItemDto } from './update-menu-item.dto';
+import { UpdatePosOrderItemDto } from './update-pos-order-item.dto';
 import { UpdatePosOrderDto } from './update-pos-order.dto';
+import { VoidPosOrderItemDto } from './void-pos-order-item.dto';
 
 async function validationErrors<T extends object>(
   dtoClass: new () => T,
@@ -297,4 +302,14 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'createdFrom')).toBe(true);
     expect(errors.some((error) => error.property === 'status')).toBe(true);
   });
+
+  it('accepts a valid POS order item payload', async () => {
+    await expect(
+      validationErrors(AddPosOrderItemDto, {
+        menuItemId: 7,
+        quantity: 2,
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
 });
