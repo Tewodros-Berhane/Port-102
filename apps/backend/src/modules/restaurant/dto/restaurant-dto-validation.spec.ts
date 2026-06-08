@@ -355,4 +355,13 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'reason')).toBe(true);
   });
 
+  it('accepts a valid direct POS payment payload', async () => {
+    await expect(
+      validationErrors(RecordPosOrderPaymentDto, {
+        amount: 450,
+        method: PosPaymentMethod.CASH,
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
 });
