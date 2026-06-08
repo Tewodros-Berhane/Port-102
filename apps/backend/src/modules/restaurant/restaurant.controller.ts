@@ -30,15 +30,19 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
+import { AddPosOrderItemDto } from './dto/add-pos-order-item.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { CreateOutletDto } from './dto/create-outlet.dto';
 import { CreatePosOrderDto } from './dto/create-pos-order.dto';
 import { GetMenuItemsQueryDto } from './dto/get-menu-items-query.dto';
 import { GetOutletsQueryDto } from './dto/get-outlets-query.dto';
 import { GetPosOrdersQueryDto } from './dto/get-pos-orders-query.dto';
+import { RecordPosOrderPaymentDto } from './dto/record-pos-order-payment.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
 import { UpdateOutletDto } from './dto/update-outlet.dto';
+import { UpdatePosOrderItemDto } from './dto/update-pos-order-item.dto';
 import { UpdatePosOrderDto } from './dto/update-pos-order.dto';
+import { VoidPosOrderItemDto } from './dto/void-pos-order-item.dto';
 import { RestaurantService } from './restaurant.service';
 
 @ApiTags('Restaurant POS')
@@ -305,6 +309,106 @@ export class RestaurantController {
       currentUser,
       orderId,
       updatePosOrderDto,
+    );
+  }
+
+  @Post('orders/:id/items')
+  @Permissions('pos.orders.update')
+  @ApiOperation({ summary: 'Add an item to an open POS order' })
+  @ApiCreatedResponse({ description: 'POS order item added successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid order item payload.' })
+  @ApiConflictResponse({
+    description: 'Order is not open or menu item is unavailable.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'POS order or menu item was not found.' })
+  addOrderItem(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) orderId: number,
+    @Body() addPosOrderItemDto: AddPosOrderItemDto,
+  ) {
+    return this.restaurantService.addOrderItem(
+      currentUser,
+      orderId,
+      addPosOrderItemDto,
+    );
+  }
+
+  @Patch('orders/:id/items/:itemId')
+  @Permissions('pos.orders.update')
+  @ApiOperation({ summary: 'Update an item on an open POS order' })
+  @ApiOkResponse({ description: 'POS order item updated successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid order item payload.' })
+  @ApiConflictResponse({
+    description: 'Order is not open or item cannot be updated.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'POS order or item was not found.' })
+  updateOrderItem(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) orderId: number,
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Body() updatePosOrderItemDto: UpdatePosOrderItemDto,
+  ) {
+    return this.restaurantService.updateOrderItem(
+      currentUser,
+      orderId,
+      itemId,
+      updatePosOrderItemDto,
+    );
+  }
+
+  @Patch('orders/:id/items/:itemId/void')
+  @Permissions('pos.orders.update')
+  @ApiOperation({ summary: 'Void an item on an open POS order' })
+  @ApiOkResponse({ description: 'POS order item voided successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid void payload.' })
+  @ApiConflictResponse({
+    description: 'Order is not open or item is already voided.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'POS order or item was not found.' })
+  voidOrderItem(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) orderId: number,
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Body() voidPosOrderItemDto: VoidPosOrderItemDto,
+  ) {
+    return this.restaurantService.voidOrderItem(
+      currentUser,
+      orderId,
+      itemId,
+      voidPosOrderItemDto,
+    );
+  }
+
+  @Post('orders/:id/payments')
+  @Permissions('pos.payments.record')
+  @ApiOperation({
+    summary: 'Record a direct payment against an open POS order',
+  })
+  @ApiCreatedResponse({ description: 'POS order payment recorded.' })
+  @ApiBadRequestResponse({
+    description: 'Invalid payment payload or overpayment.',
+  })
+  @ApiConflictResponse({
+    description: 'Order is not open or has no outstanding balance.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'POS order was not found.' })
+  recordOrderPayment(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) orderId: number,
+    @Body() recordPosOrderPaymentDto: RecordPosOrderPaymentDto,
+  ) {
+    return this.restaurantService.recordOrderPayment(
+      currentUser,
+      orderId,
+      recordPosOrderPaymentDto,
     );
   }
 }
