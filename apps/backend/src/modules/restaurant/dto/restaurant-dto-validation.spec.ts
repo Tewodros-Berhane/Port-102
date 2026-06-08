@@ -373,4 +373,14 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'method')).toBe(true);
   });
 
+  it('rejects oversized direct POS payment references', async () => {
+    const errors = await validationErrors(RecordPosOrderPaymentDto, {
+      amount: 450,
+      method: PosPaymentMethod.CARD,
+      reference: 'R'.repeat(121),
+    });
+
+    expect(errors.some((error) => error.property === 'reference')).toBe(true);
+  });
+
 });
