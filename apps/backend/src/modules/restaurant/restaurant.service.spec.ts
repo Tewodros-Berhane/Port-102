@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import {
@@ -8,12 +12,15 @@ import {
   PosOrderPaymentStatus,
   PosOrderSource,
   PosOrderStatus,
+  PosPaymentMethod,
   Prisma,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { RestaurantService } from './restaurant.service';
 import { MenuItemsRepository } from './repositories/menu-items.repository';
 import { OutletsRepository } from './repositories/outlets.repository';
+import { PosOrderItemsRepository } from './repositories/pos-order-items.repository';
+import { PosOrderPaymentsRepository } from './repositories/pos-order-payments.repository';
 import { PosOrdersRepository } from './repositories/pos-orders.repository';
 
 const currentUser = {
@@ -112,6 +119,56 @@ function createOrder(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function createOrderItem(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 12,
+    orderId: 9,
+    menuItemId: 7,
+    description: 'Special Tibs',
+    quantity: 2,
+    unitPrice: new Prisma.Decimal(450),
+    totalAmount: new Prisma.Decimal(900),
+    notes: null,
+    isVoided: false,
+    voidReason: null,
+    createdAt: now,
+    updatedAt: now,
+    menuItem: {
+      id: 7,
+      name: 'Special Tibs',
+      code: 'TIBS-01',
+      category: 'Main Course',
+      status: MenuItemStatus.ACTIVE,
+    },
+    ...overrides,
+  };
+}
+
+function createPayment(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 15,
+    paymentNumber: 'POS-PAY-20260608-000001',
+    orderId: 9,
+    amount: new Prisma.Decimal(450),
+    method: PosPaymentMethod.CASH,
+    reference: null,
+    notes: null,
+    recordedByUserId: 1,
+    recordedAt: now,
+    isVoided: false,
+    voidReason: null,
+    voidedAt: null,
+    createdAt: now,
+    updatedAt: now,
+    recordedBy: {
+      id: 1,
+      email: currentUser.email,
+      fullName: 'Hotel Admin',
+    },
+    ...overrides,
+  };
+}
+
 describe('RestaurantService', () => {
   let service: RestaurantService;
   let outletsRepository: {
@@ -137,6 +194,16 @@ describe('RestaurantService', () => {
     findByOrderNumber: jest.Mock;
     listOrders: jest.Mock;
     updateOrder: jest.Mock;
+    runInTransaction: jest.Mock;
+  };
+  let posOrderItemsRepository: {
+    createOrderItem: jest.Mock;
+    findOrderItem: jest.Mock;
+    updateOrderItem: jest.Mock;
+  };
+  let posOrderPaymentsRepository: {
+    createPayment: jest.Mock;
+    findByPaymentNumber: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -163,6 +230,18 @@ describe('RestaurantService', () => {
       findByOrderNumber: jest.fn(),
       listOrders: jest.fn(),
       updateOrder: jest.fn(),
+      runInTransaction: jest.fn(
+        (operation: (client: object) => Promise<unknown>) => operation({}),
+      ),
+    };
+    posOrderItemsRepository = {
+      createOrderItem: jest.fn(),
+      findOrderItem: jest.fn(),
+      updateOrderItem: jest.fn(),
+    };
+    posOrderPaymentsRepository = {
+      createPayment: jest.fn(),
+      findByPaymentNumber: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -179,6 +258,14 @@ describe('RestaurantService', () => {
         {
           provide: PosOrdersRepository,
           useValue: posOrdersRepository,
+        },
+        {
+          provide: PosOrderItemsRepository,
+          useValue: posOrderItemsRepository,
+        },
+        {
+          provide: PosOrderPaymentsRepository,
+          useValue: posOrderPaymentsRepository,
         },
         {
           provide: AuditLogsService,
@@ -561,5 +648,255 @@ describe('RestaurantService', () => {
     await expect(
       service.updateOrder(currentUser, 9, { tableNumber: 'T-14' }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('adds an order item and recalculates totals', async () => {
+    const order = createOrder();
+    const item = createOrderItem();
+    posOrdersRepository.findOrder
+      .mockResolvedValueOnce(order)
+      .mockResolvedValueOnce(createOrder({ items: [item] }));
+    menuItemsRepository.findMenuItem.mockResolvedValue(createMenuItem());
+    posOrderItemsRepository.createOrderItem.mockResolvedValue(item);
+    posOrdersRepository.updateOrder.mockResolvedValue(
+      createOrder({
+        items: [item],
+        subtotalAmount: new Prisma.Decimal(900),
+        totalAmount: new Prisma.Decimal(900),
+        balanceAmount: new Prisma.Decimal(900),
+      }),
+    );
+
+    const result = await service.addOrderItem(currentUser, 9, {
+      menuItemId: 7,
+      quantity: 2,
+      notes: ' No raw onion ',
+    });
+
+    expect(posOrderItemsRepository.createOrderItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 9,
+        menuItemId: 7,
+        quantity: 2,
+        unitPrice: new Prisma.Decimal(450),
+        totalAmount: new Prisma.Decimal(900),
+        notes: 'No raw onion',
+      }),
+      {},
+    );
+    expect(posOrdersRepository.updateOrder).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        subtotalAmount: new Prisma.Decimal(900),
+        totalAmount: new Prisma.Decimal(900),
+        balanceAmount: new Prisma.Decimal(900),
+      }),
+      {},
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'restaurant.order_items.added',
+      }),
+    );
+    expect(result.totalAmount).toBe('900');
+  });
+
+  it('rejects adding inactive menu items to an order', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(createOrder());
+    menuItemsRepository.findMenuItem.mockResolvedValue(
+      createMenuItem({ status: MenuItemStatus.OUT_OF_STOCK }),
+    );
+
+    await expect(
+      service.addOrderItem(currentUser, 9, {
+        menuItemId: 7,
+        quantity: 1,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('updates an order item and recalculates totals', async () => {
+    const item = createOrderItem({ quantity: 2 });
+    const updatedItem = createOrderItem({
+      quantity: 3,
+      totalAmount: new Prisma.Decimal(1350),
+    });
+    posOrdersRepository.findOrder
+      .mockResolvedValueOnce(createOrder({ items: [item] }))
+      .mockResolvedValueOnce(createOrder({ items: [updatedItem] }));
+    posOrderItemsRepository.findOrderItem.mockResolvedValue(item);
+    posOrderItemsRepository.updateOrderItem.mockResolvedValue(updatedItem);
+    posOrdersRepository.updateOrder.mockResolvedValue(
+      createOrder({
+        items: [updatedItem],
+        subtotalAmount: new Prisma.Decimal(1350),
+        totalAmount: new Prisma.Decimal(1350),
+        balanceAmount: new Prisma.Decimal(1350),
+      }),
+    );
+
+    const result = await service.updateOrderItem(currentUser, 9, 12, {
+      quantity: 3,
+    });
+
+    expect(posOrderItemsRepository.updateOrderItem).toHaveBeenCalledWith(
+      12,
+      expect.objectContaining({
+        quantity: 3,
+        totalAmount: new Prisma.Decimal(1350),
+      }),
+      {},
+    );
+    expect(result.balanceAmount).toBe('1350');
+  });
+
+  it('voids an order item and recalculates totals', async () => {
+    const item = createOrderItem();
+    const voidedItem = createOrderItem({
+      isVoided: true,
+      voidReason: 'Guest cancelled.',
+    });
+    posOrdersRepository.findOrder
+      .mockResolvedValueOnce(createOrder({ items: [item] }))
+      .mockResolvedValueOnce(createOrder({ items: [voidedItem] }));
+    posOrderItemsRepository.findOrderItem.mockResolvedValue(item);
+    posOrderItemsRepository.updateOrderItem.mockResolvedValue(voidedItem);
+    posOrdersRepository.updateOrder.mockResolvedValue(
+      createOrder({
+        items: [voidedItem],
+        subtotalAmount: new Prisma.Decimal(0),
+        totalAmount: new Prisma.Decimal(0),
+        balanceAmount: new Prisma.Decimal(0),
+      }),
+    );
+
+    const result = await service.voidOrderItem(currentUser, 9, 12, {
+      reason: ' Guest cancelled. ',
+    });
+
+    expect(posOrderItemsRepository.updateOrderItem).toHaveBeenCalledWith(
+      12,
+      {
+        isVoided: true,
+        voidReason: 'Guest cancelled.',
+      },
+      {},
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'restaurant.order_items.voided',
+      }),
+    );
+    expect(result.totalAmount).toBe('0');
+  });
+
+  it('rejects line-item edits on closed orders', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({ status: PosOrderStatus.CLOSED }),
+    );
+
+    await expect(
+      service.addOrderItem(currentUser, 9, { menuItemId: 7 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('records a partial direct payment and updates order balance', async () => {
+    const order = createOrder({
+      totalAmount: new Prisma.Decimal(900),
+      balanceAmount: new Prisma.Decimal(900),
+      items: [createOrderItem()],
+    });
+    const payment = createPayment({ amount: new Prisma.Decimal(400) });
+    posOrdersRepository.findOrder.mockResolvedValue(order);
+    posOrderPaymentsRepository.findByPaymentNumber.mockResolvedValue(null);
+    posOrderPaymentsRepository.createPayment.mockResolvedValue(payment);
+    posOrdersRepository.updateOrder.mockResolvedValue(
+      createOrder({
+        totalAmount: new Prisma.Decimal(900),
+        paidAmount: new Prisma.Decimal(400),
+        balanceAmount: new Prisma.Decimal(500),
+        paymentStatus: PosOrderPaymentStatus.PARTIALLY_PAID,
+        items: [createOrderItem()],
+        payments: [payment],
+      }),
+    );
+
+    const result = await service.recordOrderPayment(currentUser, 9, {
+      amount: 400,
+      method: PosPaymentMethod.CASH,
+      reference: ' CASH-1 ',
+    });
+
+    expect(posOrderPaymentsRepository.createPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentNumber: expect.stringMatching(/^POS-PAY-\d{8}-\d{6}$/),
+        amount: new Prisma.Decimal(400),
+        method: PosPaymentMethod.CASH,
+        reference: 'CASH-1',
+        recordedByUserId: 1,
+      }),
+      {},
+    );
+    expect(posOrdersRepository.updateOrder).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        paidAmount: new Prisma.Decimal(400),
+        balanceAmount: new Prisma.Decimal(500),
+        paymentStatus: PosOrderPaymentStatus.PARTIALLY_PAID,
+      }),
+      {},
+    );
+    expect(result.order.balanceAmount).toBe('500');
+  });
+
+  it('marks an order paid when direct payment clears the balance', async () => {
+    const order = createOrder({
+      totalAmount: new Prisma.Decimal(900),
+      balanceAmount: new Prisma.Decimal(900),
+    });
+    posOrdersRepository.findOrder.mockResolvedValue(order);
+    posOrderPaymentsRepository.findByPaymentNumber.mockResolvedValue(null);
+    posOrderPaymentsRepository.createPayment.mockResolvedValue(
+      createPayment({ amount: new Prisma.Decimal(900) }),
+    );
+    posOrdersRepository.updateOrder.mockResolvedValue(
+      createOrder({
+        totalAmount: new Prisma.Decimal(900),
+        paidAmount: new Prisma.Decimal(900),
+        balanceAmount: new Prisma.Decimal(0),
+        paymentStatus: PosOrderPaymentStatus.PAID,
+      }),
+    );
+
+    const result = await service.recordOrderPayment(currentUser, 9, {
+      amount: 900,
+      method: PosPaymentMethod.CARD,
+    });
+
+    expect(result.order.paymentStatus).toBe(PosOrderPaymentStatus.PAID);
+    expect(result.order.balanceAmount).toBe('0');
+  });
+
+  it('rejects POS overpayments and direct room-charge payments', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({
+        totalAmount: new Prisma.Decimal(900),
+        balanceAmount: new Prisma.Decimal(900),
+      }),
+    );
+
+    await expect(
+      service.recordOrderPayment(currentUser, 9, {
+        amount: 901,
+        method: PosPaymentMethod.CASH,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    await expect(
+      service.recordOrderPayment(currentUser, 9, {
+        amount: 100,
+        method: PosPaymentMethod.ROOM_CHARGE,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
