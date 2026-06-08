@@ -383,4 +383,19 @@ describe('Restaurant DTO validation', () => {
     expect(errors.some((error) => error.property === 'reference')).toBe(true);
   });
 
+  it('rejects non-positive and over-precision POS payment amounts', async () => {
+    const zeroErrors = await validationErrors(RecordPosOrderPaymentDto, {
+      amount: 0,
+      method: PosPaymentMethod.CASH,
+    });
+    const precisionErrors = await validationErrors(RecordPosOrderPaymentDto, {
+      amount: 1.123,
+      method: PosPaymentMethod.CASH,
+    });
+
+    expect(zeroErrors.some((error) => error.property === 'amount')).toBe(true);
+    expect(precisionErrors.some((error) => error.property === 'amount')).toBe(
+      true,
+    );
+  });
 });
