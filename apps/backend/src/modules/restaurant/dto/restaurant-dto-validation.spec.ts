@@ -347,4 +347,12 @@ describe('Restaurant DTO validation', () => {
     ).resolves.toHaveLength(0);
   });
 
+  it('requires a non-empty POS order item void reason', async () => {
+    const errors = await validationErrors(VoidPosOrderItemDto, {
+      reason: '',
+    });
+
+    expect(errors.some((error) => error.property === 'reason')).toBe(true);
+  });
+
 });
