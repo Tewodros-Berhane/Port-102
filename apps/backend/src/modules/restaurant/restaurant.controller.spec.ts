@@ -32,6 +32,7 @@ describe('RestaurantController', () => {
     updateOrderItem: jest.Mock;
     voidOrderItem: jest.Mock;
     recordOrderPayment: jest.Mock;
+    chargeOrderToRoom: jest.Mock;
   };
 
   const currentUser = {
@@ -65,6 +66,7 @@ describe('RestaurantController', () => {
       updateOrderItem: jest.fn(),
       voidOrderItem: jest.fn(),
       recordOrderPayment: jest.fn(),
+      chargeOrderToRoom: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -210,6 +212,12 @@ describe('RestaurantController', () => {
         RestaurantController.prototype.recordOrderPayment,
       ),
     ).toEqual(['pos.payments.record']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.chargeOrderToRoom,
+      ),
+    ).toEqual(['pos.charge_to_room']);
   });
 
   it('delegates outlet operations to the service', async () => {
@@ -349,6 +357,10 @@ describe('RestaurantController', () => {
       payment: { id: 15 },
       order,
     });
+    restaurantService.chargeOrderToRoom.mockResolvedValue({
+      order,
+      folioCharge: { id: 18 },
+    });
 
     await controller.createOrder(currentUser, createDto);
     await controller.listOrders(currentUser, query);
@@ -365,6 +377,10 @@ describe('RestaurantController', () => {
     await controller.recordOrderPayment(currentUser, 9, {
       amount: 450,
       method: 'CASH',
+    });
+    await controller.chargeOrderToRoom(currentUser, 9, {
+      stayId: 42,
+      closeOrder: true,
     });
 
     expect(restaurantService.createOrder).toHaveBeenCalledWith(
@@ -400,6 +416,11 @@ describe('RestaurantController', () => {
       currentUser,
       9,
       { amount: 450, method: 'CASH' },
+    );
+    expect(restaurantService.chargeOrderToRoom).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      { stayId: 42, closeOrder: true },
     );
   });
 });
