@@ -1101,4 +1101,17 @@ describe('RestaurantService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(posRoomChargesRepository.findStay).not.toHaveBeenCalled();
   });
+
+  it('rejects an order already linked to a folio', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({
+        folioId: 7,
+        balanceAmount: new Prisma.Decimal(100),
+      }),
+    );
+
+    await expect(
+      service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
 });
