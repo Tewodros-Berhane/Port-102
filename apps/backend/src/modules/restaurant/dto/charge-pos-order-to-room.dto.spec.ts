@@ -26,4 +26,13 @@ describe('ChargePosOrderToRoomDto', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
     expect(dto.closeOrder).toBe(false);
   });
+
+  it('rejects non-boolean close order values', async () => {
+    const dto = plainToInstance(ChargePosOrderToRoomDto, {
+      stayId: 42,
+      closeOrder: 'yes',
+    });
+
+    await expect(validate(dto)).resolves.not.toHaveLength(0);
+  });
 });
