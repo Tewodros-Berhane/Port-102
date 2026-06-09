@@ -1049,4 +1049,15 @@ describe('RestaurantService', () => {
       service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('rejects a room charge when the stay does not exist', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({ balanceAmount: new Prisma.Decimal(100) }),
+    );
+    posRoomChargesRepository.findStay.mockResolvedValue(null);
+
+    await expect(
+      service.chargeOrderToRoom(currentUser, 9, { stayId: 404 }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
 });
