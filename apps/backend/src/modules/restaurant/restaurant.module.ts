@@ -10,6 +10,7 @@ import { OutletsRepository } from './repositories/outlets.repository';
 import { PosOrderItemsRepository } from './repositories/pos-order-items.repository';
 import { PosOrderPaymentsRepository } from './repositories/pos-order-payments.repository';
 import { PosOrdersRepository } from './repositories/pos-orders.repository';
+import { PosRoomChargesRepository } from './repositories/pos-room-charges.repository';
 
 @Module({
   imports: [PrismaModule, AuditLogsModule],
@@ -21,6 +22,7 @@ import { PosOrdersRepository } from './repositories/pos-orders.repository';
     PosOrdersRepository,
     PosOrderItemsRepository,
     PosOrderPaymentsRepository,
+    PosRoomChargesRepository,
     PermissionsGuard,
   ],
   exports: [RestaurantService, OutletsRepository],
