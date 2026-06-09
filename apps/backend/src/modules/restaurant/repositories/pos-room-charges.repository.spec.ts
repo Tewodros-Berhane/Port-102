@@ -68,4 +68,20 @@ describe('PosRoomChargesRepository', () => {
       }),
     );
   });
+
+  it('creates a POS folio line item with the supplied posting data', async () => {
+    const data = {
+      folioId: 7,
+      type: FolioLineItemType.POS_CHARGE,
+      description: 'POS charge',
+      unitAmount: new Prisma.Decimal(900),
+      totalAmount: new Prisma.Decimal(900),
+    };
+
+    await repository.createCharge(data);
+
+    expect(prisma.folioLineItem.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data }),
+    );
+  });
 });
