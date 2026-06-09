@@ -14,6 +14,8 @@ import {
   PosOrderStatus,
   PosPaymentMethod,
   Prisma,
+  FolioStatus,
+  StayStatus,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { RestaurantService } from './restaurant.service';
@@ -22,6 +24,7 @@ import { OutletsRepository } from './repositories/outlets.repository';
 import { PosOrderItemsRepository } from './repositories/pos-order-items.repository';
 import { PosOrderPaymentsRepository } from './repositories/pos-order-payments.repository';
 import { PosOrdersRepository } from './repositories/pos-orders.repository';
+import { PosRoomChargesRepository } from './repositories/pos-room-charges.repository';
 
 const currentUser = {
   sub: 1,
@@ -205,6 +208,12 @@ describe('RestaurantService', () => {
     createPayment: jest.Mock;
     findByPaymentNumber: jest.Mock;
   };
+  let posRoomChargesRepository: {
+    findStay: jest.Mock;
+    findOrderCharge: jest.Mock;
+    createCharge: jest.Mock;
+    incrementFolio: jest.Mock;
+  };
 
   beforeEach(async () => {
     outletsRepository = {
@@ -243,6 +252,12 @@ describe('RestaurantService', () => {
       createPayment: jest.fn(),
       findByPaymentNumber: jest.fn(),
     };
+    posRoomChargesRepository = {
+      findStay: jest.fn(),
+      findOrderCharge: jest.fn(),
+      createCharge: jest.fn(),
+      incrementFolio: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -266,6 +281,10 @@ describe('RestaurantService', () => {
         {
           provide: PosOrderPaymentsRepository,
           useValue: posOrderPaymentsRepository,
+        },
+        {
+          provide: PosRoomChargesRepository,
+          useValue: posRoomChargesRepository,
         },
         {
           provide: AuditLogsService,
@@ -898,5 +917,136 @@ describe('RestaurantService', () => {
         method: PosPaymentMethod.ROOM_CHARGE,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('posts an order balance to an active stay folio and closes the order', async () => {
+    const order = createOrder({
+      totalAmount: new Prisma.Decimal(900),
+      balanceAmount: new Prisma.Decimal(900),
+    });
+    const chargedOrder = createOrder({
+      status: PosOrderStatus.CLOSED,
+      paymentStatus: PosOrderPaymentStatus.CHARGED_TO_ROOM,
+      roomId: 11,
+      stayId: 42,
+      folioId: 7,
+      totalAmount: new Prisma.Decimal(900),
+      balanceAmount: new Prisma.Decimal(0),
+      closedByUserId: 1,
+      closedAt: now,
+    });
+    posOrdersRepository.findOrder.mockResolvedValue(order);
+    posRoomChargesRepository.findStay.mockResolvedValue({
+      id: 42,
+      stayNumber: 'STAY-42',
+      status: StayStatus.ACTIVE,
+      folio: {
+        id: 7,
+        folioNumber: 'FOL-7',
+        status: FolioStatus.OPEN,
+        subtotalAmount: new Prisma.Decimal(0),
+        totalAmount: new Prisma.Decimal(0),
+        balanceAmount: new Prisma.Decimal(0),
+      },
+      roomAssignments: [
+        { id: 3, roomId: 11, room: { id: 11, roomNumber: '101' } },
+      ],
+    });
+    posRoomChargesRepository.findOrderCharge.mockResolvedValue(null);
+    posRoomChargesRepository.createCharge.mockResolvedValue({
+      id: 18,
+      folioId: 7,
+      type: 'POS_CHARGE',
+      description: 'POS charge',
+      quantity: 1,
+      unitAmount: new Prisma.Decimal(900),
+      totalAmount: new Prisma.Decimal(900),
+      sourceType: 'POS_ORDER',
+      sourceId: 9,
+      postedByUserId: 1,
+      postedAt: now,
+    });
+    posRoomChargesRepository.incrementFolio.mockResolvedValue({
+      id: 7,
+      folioNumber: 'FOL-7',
+      status: FolioStatus.OPEN,
+      subtotalAmount: new Prisma.Decimal(900),
+      totalAmount: new Prisma.Decimal(900),
+      paidAmount: new Prisma.Decimal(0),
+      balanceAmount: new Prisma.Decimal(900),
+    });
+    posOrdersRepository.updateOrder.mockResolvedValue(chargedOrder);
+
+    const result = await service.chargeOrderToRoom(currentUser, 9, {
+      stayId: 42,
+    });
+
+    expect(posRoomChargesRepository.createCharge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folioId: 7,
+        sourceType: 'POS_ORDER',
+        sourceId: 9,
+        totalAmount: new Prisma.Decimal(900),
+      }),
+      {},
+    );
+    expect(posOrdersRepository.updateOrder).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        roomId: 11,
+        stayId: 42,
+        folioId: 7,
+        paymentStatus: PosOrderPaymentStatus.CHARGED_TO_ROOM,
+        status: PosOrderStatus.CLOSED,
+      }),
+      {},
+    );
+    expect(result.folioCharge.totalAmount).toBe('900');
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'restaurant.orders.charged_to_room',
+      }),
+    );
+  });
+
+  it('rejects room charges for inactive stays and duplicate folio charges', async () => {
+    const order = createOrder({
+      totalAmount: new Prisma.Decimal(900),
+      balanceAmount: new Prisma.Decimal(900),
+    });
+    posOrdersRepository.findOrder.mockResolvedValue(order);
+    posRoomChargesRepository.findStay.mockResolvedValueOnce({
+      id: 42,
+      stayNumber: 'STAY-42',
+      status: StayStatus.CHECKED_OUT,
+      folio: null,
+      roomAssignments: [],
+    });
+
+    await expect(
+      service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    posRoomChargesRepository.findStay.mockResolvedValueOnce({
+      id: 42,
+      stayNumber: 'STAY-42',
+      status: StayStatus.ACTIVE,
+      folio: {
+        id: 7,
+        folioNumber: 'FOL-7',
+        status: FolioStatus.OPEN,
+        subtotalAmount: new Prisma.Decimal(0),
+        totalAmount: new Prisma.Decimal(0),
+        balanceAmount: new Prisma.Decimal(0),
+      },
+      roomAssignments: [
+        { id: 3, roomId: 11, room: { id: 11, roomNumber: '101' } },
+      ],
+    });
+    posRoomChargesRepository.findOrderCharge.mockResolvedValueOnce({ id: 18 });
+
+    await expect(
+      service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });
