@@ -31,6 +31,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { AddPosOrderItemDto } from './dto/add-pos-order-item.dto';
+import { ChargePosOrderToRoomDto } from './dto/charge-pos-order-to-room.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { CreateOutletDto } from './dto/create-outlet.dto';
 import { CreatePosOrderDto } from './dto/create-pos-order.dto';
@@ -409,6 +410,34 @@ export class RestaurantController {
       currentUser,
       orderId,
       recordPosOrderPaymentDto,
+    );
+  }
+
+  @Post('orders/:id/charge-to-room')
+  @Permissions('pos.charge_to_room')
+  @ApiOperation({
+    summary: 'Post an open POS order balance to an active stay folio',
+  })
+  @ApiCreatedResponse({
+    description: 'POS order charged to the room folio successfully.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid charge-to-room payload.' })
+  @ApiConflictResponse({
+    description:
+      'Order, stay, room assignment, or folio is not eligible for charging.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'POS order or stay was not found.' })
+  chargeOrderToRoom(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) orderId: number,
+    @Body() chargeDto: ChargePosOrderToRoomDto,
+  ) {
+    return this.restaurantService.chargeOrderToRoom(
+      currentUser,
+      orderId,
+      chargeDto,
     );
   }
 }
