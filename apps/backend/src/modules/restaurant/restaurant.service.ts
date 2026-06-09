@@ -7,15 +7,19 @@ import {
 
 import {
   MenuItemStatus,
+  FolioLineItemType,
+  FolioStatus,
   PosOrderPaymentStatus,
   PosOrderSource,
   PosOrderStatus,
   PosPaymentMethod,
   Prisma,
+  StayStatus,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { AddPosOrderItemDto } from './dto/add-pos-order-item.dto';
+import { ChargePosOrderToRoomDto } from './dto/charge-pos-order-to-room.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { CreateOutletDto } from './dto/create-outlet.dto';
 import { CreatePosOrderDto } from './dto/create-pos-order.dto';
@@ -45,6 +49,10 @@ import {
   PosOrderRecord,
   PosOrdersRepository,
 } from './repositories/pos-orders.repository';
+import {
+  PosRoomChargeRecord,
+  PosRoomChargesRepository,
+} from './repositories/pos-room-charges.repository';
 
 @Injectable()
 export class RestaurantService {
@@ -54,6 +62,7 @@ export class RestaurantService {
     private readonly posOrdersRepository: PosOrdersRepository,
     private readonly posOrderItemsRepository: PosOrderItemsRepository,
     private readonly posOrderPaymentsRepository: PosOrderPaymentsRepository,
+    private readonly posRoomChargesRepository: PosRoomChargesRepository,
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
@@ -836,6 +845,139 @@ export class RestaurantService {
     };
   }
 
+  async chargeOrderToRoom(
+    currentUser: CurrentUserPayload,
+    orderId: number,
+    chargeDto: ChargePosOrderToRoomDto,
+  ) {
+    const order = await this.findRequiredOrder(orderId);
+    this.ensureOrderCanBeChargedToRoom(order);
+
+    const result = await this.posOrdersRepository.runInTransaction(
+      async (client) => {
+        const currentOrder = await this.posOrdersRepository.findOrder(
+          order.id,
+          client,
+        );
+
+        if (!currentOrder) {
+          throw new NotFoundException('POS order was not found.');
+        }
+
+        this.ensureOrderCanBeChargedToRoom(currentOrder);
+
+        const stay = await this.posRoomChargesRepository.findStay(
+          chargeDto.stayId,
+          client,
+        );
+
+        if (!stay) {
+          throw new NotFoundException('Stay was not found.');
+        }
+
+        if (stay.status !== StayStatus.ACTIVE) {
+          throw new ConflictException(
+            'Only active stays can receive POS room charges.',
+          );
+        }
+
+        const roomAssignment = stay.roomAssignments[0];
+
+        if (!roomAssignment) {
+          throw new ConflictException(
+            'Stay has no active room assignment for the POS charge.',
+          );
+        }
+
+        if (!stay.folio || stay.folio.status !== FolioStatus.OPEN) {
+          throw new ConflictException(
+            'Stay must have an open folio for the POS charge.',
+          );
+        }
+
+        const existingCharge =
+          await this.posRoomChargesRepository.findOrderCharge(
+            currentOrder.id,
+            client,
+          );
+
+        if (existingCharge) {
+          throw new ConflictException(
+            'POS order has already been charged to a folio.',
+          );
+        }
+
+        const amount = currentOrder.balanceAmount;
+        const charge = await this.posRoomChargesRepository.createCharge(
+          {
+            folioId: stay.folio.id,
+            type: FolioLineItemType.POS_CHARGE,
+            description: `POS charge - ${currentOrder.outlet.name} - ${currentOrder.orderNumber}`,
+            quantity: 1,
+            unitAmount: amount,
+            totalAmount: amount,
+            sourceType: 'POS_ORDER',
+            sourceId: currentOrder.id,
+            postedByUserId: currentUser.sub,
+          },
+          client,
+        );
+        const folio = await this.posRoomChargesRepository.incrementFolio(
+          stay.folio.id,
+          amount,
+          client,
+        );
+        const closeOrder = chargeDto.closeOrder ?? true;
+        const updatedOrder = await this.posOrdersRepository.updateOrder(
+          currentOrder.id,
+          {
+            roomId: roomAssignment.roomId,
+            stayId: stay.id,
+            folioId: stay.folio.id,
+            paymentStatus: PosOrderPaymentStatus.CHARGED_TO_ROOM,
+            balanceAmount: new Prisma.Decimal(0),
+            ...(closeOrder
+              ? {
+                  status: PosOrderStatus.CLOSED,
+                  closedAt: new Date(),
+                  closedByUserId: currentUser.sub,
+                }
+              : {}),
+          },
+          client,
+        );
+
+        return { order: updatedOrder, charge, folio, stay, roomAssignment };
+      },
+    );
+
+    await this.recordOrderAudit(
+      currentUser,
+      'restaurant.orders.charged_to_room',
+      result.order,
+      {
+        stayId: result.stay.id,
+        folioId: result.folio.id,
+        roomId: result.roomAssignment.roomId,
+        folioLineItemId: result.charge.id,
+        amount: this.serializeDecimal(result.charge.totalAmount),
+        closed: result.order.status === PosOrderStatus.CLOSED,
+      },
+    );
+
+    return {
+      order: this.serializeOrder(result.order),
+      folioCharge: this.serializeRoomCharge(result.charge),
+      folio: {
+        ...result.folio,
+        subtotalAmount: this.serializeDecimal(result.folio.subtotalAmount),
+        totalAmount: this.serializeDecimal(result.folio.totalAmount),
+        paidAmount: this.serializeDecimal(result.folio.paidAmount),
+        balanceAmount: this.serializeDecimal(result.folio.balanceAmount),
+      },
+    };
+  }
+
   private async findRequiredOutlet(outletId: number) {
     const outlet = await this.outletsRepository.findOutlet(outletId);
 
@@ -888,6 +1030,23 @@ export class RestaurantService {
   private ensureOrderIsOpen(order: PosOrderRecord) {
     if (order.status !== PosOrderStatus.OPEN) {
       throw new ConflictException('Only open POS orders can be modified.');
+    }
+  }
+
+  private ensureOrderCanBeChargedToRoom(order: PosOrderRecord) {
+    this.ensureOrderIsOpen(order);
+
+    if (
+      order.paymentStatus === PosOrderPaymentStatus.CHARGED_TO_ROOM ||
+      order.folioId !== null
+    ) {
+      throw new ConflictException(
+        'POS order has already been charged to a folio.',
+      );
+    }
+
+    if (order.balanceAmount.lte(0)) {
+      throw new ConflictException('POS order has no outstanding balance.');
     }
   }
 
@@ -1048,6 +1207,14 @@ export class RestaurantService {
     return {
       ...payment,
       amount: this.serializeDecimal(payment.amount),
+    };
+  }
+
+  private serializeRoomCharge(charge: PosRoomChargeRecord) {
+    return {
+      ...charge,
+      unitAmount: this.serializeDecimal(charge.unitAmount),
+      totalAmount: this.serializeDecimal(charge.totalAmount),
     };
   }
 
