@@ -1127,4 +1127,17 @@ describe('RestaurantService', () => {
       service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('rejects charging a closed POS order', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({
+        status: PosOrderStatus.CLOSED,
+        balanceAmount: new Prisma.Decimal(100),
+      }),
+    );
+
+    await expect(
+      service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
 });
