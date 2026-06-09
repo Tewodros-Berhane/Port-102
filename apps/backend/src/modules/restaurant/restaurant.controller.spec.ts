@@ -423,4 +423,19 @@ describe('RestaurantController', () => {
       { stayId: 42, closeOrder: true },
     );
   });
+
+  it('delegates room charges that keep the POS order open', async () => {
+    restaurantService.chargeOrderToRoom.mockResolvedValue({ order: { id: 9 } });
+
+    await controller.chargeOrderToRoom(currentUser, 9, {
+      stayId: 42,
+      closeOrder: false,
+    });
+
+    expect(restaurantService.chargeOrderToRoom).toHaveBeenCalledWith(
+      currentUser,
+      9,
+      { stayId: 42, closeOrder: false },
+    );
+  });
 });
