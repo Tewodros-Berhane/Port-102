@@ -16,4 +16,14 @@ describe('ChargePosOrderToRoomDto', () => {
 
     await expect(validate(dto)).resolves.not.toHaveLength(0);
   });
+
+  it('allows callers to keep the order open after charging', async () => {
+    const dto = plainToInstance(ChargePosOrderToRoomDto, {
+      stayId: 42,
+      closeOrder: false,
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.closeOrder).toBe(false);
+  });
 });
