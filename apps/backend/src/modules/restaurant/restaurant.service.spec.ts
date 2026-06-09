@@ -1076,4 +1076,20 @@ describe('RestaurantService', () => {
       service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('rejects a stay without an open folio', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({ balanceAmount: new Prisma.Decimal(100) }),
+    );
+    posRoomChargesRepository.findStay.mockResolvedValue({
+      id: 42,
+      status: StayStatus.ACTIVE,
+      folio: { id: 7, status: FolioStatus.CLOSED },
+      roomAssignments: [{ roomId: 11 }],
+    });
+
+    await expect(
+      service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
 });
