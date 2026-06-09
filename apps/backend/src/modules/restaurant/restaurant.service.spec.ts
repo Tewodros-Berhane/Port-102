@@ -1092,4 +1092,13 @@ describe('RestaurantService', () => {
       service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('rejects charging an order without an outstanding balance', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(createOrder());
+
+    await expect(
+      service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(posRoomChargesRepository.findStay).not.toHaveBeenCalled();
+  });
 });
