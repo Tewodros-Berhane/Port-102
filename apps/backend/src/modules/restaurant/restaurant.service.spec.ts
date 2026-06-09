@@ -1060,4 +1060,20 @@ describe('RestaurantService', () => {
       service.chargeOrderToRoom(currentUser, 9, { stayId: 404 }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('rejects a stay without an active room assignment', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({ balanceAmount: new Prisma.Decimal(100) }),
+    );
+    posRoomChargesRepository.findStay.mockResolvedValue({
+      id: 42,
+      status: StayStatus.ACTIVE,
+      folio: { id: 7, status: FolioStatus.OPEN },
+      roomAssignments: [],
+    });
+
+    await expect(
+      service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
 });
