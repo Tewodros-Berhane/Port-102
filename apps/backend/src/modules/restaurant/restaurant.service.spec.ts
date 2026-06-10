@@ -1177,9 +1177,9 @@ describe('RestaurantService', () => {
       createOrder({ balanceAmount: new Prisma.Decimal(100) }),
     );
 
-    await expect(
-      service.closeOrder(currentUser, 9, {}),
-    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.closeOrder(currentUser, 9, {})).rejects.toBeInstanceOf(
+      ConflictException,
+    );
     expect(posOrdersRepository.updateOrder).not.toHaveBeenCalled();
   });
 
@@ -1231,5 +1231,32 @@ describe('RestaurantService', () => {
     expect(auditLogsService.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'restaurant.orders.cancelled' }),
     );
+  });
+
+  it('normalizes the POS order cancellation reason', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(createOrder());
+    posOrdersRepository.updateOrder.mockResolvedValue(
+      createOrder({ status: PosOrderStatus.CANCELLED }),
+    );
+
+    await service.cancelOrder(currentUser, 9, {
+      reason: ' Guest cancelled. ',
+    });
+
+    expect(posOrdersRepository.updateOrder).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({ cancelledReason: 'Guest cancelled.' }),
+    );
+  });
+
+  it('rejects cancelling a closed POS order', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({ status: PosOrderStatus.CLOSED }),
+    );
+
+    await expect(
+      service.cancelOrder(currentUser, 9, { reason: 'Too late.' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(posOrdersRepository.updateOrder).not.toHaveBeenCalled();
   });
 });
