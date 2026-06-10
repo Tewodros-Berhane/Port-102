@@ -9,6 +9,7 @@ import {
   PosPaymentMethod,
 } from '../../../generated/prisma/client';
 import { AddPosOrderItemDto } from './add-pos-order-item.dto';
+import { CancelPosOrderDto } from './cancel-pos-order.dto';
 import { ClosePosOrderDto } from './close-pos-order.dto';
 import { CreateMenuItemDto } from './create-menu-item.dto';
 import { CreateOutletDto } from './create-outlet.dto';
@@ -412,5 +413,13 @@ describe('Restaurant DTO validation', () => {
     });
 
     expect(errors.some((error) => error.property === 'notes')).toBe(true);
+  });
+
+  it('accepts a valid POS cancellation reason', async () => {
+    await expect(
+      validationErrors(CancelPosOrderDto, {
+        reason: 'Guest cancelled before preparation.',
+      }),
+    ).resolves.toHaveLength(0);
   });
 });
