@@ -422,4 +422,10 @@ describe('Restaurant DTO validation', () => {
       }),
     ).resolves.toHaveLength(0);
   });
+
+  it('requires a non-empty POS cancellation reason', async () => {
+    const errors = await validationErrors(CancelPosOrderDto, { reason: '' });
+
+    expect(errors.some((error) => error.property === 'reason')).toBe(true);
+  });
 });
