@@ -1182,4 +1182,24 @@ describe('RestaurantService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(posOrdersRepository.updateOrder).not.toHaveBeenCalled();
   });
+
+  it('stores normalized notes when closing a POS order', async () => {
+    const order = createOrder();
+    posOrdersRepository.findOrder.mockResolvedValue(order);
+    posOrdersRepository.updateOrder.mockResolvedValue(
+      createOrder({
+        status: PosOrderStatus.CLOSED,
+        notes: 'Payment verified.',
+      }),
+    );
+
+    await service.closeOrder(currentUser, 9, {
+      notes: ' Payment verified. ',
+    });
+
+    expect(posOrdersRepository.updateOrder).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({ notes: 'Payment verified.' }),
+    );
+  });
 });
