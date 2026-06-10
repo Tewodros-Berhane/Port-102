@@ -1140,4 +1140,35 @@ describe('RestaurantService', () => {
       service.chargeOrderToRoom(currentUser, 9, { stayId: 42 }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('closes a fully paid POS order and records an audit log', async () => {
+    const order = createOrder({
+      paymentStatus: PosOrderPaymentStatus.PAID,
+      paidAmount: new Prisma.Decimal(900),
+      totalAmount: new Prisma.Decimal(900),
+    });
+    const closedOrder = createOrder({
+      ...order,
+      status: PosOrderStatus.CLOSED,
+      closedByUserId: 1,
+      closedAt: now,
+    });
+    posOrdersRepository.findOrder.mockResolvedValue(order);
+    posOrdersRepository.updateOrder.mockResolvedValue(closedOrder);
+
+    const result = await service.closeOrder(currentUser, 9, {});
+
+    expect(posOrdersRepository.updateOrder).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        status: PosOrderStatus.CLOSED,
+        closedByUserId: 1,
+        closedAt: expect.any(Date),
+      }),
+    );
+    expect(result.status).toBe(PosOrderStatus.CLOSED);
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'restaurant.orders.closed' }),
+    );
+  });
 });
