@@ -405,4 +405,12 @@ describe('Restaurant DTO validation', () => {
       0,
     );
   });
+
+  it('rejects oversized POS close notes', async () => {
+    const errors = await validationErrors(ClosePosOrderDto, {
+      notes: 'N'.repeat(501),
+    });
+
+    expect(errors.some((error) => error.property === 'notes')).toBe(true);
+  });
 });
