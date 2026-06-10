@@ -377,6 +377,8 @@ describe('RestaurantController', () => {
       order,
       folioCharge: { id: 18 },
     });
+    restaurantService.closeOrder.mockResolvedValue(order);
+    restaurantService.cancelOrder.mockResolvedValue(order);
 
     await controller.createOrder(currentUser, createDto);
     await controller.listOrders(currentUser, query);
@@ -397,6 +399,12 @@ describe('RestaurantController', () => {
     await controller.chargeOrderToRoom(currentUser, 9, {
       stayId: 42,
       closeOrder: true,
+    });
+    await controller.closeOrder(currentUser, 9, {
+      notes: 'Payment verified.',
+    });
+    await controller.cancelOrder(currentUser, 10, {
+      reason: 'Guest cancelled.',
     });
 
     expect(restaurantService.createOrder).toHaveBeenCalledWith(
@@ -437,6 +445,14 @@ describe('RestaurantController', () => {
       currentUser,
       9,
       { stayId: 42, closeOrder: true },
+    );
+    expect(restaurantService.closeOrder).toHaveBeenCalledWith(currentUser, 9, {
+      notes: 'Payment verified.',
+    });
+    expect(restaurantService.cancelOrder).toHaveBeenCalledWith(
+      currentUser,
+      10,
+      { reason: 'Guest cancelled.' },
     );
   });
 
