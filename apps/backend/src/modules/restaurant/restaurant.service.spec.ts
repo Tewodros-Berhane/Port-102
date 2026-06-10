@@ -1202,4 +1202,34 @@ describe('RestaurantService', () => {
       expect.objectContaining({ notes: 'Payment verified.' }),
     );
   });
+
+  it('cancels an open POS order and records an audit log', async () => {
+    const order = createOrder();
+    const cancelledOrder = createOrder({
+      status: PosOrderStatus.CANCELLED,
+      cancelledReason: 'Guest cancelled.',
+      cancelledByUserId: 1,
+      cancelledAt: now,
+    });
+    posOrdersRepository.findOrder.mockResolvedValue(order);
+    posOrdersRepository.updateOrder.mockResolvedValue(cancelledOrder);
+
+    const result = await service.cancelOrder(currentUser, 9, {
+      reason: 'Guest cancelled.',
+    });
+
+    expect(posOrdersRepository.updateOrder).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        status: PosOrderStatus.CANCELLED,
+        cancelledReason: 'Guest cancelled.',
+        cancelledByUserId: 1,
+        cancelledAt: expect.any(Date),
+      }),
+    );
+    expect(result.status).toBe(PosOrderStatus.CANCELLED);
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'restaurant.orders.cancelled' }),
+    );
+  });
 });
