@@ -32,6 +32,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { AddPosOrderItemDto } from './dto/add-pos-order-item.dto';
 import { ChargePosOrderToRoomDto } from './dto/charge-pos-order-to-room.dto';
+import { CancelPosOrderDto } from './dto/cancel-pos-order.dto';
+import { ClosePosOrderDto } from './dto/close-pos-order.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { CreateOutletDto } from './dto/create-outlet.dto';
 import { CreatePosOrderDto } from './dto/create-pos-order.dto';
@@ -439,5 +441,43 @@ export class RestaurantController {
       orderId,
       chargeDto,
     );
+  }
+
+  @Patch('orders/:id/close')
+  @Permissions('pos.orders.close')
+  @ApiOperation({ summary: 'Close a fully settled POS order' })
+  @ApiOkResponse({ description: 'POS order closed successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid close-order payload.' })
+  @ApiConflictResponse({
+    description: 'Order is not open or still has an unpaid balance.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'POS order was not found.' })
+  closeOrder(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) orderId: number,
+    @Body() closeDto: ClosePosOrderDto,
+  ) {
+    return this.restaurantService.closeOrder(currentUser, orderId, closeDto);
+  }
+
+  @Patch('orders/:id/cancel')
+  @Permissions('pos.orders.cancel')
+  @ApiOperation({ summary: 'Cancel an open POS order with a reason' })
+  @ApiOkResponse({ description: 'POS order cancelled successfully.' })
+  @ApiBadRequestResponse({
+    description: 'Cancellation reason is missing or invalid.',
+  })
+  @ApiConflictResponse({ description: 'Only open orders can be cancelled.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'POS order was not found.' })
+  cancelOrder(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) orderId: number,
+    @Body() cancelDto: CancelPosOrderDto,
+  ) {
+    return this.restaurantService.cancelOrder(currentUser, orderId, cancelDto);
   }
 }
