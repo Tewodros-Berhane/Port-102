@@ -1171,4 +1171,15 @@ describe('RestaurantService', () => {
       expect.objectContaining({ action: 'restaurant.orders.closed' }),
     );
   });
+
+  it('rejects closing a POS order with an unpaid balance', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({ balanceAmount: new Prisma.Decimal(100) }),
+    );
+
+    await expect(
+      service.closeOrder(currentUser, 9, {}),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(posOrdersRepository.updateOrder).not.toHaveBeenCalled();
+  });
 });
