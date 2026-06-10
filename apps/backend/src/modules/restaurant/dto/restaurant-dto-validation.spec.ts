@@ -9,6 +9,7 @@ import {
   PosPaymentMethod,
 } from '../../../generated/prisma/client';
 import { AddPosOrderItemDto } from './add-pos-order-item.dto';
+import { ClosePosOrderDto } from './close-pos-order.dto';
 import { CreateMenuItemDto } from './create-menu-item.dto';
 import { CreateOutletDto } from './create-outlet.dto';
 import { CreatePosOrderDto } from './create-pos-order.dto';
@@ -396,6 +397,12 @@ describe('Restaurant DTO validation', () => {
     expect(zeroErrors.some((error) => error.property === 'amount')).toBe(true);
     expect(precisionErrors.some((error) => error.property === 'amount')).toBe(
       true,
+    );
+  });
+
+  it('accepts an empty POS close payload', async () => {
+    await expect(validationErrors(ClosePosOrderDto, {})).resolves.toHaveLength(
+      0,
     );
   });
 });
