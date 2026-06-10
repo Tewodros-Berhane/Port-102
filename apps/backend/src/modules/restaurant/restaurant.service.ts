@@ -20,6 +20,8 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { AddPosOrderItemDto } from './dto/add-pos-order-item.dto';
 import { ChargePosOrderToRoomDto } from './dto/charge-pos-order-to-room.dto';
+import { CancelPosOrderDto } from './dto/cancel-pos-order.dto';
+import { ClosePosOrderDto } from './dto/close-pos-order.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { CreateOutletDto } from './dto/create-outlet.dto';
 import { CreatePosOrderDto } from './dto/create-pos-order.dto';
@@ -976,6 +978,75 @@ export class RestaurantService {
         balanceAmount: this.serializeDecimal(result.folio.balanceAmount),
       },
     };
+  }
+
+  async closeOrder(
+    currentUser: CurrentUserPayload,
+    orderId: number,
+    closeDto: ClosePosOrderDto,
+  ) {
+    const order = await this.findRequiredOrder(orderId);
+    this.ensureOrderIsOpen(order);
+
+    if (order.balanceAmount.gt(0)) {
+      throw new ConflictException(
+        'POS order must have no unpaid balance before closing.',
+      );
+    }
+
+    const updatedOrder = await this.posOrdersRepository.updateOrder(order.id, {
+      status: PosOrderStatus.CLOSED,
+      closedAt: new Date(),
+      closedByUserId: currentUser.sub,
+      ...(closeDto.notes === undefined
+        ? {}
+        : { notes: this.normalizeOptionalString(closeDto.notes) }),
+    });
+
+    await this.recordOrderAudit(
+      currentUser,
+      'restaurant.orders.closed',
+      updatedOrder,
+      {
+        previousStatus: order.status,
+        status: updatedOrder.status,
+        paymentStatus: updatedOrder.paymentStatus,
+      },
+    );
+
+    return this.serializeOrder(updatedOrder);
+  }
+
+  async cancelOrder(
+    currentUser: CurrentUserPayload,
+    orderId: number,
+    cancelDto: CancelPosOrderDto,
+  ) {
+    const order = await this.findRequiredOrder(orderId);
+    this.ensureOrderIsOpen(order);
+    const reason = this.normalizeRequiredString(
+      cancelDto.reason,
+      'Cancellation reason is required.',
+    );
+    const updatedOrder = await this.posOrdersRepository.updateOrder(order.id, {
+      status: PosOrderStatus.CANCELLED,
+      cancelledReason: reason,
+      cancelledAt: new Date(),
+      cancelledByUserId: currentUser.sub,
+    });
+
+    await this.recordOrderAudit(
+      currentUser,
+      'restaurant.orders.cancelled',
+      updatedOrder,
+      {
+        previousStatus: order.status,
+        status: updatedOrder.status,
+        reason,
+      },
+    );
+
+    return this.serializeOrder(updatedOrder);
   }
 
   private async findRequiredOutlet(outletId: number) {
