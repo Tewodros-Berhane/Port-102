@@ -33,6 +33,8 @@ describe('RestaurantController', () => {
     voidOrderItem: jest.Mock;
     recordOrderPayment: jest.Mock;
     chargeOrderToRoom: jest.Mock;
+    closeOrder: jest.Mock;
+    cancelOrder: jest.Mock;
   };
 
   const currentUser = {
@@ -67,6 +69,8 @@ describe('RestaurantController', () => {
       voidOrderItem: jest.fn(),
       recordOrderPayment: jest.fn(),
       chargeOrderToRoom: jest.fn(),
+      closeOrder: jest.fn(),
+      cancelOrder: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -218,6 +222,18 @@ describe('RestaurantController', () => {
         RestaurantController.prototype.chargeOrderToRoom,
       ),
     ).toEqual(['pos.charge_to_room']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.closeOrder,
+      ),
+    ).toEqual(['pos.orders.close']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.cancelOrder,
+      ),
+    ).toEqual(['pos.orders.cancel']);
   });
 
   it('delegates outlet operations to the service', async () => {
