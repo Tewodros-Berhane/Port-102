@@ -1308,4 +1308,22 @@ describe('RestaurantService', () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0].id).toBe(12);
   });
+
+  it('generates a receipt for a room-charged order', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({
+        status: PosOrderStatus.CLOSED,
+        paymentStatus: PosOrderPaymentStatus.CHARGED_TO_ROOM,
+        roomId: 11,
+        stayId: 42,
+        folioId: 7,
+      }),
+    );
+
+    const result = await service.generateOrderReceipt(currentUser, 9);
+
+    expect(result.order).toEqual(
+      expect.objectContaining({ roomId: 11, stayId: 42, folioId: 7 }),
+    );
+  });
 });
