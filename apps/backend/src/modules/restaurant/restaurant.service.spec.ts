@@ -1347,4 +1347,22 @@ describe('RestaurantService', () => {
       service.generateOrderReceipt(currentUser, 9),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('audits generated POS receipts', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({
+        status: PosOrderStatus.CLOSED,
+        paymentStatus: PosOrderPaymentStatus.PAID,
+      }),
+    );
+
+    await service.generateOrderReceipt(currentUser, 9);
+
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'restaurant.receipts.generated',
+        entityType: 'PosOrder',
+      }),
+    );
+  });
 });
