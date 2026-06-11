@@ -1334,4 +1334,17 @@ describe('RestaurantService', () => {
       service.generateOrderReceipt(currentUser, 9),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('rejects receipt generation for an unsettled closed order', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({
+        status: PosOrderStatus.CLOSED,
+        paymentStatus: PosOrderPaymentStatus.UNPAID,
+      }),
+    );
+
+    await expect(
+      service.generateOrderReceipt(currentUser, 9),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
 });
