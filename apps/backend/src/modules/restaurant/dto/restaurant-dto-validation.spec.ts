@@ -437,4 +437,12 @@ describe('Restaurant DTO validation', () => {
       validationErrors(RestaurantDashboardQueryDto, {}),
     ).resolves.toHaveLength(0);
   });
+
+  it('transforms a restaurant dashboard outlet ID', async () => {
+    const dto = plainToInstance(RestaurantDashboardQueryDto, {
+      outletId: '4',
+    });
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.outletId).toBe(4);
+  });
 });
