@@ -40,6 +40,19 @@ describe('RestaurantReportsRepository', () => {
     repository = module.get(RestaurantReportsRepository);
   });
 
+  function mockEmptySalesSummary() {
+    prisma.posOrder.count.mockResolvedValue(0);
+    prisma.posOrder.aggregate.mockResolvedValue({
+      _sum: { totalAmount: null, balanceAmount: null },
+    });
+    prisma.posOrderPayment.aggregate.mockResolvedValue({
+      _sum: { amount: null },
+    });
+    prisma.posOrder.groupBy.mockResolvedValue([]);
+    prisma.posOrderPayment.groupBy.mockResolvedValue([]);
+    prisma.outlet.findMany.mockResolvedValue([]);
+  }
+
   it('returns restaurant dashboard counts', async () => {
     prisma.posOrder.count.mockResolvedValueOnce(3).mockResolvedValueOnce(2);
     prisma.outlet.count.mockResolvedValue(1);
