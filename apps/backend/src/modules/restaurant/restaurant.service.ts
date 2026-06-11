@@ -28,7 +28,10 @@ import { CreatePosOrderDto } from './dto/create-pos-order.dto';
 import { GetMenuItemsQueryDto } from './dto/get-menu-items-query.dto';
 import { GetOutletsQueryDto } from './dto/get-outlets-query.dto';
 import { GetPosOrdersQueryDto } from './dto/get-pos-orders-query.dto';
+import { InHouseGuestSearchQueryDto } from './dto/in-house-guest-search-query.dto';
 import { RecordPosOrderPaymentDto } from './dto/record-pos-order-payment.dto';
+import { RestaurantDashboardQueryDto } from './dto/restaurant-dashboard-query.dto';
+import { RestaurantSalesSummaryQueryDto } from './dto/restaurant-sales-summary-query.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
 import { UpdateOutletDto } from './dto/update-outlet.dto';
 import { UpdatePosOrderItemDto } from './dto/update-pos-order-item.dto';
@@ -55,6 +58,10 @@ import {
   PosRoomChargeRecord,
   PosRoomChargesRepository,
 } from './repositories/pos-room-charges.repository';
+import {
+  RestaurantReportFilters,
+  RestaurantReportsRepository,
+} from './repositories/restaurant-reports.repository';
 
 @Injectable()
 export class RestaurantService {
@@ -65,8 +72,104 @@ export class RestaurantService {
     private readonly posOrderItemsRepository: PosOrderItemsRepository,
     private readonly posOrderPaymentsRepository: PosOrderPaymentsRepository,
     private readonly posRoomChargesRepository: PosRoomChargesRepository,
+    private readonly restaurantReportsRepository: RestaurantReportsRepository,
     private readonly auditLogsService: AuditLogsService,
   ) {}
+
+  async getDashboard(
+    _currentUser: CurrentUserPayload,
+    query: RestaurantDashboardQueryDto,
+  ) {
+    if (query.outletId !== undefined) {
+      await this.findRequiredOutlet(query.outletId);
+    }
+
+    const filters = this.reportFilters(query, true);
+    const [counts, summary] = await Promise.all([
+      this.restaurantReportsRepository.getDashboardCounts(filters),
+      this.restaurantReportsRepository.getSalesSummary(filters),
+    ]);
+
+    return {
+      period: this.serializeReportPeriod(filters),
+      outletId: filters.outletId ?? null,
+      ...counts,
+      totalOrders: summary.totalOrders,
+      closedOrders: summary.closedOrders,
+      cancelledOrders: summary.cancelledOrders,
+      grossSales: this.serializeNullableDecimal(summary.grossSales),
+      directPayments: this.serializeNullableDecimal(summary.directPayments),
+      roomCharges: this.serializeNullableDecimal(summary.roomCharges),
+      unpaidBalance: this.serializeNullableDecimal(summary.unpaidBalance),
+    };
+  }
+
+  async getSalesSummary(
+    _currentUser: CurrentUserPayload,
+    query: RestaurantSalesSummaryQueryDto,
+  ) {
+    if (query.outletId !== undefined) {
+      await this.findRequiredOutlet(query.outletId);
+    }
+
+    const filters = this.reportFilters(query);
+    const summary =
+      await this.restaurantReportsRepository.getSalesSummary(filters);
+
+    return this.serializeSalesSummary(summary, filters);
+  }
+
+  async getOutletSalesSummary(
+    _currentUser: CurrentUserPayload,
+    outletId: number,
+    query: RestaurantSalesSummaryQueryDto,
+  ) {
+    const outlet = await this.findRequiredOutlet(outletId);
+    const filters = this.reportFilters({ ...query, outletId });
+    const summary =
+      await this.restaurantReportsRepository.getSalesSummary(filters);
+
+    return {
+      outlet: this.serializeOutlet(outlet),
+      ...this.serializeSalesSummary(summary, filters),
+    };
+  }
+
+  async searchInHouseGuests(
+    _currentUser: CurrentUserPayload,
+    query: InHouseGuestSearchQueryDto,
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const [total, stays] =
+      await this.restaurantReportsRepository.searchInHouseGuests({
+        skip: (page - 1) * limit,
+        take: limit,
+        search: this.normalizeOptionalString(query.search) ?? undefined,
+      });
+
+    return {
+      items: stays.map((stay) => ({
+        id: stay.id,
+        stayNumber: stay.stayNumber,
+        expectedCheckOutDate: stay.expectedCheckOutDate,
+        guest: stay.guest,
+        roomAssignment: stay.roomAssignments[0] ?? null,
+        folio: stay.folio
+          ? {
+              ...stay.folio,
+              balanceAmount: this.serializeDecimal(stay.folio.balanceAmount),
+            }
+          : null,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
 
   async createOutlet(
     currentUser: CurrentUserPayload,
@@ -1017,6 +1120,87 @@ export class RestaurantService {
     return this.serializeOrder(updatedOrder);
   }
 
+  async generateOrderReceipt(currentUser: CurrentUserPayload, orderId: number) {
+    const order = await this.findRequiredOrder(orderId);
+
+    if (order.status !== PosOrderStatus.CLOSED) {
+      throw new ConflictException(
+        'Only closed POS orders can generate receipts.',
+      );
+    }
+
+    if (
+      order.paymentStatus !== PosOrderPaymentStatus.PAID &&
+      order.paymentStatus !== PosOrderPaymentStatus.CHARGED_TO_ROOM
+    ) {
+      throw new ConflictException(
+        'POS order must be fully settled before generating a receipt.',
+      );
+    }
+
+    const receipt = {
+      receiptNumber: `POS-RCT-${order.orderNumber}`,
+      generatedAt: new Date(),
+      generatedByUserId: currentUser.sub,
+      order: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        source: order.source,
+        tableNumber: order.tableNumber,
+        roomId: order.roomId,
+        stayId: order.stayId,
+        folioId: order.folioId,
+        createdAt: order.createdAt,
+        closedAt: order.closedAt,
+      },
+      outlet: order.outlet,
+      items: order.items
+        .filter((item) => !item.isVoided)
+        .map((item) => ({
+          id: item.id,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: this.serializeDecimal(item.unitPrice),
+          totalAmount: this.serializeDecimal(item.totalAmount),
+          notes: item.notes,
+        })),
+      payments: order.payments
+        .filter((payment) => !payment.isVoided)
+        .map((payment) => ({
+          id: payment.id,
+          paymentNumber: payment.paymentNumber,
+          amount: this.serializeDecimal(payment.amount),
+          method: payment.method,
+          reference: payment.reference,
+          recordedAt: payment.recordedAt,
+        })),
+      totals: {
+        subtotalAmount: this.serializeDecimal(order.subtotalAmount),
+        discountAmount: this.serializeDecimal(order.discountAmount),
+        taxAmount: this.serializeDecimal(order.taxAmount),
+        serviceAmount: this.serializeDecimal(order.serviceAmount),
+        totalAmount: this.serializeDecimal(order.totalAmount),
+        paidAmount: this.serializeDecimal(order.paidAmount),
+        balanceAmount: this.serializeDecimal(order.balanceAmount),
+      },
+    };
+
+    await this.recordOrderAudit(
+      currentUser,
+      'restaurant.receipts.generated',
+      order,
+      {
+        receiptNumber: receipt.receiptNumber,
+        paymentStatus: order.paymentStatus,
+        totalAmount: receipt.totals.totalAmount,
+      },
+    );
+
+    return receipt;
+  }
+
   async cancelOrder(
     currentUser: CurrentUserPayload,
     orderId: number,
@@ -1289,6 +1473,42 @@ export class RestaurantService {
     };
   }
 
+  private serializeSalesSummary(
+    summary: Awaited<
+      ReturnType<RestaurantReportsRepository['getSalesSummary']>
+    >,
+    filters: RestaurantReportFilters,
+  ) {
+    const outletLookup = new Map(
+      summary.outlets.map((outlet) => [outlet.id, outlet]),
+    );
+
+    return {
+      period: this.serializeReportPeriod(filters),
+      totalOrders: summary.totalOrders,
+      closedOrders: summary.closedOrders,
+      cancelledOrders: summary.cancelledOrders,
+      grossSales: this.serializeNullableDecimal(summary.grossSales),
+      directPayments: this.serializeNullableDecimal(summary.directPayments),
+      roomCharges: this.serializeNullableDecimal(summary.roomCharges),
+      unpaidBalance: this.serializeNullableDecimal(summary.unpaidBalance),
+      salesByOutlet: summary.outletGroups.map((group) => ({
+        outlet: outletLookup.get(group.outletId) ?? {
+          id: group.outletId,
+          name: null,
+          code: null,
+        },
+        orderCount: group._count._all,
+        grossSales: this.serializeNullableDecimal(group._sum.totalAmount),
+      })),
+      salesByPaymentMethod: summary.paymentGroups.map((group) => ({
+        method: group.method,
+        paymentCount: group._count._all,
+        amount: this.serializeNullableDecimal(group._sum.amount),
+      })),
+    };
+  }
+
   private outletAuditSnapshot(outlet: OutletRecord): Prisma.InputJsonObject {
     return {
       name: outlet.name,
@@ -1424,6 +1644,48 @@ export class RestaurantService {
 
   private parseOptionalDate(value?: string) {
     return value ? new Date(value) : undefined;
+  }
+
+  private reportFilters(
+    query: {
+      outletId?: number;
+      createdFrom?: string;
+      createdTo?: string;
+    },
+    defaultToToday = false,
+  ): RestaurantReportFilters {
+    let createdFrom = this.parseOptionalDate(query.createdFrom);
+    let createdTo = this.parseOptionalDate(query.createdTo);
+
+    if (defaultToToday && !createdFrom && !createdTo) {
+      createdFrom = new Date();
+      createdFrom.setHours(0, 0, 0, 0);
+      createdTo = new Date(createdFrom);
+      createdTo.setDate(createdTo.getDate() + 1);
+    }
+
+    if (createdFrom && createdTo && createdFrom > createdTo) {
+      throw new BadRequestException(
+        'Report start date cannot be after the end date.',
+      );
+    }
+
+    return {
+      outletId: query.outletId,
+      createdFrom,
+      createdTo,
+    };
+  }
+
+  private serializeReportPeriod(filters: RestaurantReportFilters) {
+    return {
+      createdFrom: filters.createdFrom ?? null,
+      createdTo: filters.createdTo ?? null,
+    };
+  }
+
+  private serializeNullableDecimal(value: Prisma.Decimal | null) {
+    return this.serializeDecimal(value ?? new Prisma.Decimal(0));
   }
 
   private serializeDecimal(value: Prisma.Decimal) {
