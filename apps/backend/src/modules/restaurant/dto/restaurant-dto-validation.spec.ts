@@ -485,4 +485,11 @@ describe('Restaurant DTO validation', () => {
     expect(dto.page).toBe(2);
     expect(dto.limit).toBe(25);
   });
+
+  it('rejects in-house guest search limits above 100', async () => {
+    const errors = await validationErrors(InHouseGuestSearchQueryDto, {
+      limit: 101,
+    });
+    expect(errors.some((error) => error.property === 'limit')).toBe(true);
+  });
 });
