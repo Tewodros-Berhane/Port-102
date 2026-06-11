@@ -1392,4 +1392,15 @@ describe('RestaurantService', () => {
     expect(result.openOrders).toBe(0);
     expect(result.period.createdFrom).toBeInstanceOf(Date);
   });
+
+  it('validates dashboard outlet filters', async () => {
+    outletsRepository.findOutlet.mockResolvedValue(null);
+
+    await expect(
+      service.getDashboard(currentUser, { outletId: 404 }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(
+      restaurantReportsRepository.getDashboardCounts,
+    ).not.toHaveBeenCalled();
+  });
 });
