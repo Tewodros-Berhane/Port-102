@@ -1365,4 +1365,31 @@ describe('RestaurantService', () => {
       }),
     );
   });
+
+  it('returns a zero-backed restaurant dashboard', async () => {
+    restaurantReportsRepository.getDashboardCounts.mockResolvedValue({
+      openOrders: 0,
+      unpaidOrders: 0,
+      activeOutlets: 1,
+      unavailableMenuItems: 0,
+    });
+    restaurantReportsRepository.getSalesSummary.mockResolvedValue({
+      totalOrders: 0,
+      closedOrders: 0,
+      cancelledOrders: 0,
+      grossSales: null,
+      directPayments: null,
+      roomCharges: null,
+      unpaidBalance: null,
+      outletGroups: [],
+      paymentGroups: [],
+      outlets: [],
+    });
+
+    const result = await service.getDashboard(currentUser, {});
+
+    expect(result.grossSales).toBe('0');
+    expect(result.openOrders).toBe(0);
+    expect(result.period.createdFrom).toBeInstanceOf(Date);
+  });
 });
