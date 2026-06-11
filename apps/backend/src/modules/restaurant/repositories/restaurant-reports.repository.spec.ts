@@ -146,4 +146,23 @@ describe('RestaurantReportsRepository', () => {
       }),
     });
   });
+
+  it('applies guest and room search text to active stays', async () => {
+    prisma.stay.count.mockResolvedValue(0);
+    prisma.stay.findMany.mockResolvedValue([]);
+
+    await repository.searchInHouseGuests({
+      skip: 20,
+      take: 20,
+      search: '101',
+    });
+
+    expect(prisma.stay.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 20,
+        take: 20,
+        where: expect.objectContaining({ OR: expect.any(Array) }),
+      }),
+    );
+  });
 });
