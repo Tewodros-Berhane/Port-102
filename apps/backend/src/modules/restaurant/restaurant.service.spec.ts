@@ -25,6 +25,7 @@ import { PosOrderItemsRepository } from './repositories/pos-order-items.reposito
 import { PosOrderPaymentsRepository } from './repositories/pos-order-payments.repository';
 import { PosOrdersRepository } from './repositories/pos-orders.repository';
 import { PosRoomChargesRepository } from './repositories/pos-room-charges.repository';
+import { RestaurantReportsRepository } from './repositories/restaurant-reports.repository';
 
 const currentUser = {
   sub: 1,
@@ -214,6 +215,11 @@ describe('RestaurantService', () => {
     createCharge: jest.Mock;
     incrementFolio: jest.Mock;
   };
+  let restaurantReportsRepository: {
+    getDashboardCounts: jest.Mock;
+    getSalesSummary: jest.Mock;
+    searchInHouseGuests: jest.Mock;
+  };
 
   beforeEach(async () => {
     outletsRepository = {
@@ -258,6 +264,11 @@ describe('RestaurantService', () => {
       createCharge: jest.fn(),
       incrementFolio: jest.fn(),
     };
+    restaurantReportsRepository = {
+      getDashboardCounts: jest.fn(),
+      getSalesSummary: jest.fn(),
+      searchInHouseGuests: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -285,6 +296,10 @@ describe('RestaurantService', () => {
         {
           provide: PosRoomChargesRepository,
           useValue: posRoomChargesRepository,
+        },
+        {
+          provide: RestaurantReportsRepository,
+          useValue: restaurantReportsRepository,
         },
         {
           provide: AuditLogsService,
