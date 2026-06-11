@@ -104,4 +104,18 @@ describe('RestaurantReportsRepository', () => {
       where: { createdAt: { gte: createdFrom, lte: createdTo } },
     });
   });
+
+  it('loads outlet labels for grouped sales', async () => {
+    mockEmptySalesSummary();
+    prisma.posOrder.groupBy.mockResolvedValue([
+      { outletId: 4, _count: { _all: 2 }, _sum: { totalAmount: 900 } },
+    ]);
+
+    await repository.getSalesSummary({});
+
+    expect(prisma.outlet.findMany).toHaveBeenCalledWith({
+      where: { id: { in: [4] } },
+      select: { id: true, name: true, code: true },
+    });
+  });
 });
