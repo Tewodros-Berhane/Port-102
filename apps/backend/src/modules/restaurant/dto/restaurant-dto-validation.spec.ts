@@ -475,4 +475,14 @@ describe('Restaurant DTO validation', () => {
     expect(dto.page).toBe(1);
     expect(dto.limit).toBe(20);
   });
+
+  it('transforms in-house guest pagination values', async () => {
+    const dto = plainToInstance(InHouseGuestSearchQueryDto, {
+      page: '2',
+      limit: '25',
+    });
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.page).toBe(2);
+    expect(dto.limit).toBe(25);
+  });
 });
