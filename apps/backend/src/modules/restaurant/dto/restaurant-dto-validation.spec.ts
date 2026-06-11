@@ -492,4 +492,11 @@ describe('Restaurant DTO validation', () => {
     });
     expect(errors.some((error) => error.property === 'limit')).toBe(true);
   });
+
+  it('rejects oversized in-house guest search text', async () => {
+    const errors = await validationErrors(InHouseGuestSearchQueryDto, {
+      search: 'S'.repeat(121),
+    });
+    expect(errors.some((error) => error.property === 'search')).toBe(true);
+  });
 });
