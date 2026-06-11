@@ -244,6 +244,12 @@ describe('RestaurantController', () => {
         RestaurantController.prototype.cancelOrder,
       ),
     ).toEqual(['pos.orders.cancel']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.generateOrderReceipt,
+      ),
+    ).toEqual(['pos.receipts.generate']);
   });
 
   it('delegates outlet operations to the service', async () => {
