@@ -1274,4 +1274,20 @@ describe('RestaurantService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(posOrdersRepository.updateOrder).not.toHaveBeenCalled();
   });
+
+  it('generates a receipt for a paid closed POS order', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({
+        status: PosOrderStatus.CLOSED,
+        paymentStatus: PosOrderPaymentStatus.PAID,
+        totalAmount: new Prisma.Decimal(900),
+        paidAmount: new Prisma.Decimal(900),
+      }),
+    );
+
+    const result = await service.generateOrderReceipt(currentUser, 9);
+
+    expect(result.receiptNumber).toBe('POS-RCT-POS-20260607-000001');
+    expect(result.totals.totalAmount).toBe('900');
+  });
 });
