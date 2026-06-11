@@ -1296,10 +1296,7 @@ describe('RestaurantService', () => {
       createOrder({
         status: PosOrderStatus.CLOSED,
         paymentStatus: PosOrderPaymentStatus.PAID,
-        items: [
-          createOrderItem(),
-          createOrderItem({ id: 13, isVoided: true }),
-        ],
+        items: [createOrderItem(), createOrderItem({ id: 13, isVoided: true })],
       }),
     );
 
@@ -1469,5 +1466,38 @@ describe('RestaurantService', () => {
       expect.objectContaining({ outletId: 4 }),
     );
     expect(result.outlet.id).toBe(4);
+  });
+
+  it('returns paginated in-house guest charge targets', async () => {
+    restaurantReportsRepository.searchInHouseGuests.mockResolvedValue([
+      1,
+      [
+        {
+          id: 42,
+          stayNumber: 'STAY-42',
+          expectedCheckOutDate: now,
+          guest: { id: 5, firstName: 'Sara', lastName: 'Bekele' },
+          folio: {
+            id: 7,
+            folioNumber: 'FOL-7',
+            status: FolioStatus.OPEN,
+            balanceAmount: new Prisma.Decimal(125),
+          },
+          roomAssignments: [{ roomId: 11, room: { roomNumber: '101' } }],
+        },
+      ],
+    ]);
+
+    const result = await service.searchInHouseGuests(currentUser, {
+      page: 2,
+      limit: 10,
+      search: ' 101 ',
+    });
+
+    expect(
+      restaurantReportsRepository.searchInHouseGuests,
+    ).toHaveBeenCalledWith({ skip: 10, take: 10, search: '101' });
+    expect(result.items[0].folio?.balanceAmount).toBe('125');
+    expect(result.pagination.total).toBe(1);
   });
 });
