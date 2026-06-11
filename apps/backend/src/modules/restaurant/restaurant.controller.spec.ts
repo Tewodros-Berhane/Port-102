@@ -529,4 +529,25 @@ describe('RestaurantController', () => {
       9,
     );
   });
+
+  it('delegates dashboard and sales report queries', async () => {
+    const query = { outletId: 4 };
+    restaurantService.getDashboard.mockResolvedValue({});
+    restaurantService.getSalesSummary.mockResolvedValue({});
+    restaurantService.getOutletSalesSummary.mockResolvedValue({});
+
+    await controller.getDashboard(currentUser, query);
+    await controller.getSalesSummary(currentUser, query);
+    await controller.getOutletSalesSummary(currentUser, 4, query);
+
+    expect(restaurantService.getDashboard).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+    expect(restaurantService.getOutletSalesSummary).toHaveBeenCalledWith(
+      currentUser,
+      4,
+      query,
+    );
+  });
 });
