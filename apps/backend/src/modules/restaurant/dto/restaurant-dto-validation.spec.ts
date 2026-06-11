@@ -445,4 +445,11 @@ describe('Restaurant DTO validation', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
     expect(dto.outletId).toBe(4);
   });
+
+  it('rejects an invalid restaurant dashboard date', async () => {
+    const errors = await validationErrors(RestaurantDashboardQueryDto, {
+      createdFrom: 'not-a-date',
+    });
+    expect(errors.some((error) => error.property === 'createdFrom')).toBe(true);
+  });
 });
