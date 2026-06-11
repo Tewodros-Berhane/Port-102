@@ -1403,4 +1403,37 @@ describe('RestaurantService', () => {
       restaurantReportsRepository.getDashboardCounts,
     ).not.toHaveBeenCalled();
   });
+
+  it('serializes outlet and payment method sales groups', async () => {
+    restaurantReportsRepository.getSalesSummary.mockResolvedValue({
+      totalOrders: 2,
+      closedOrders: 2,
+      cancelledOrders: 0,
+      grossSales: new Prisma.Decimal(900),
+      directPayments: new Prisma.Decimal(400),
+      roomCharges: new Prisma.Decimal(500),
+      unpaidBalance: null,
+      outletGroups: [
+        {
+          outletId: 4,
+          _count: { _all: 2 },
+          _sum: { totalAmount: new Prisma.Decimal(900) },
+        },
+      ],
+      paymentGroups: [
+        {
+          method: PosPaymentMethod.CASH,
+          _count: { _all: 1 },
+          _sum: { amount: new Prisma.Decimal(400) },
+        },
+      ],
+      outlets: [{ id: 4, name: 'Main Restaurant', code: 'MAIN' }],
+    });
+
+    const result = await service.getSalesSummary(currentUser, {});
+
+    expect(result.grossSales).toBe('900');
+    expect(result.salesByOutlet[0].orderCount).toBe(2);
+    expect(result.salesByPaymentMethod[0].amount).toBe('400');
+  });
 });
