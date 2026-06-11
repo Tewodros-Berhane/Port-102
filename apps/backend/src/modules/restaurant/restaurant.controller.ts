@@ -40,7 +40,10 @@ import { CreatePosOrderDto } from './dto/create-pos-order.dto';
 import { GetMenuItemsQueryDto } from './dto/get-menu-items-query.dto';
 import { GetOutletsQueryDto } from './dto/get-outlets-query.dto';
 import { GetPosOrdersQueryDto } from './dto/get-pos-orders-query.dto';
+import { InHouseGuestSearchQueryDto } from './dto/in-house-guest-search-query.dto';
 import { RecordPosOrderPaymentDto } from './dto/record-pos-order-payment.dto';
+import { RestaurantDashboardQueryDto } from './dto/restaurant-dashboard-query.dto';
+import { RestaurantSalesSummaryQueryDto } from './dto/restaurant-sales-summary-query.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
 import { UpdateOutletDto } from './dto/update-outlet.dto';
 import { UpdatePosOrderItemDto } from './dto/update-pos-order-item.dto';
@@ -54,6 +57,47 @@ import { RestaurantService } from './restaurant.service';
 @Controller('restaurant')
 export class RestaurantController {
   constructor(private readonly restaurantService: RestaurantService) {}
+
+  @Get('dashboard')
+  @Permissions('pos.dashboard.read')
+  @ApiOperation({ summary: 'Get restaurant POS operational dashboard totals' })
+  @ApiOkResponse({ description: 'Restaurant dashboard returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  getDashboard(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: RestaurantDashboardQueryDto,
+  ) {
+    return this.restaurantService.getDashboard(currentUser, query);
+  }
+
+  @Get('sales-summary')
+  @Permissions('outlet_sales.read')
+  @ApiOperation({ summary: 'Get sales totals across restaurant POS outlets' })
+  @ApiOkResponse({ description: 'Sales summary returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  getSalesSummary(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: RestaurantSalesSummaryQueryDto,
+  ) {
+    return this.restaurantService.getSalesSummary(currentUser, query);
+  }
+
+  @Get('in-house-guests/search')
+  @Permissions('in_house_guests.read')
+  @ApiOperation({
+    summary: 'Search active stays and rooms for charge-to-room selection',
+  })
+  @ApiOkResponse({ description: 'In-house guests returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  searchInHouseGuests(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: InHouseGuestSearchQueryDto,
+  ) {
+    return this.restaurantService.searchInHouseGuests(currentUser, query);
+  }
 
   @Post('outlets')
   @Permissions('pos.menu_items.create')
@@ -95,6 +139,25 @@ export class RestaurantController {
     @Param('id', ParseIntPipe) outletId: number,
   ) {
     return this.restaurantService.getOutletById(currentUser, outletId);
+  }
+
+  @Get('outlets/:id/sales-summary')
+  @Permissions('outlet_sales.read')
+  @ApiOperation({ summary: 'Get sales totals for one restaurant POS outlet' })
+  @ApiOkResponse({ description: 'Outlet sales summary returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Outlet was not found.' })
+  getOutletSalesSummary(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) outletId: number,
+    @Query() query: RestaurantSalesSummaryQueryDto,
+  ) {
+    return this.restaurantService.getOutletSalesSummary(
+      currentUser,
+      outletId,
+      query,
+    );
   }
 
   @Patch('outlets/:id')
@@ -441,6 +504,23 @@ export class RestaurantController {
       orderId,
       chargeDto,
     );
+  }
+
+  @Post('orders/:id/receipt')
+  @Permissions('pos.receipts.generate')
+  @ApiOperation({ summary: 'Generate a printable receipt for a settled order' })
+  @ApiCreatedResponse({ description: 'POS receipt generated successfully.' })
+  @ApiConflictResponse({
+    description: 'The POS order is cancelled, open, or not fully settled.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'POS order was not found.' })
+  generateOrderReceipt(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) orderId: number,
+  ) {
+    return this.restaurantService.generateOrderReceipt(currentUser, orderId);
   }
 
   @Patch('orders/:id/close')
