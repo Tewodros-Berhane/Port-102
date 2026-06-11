@@ -1290,4 +1290,22 @@ describe('RestaurantService', () => {
     expect(result.receiptNumber).toBe('POS-RCT-POS-20260607-000001');
     expect(result.totals.totalAmount).toBe('900');
   });
+
+  it('omits voided items from generated POS receipts', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(
+      createOrder({
+        status: PosOrderStatus.CLOSED,
+        paymentStatus: PosOrderPaymentStatus.PAID,
+        items: [
+          createOrderItem(),
+          createOrderItem({ id: 13, isVoided: true }),
+        ],
+      }),
+    );
+
+    const result = await service.generateOrderReceipt(currentUser, 9);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].id).toBe(12);
+  });
 });
