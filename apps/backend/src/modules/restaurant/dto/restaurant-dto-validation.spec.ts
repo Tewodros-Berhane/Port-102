@@ -468,4 +468,11 @@ describe('Restaurant DTO validation', () => {
     });
     expect(errors.some((error) => error.property === 'outletId')).toBe(true);
   });
+
+  it('defaults in-house guest search pagination', async () => {
+    const dto = plainToInstance(InHouseGuestSearchQueryDto, {});
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.page).toBe(1);
+    expect(dto.limit).toBe(20);
+  });
 });
