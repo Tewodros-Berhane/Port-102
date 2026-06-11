@@ -118,4 +118,18 @@ describe('RestaurantReportsRepository', () => {
       select: { id: true, name: true, code: true },
     });
   });
+
+  it('groups direct payments by payment method', async () => {
+    mockEmptySalesSummary();
+
+    await repository.getSalesSummary({});
+
+    expect(prisma.posOrderPayment.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['method'],
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+    );
+  });
 });
