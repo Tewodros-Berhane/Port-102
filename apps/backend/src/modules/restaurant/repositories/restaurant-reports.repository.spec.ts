@@ -132,4 +132,18 @@ describe('RestaurantReportsRepository', () => {
       }),
     );
   });
+
+  it('searches only active stays with active rooms', async () => {
+    prisma.stay.count.mockResolvedValue(0);
+    prisma.stay.findMany.mockResolvedValue([]);
+
+    await repository.searchInHouseGuests({ skip: 0, take: 20 });
+
+    expect(prisma.stay.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        status: 'ACTIVE',
+        roomAssignments: { some: { status: 'ACTIVE' } },
+      }),
+    });
+  });
 });
