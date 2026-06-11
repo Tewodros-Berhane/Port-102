@@ -65,4 +65,14 @@ describe('RestaurantReportsRepository', () => {
       unavailableMenuItems: 4,
     });
   });
+
+  it('returns zero-backed raw values for an empty sales period', async () => {
+    mockEmptySalesSummary();
+
+    const result = await repository.getSalesSummary({});
+
+    expect(result.totalOrders).toBe(0);
+    expect(result.outletGroups).toEqual([]);
+    expect(result.paymentGroups).toEqual([]);
+  });
 });
