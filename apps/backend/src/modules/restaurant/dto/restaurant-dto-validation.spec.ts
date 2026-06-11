@@ -461,4 +461,11 @@ describe('Restaurant DTO validation', () => {
       }),
     ).resolves.toHaveLength(0);
   });
+
+  it('rejects a zero sales summary outlet ID', async () => {
+    const errors = await validationErrors(RestaurantSalesSummaryQueryDto, {
+      outletId: 0,
+    });
+    expect(errors.some((error) => error.property === 'outletId')).toBe(true);
+  });
 });
