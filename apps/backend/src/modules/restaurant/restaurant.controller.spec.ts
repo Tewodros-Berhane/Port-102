@@ -35,6 +35,11 @@ describe('RestaurantController', () => {
     chargeOrderToRoom: jest.Mock;
     closeOrder: jest.Mock;
     cancelOrder: jest.Mock;
+    generateOrderReceipt: jest.Mock;
+    getDashboard: jest.Mock;
+    getSalesSummary: jest.Mock;
+    getOutletSalesSummary: jest.Mock;
+    searchInHouseGuests: jest.Mock;
   };
 
   const currentUser = {
@@ -71,6 +76,11 @@ describe('RestaurantController', () => {
       chargeOrderToRoom: jest.fn(),
       closeOrder: jest.fn(),
       cancelOrder: jest.fn(),
+      generateOrderReceipt: jest.fn(),
+      getDashboard: jest.fn(),
+      getSalesSummary: jest.fn(),
+      getOutletSalesSummary: jest.fn(),
+      searchInHouseGuests: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
