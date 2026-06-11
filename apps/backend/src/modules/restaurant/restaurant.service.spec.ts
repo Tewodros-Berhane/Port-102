@@ -1326,4 +1326,12 @@ describe('RestaurantService', () => {
       expect.objectContaining({ roomId: 11, stayId: 42, folioId: 7 }),
     );
   });
+
+  it('rejects receipt generation for an open order', async () => {
+    posOrdersRepository.findOrder.mockResolvedValue(createOrder());
+
+    await expect(
+      service.generateOrderReceipt(currentUser, 9),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
 });
