@@ -1445,4 +1445,29 @@ describe('RestaurantService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('scopes outlet sales summaries to the route outlet', async () => {
+    outletsRepository.findOutlet.mockResolvedValue(createOutlet());
+    restaurantReportsRepository.getSalesSummary.mockResolvedValue({
+      totalOrders: 0,
+      closedOrders: 0,
+      cancelledOrders: 0,
+      grossSales: null,
+      directPayments: null,
+      roomCharges: null,
+      unpaidBalance: null,
+      outletGroups: [],
+      paymentGroups: [],
+      outlets: [],
+    });
+
+    const result = await service.getOutletSalesSummary(currentUser, 4, {
+      outletId: 99,
+    });
+
+    expect(restaurantReportsRepository.getSalesSummary).toHaveBeenCalledWith(
+      expect.objectContaining({ outletId: 4 }),
+    );
+    expect(result.outlet.id).toBe(4);
+  });
 });
