@@ -516,4 +516,17 @@ describe('RestaurantController', () => {
       { stayId: 42, closeOrder: false },
     );
   });
+
+  it('delegates POS receipt generation', async () => {
+    restaurantService.generateOrderReceipt.mockResolvedValue({
+      receiptNumber: 'POS-RCT-POS-1',
+    });
+
+    await controller.generateOrderReceipt(currentUser, 9);
+
+    expect(restaurantService.generateOrderReceipt).toHaveBeenCalledWith(
+      currentUser,
+      9,
+    );
+  });
 });
