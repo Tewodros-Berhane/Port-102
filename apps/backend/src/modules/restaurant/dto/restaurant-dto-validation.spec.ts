@@ -431,4 +431,10 @@ describe('Restaurant DTO validation', () => {
 
     expect(errors.some((error) => error.property === 'reason')).toBe(true);
   });
+
+  it('accepts an empty restaurant dashboard query', async () => {
+    await expect(
+      validationErrors(RestaurantDashboardQueryDto, {}),
+    ).resolves.toHaveLength(0);
+  });
 });
