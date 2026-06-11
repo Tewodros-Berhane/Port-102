@@ -452,4 +452,13 @@ describe('Restaurant DTO validation', () => {
     });
     expect(errors.some((error) => error.property === 'createdFrom')).toBe(true);
   });
+
+  it('accepts a bounded restaurant sales period', async () => {
+    await expect(
+      validationErrors(RestaurantSalesSummaryQueryDto, {
+        createdFrom: '2026-06-01T00:00:00.000Z',
+        createdTo: '2026-06-30T23:59:59.999Z',
+      }),
+    ).resolves.toHaveLength(0);
+  });
 });
