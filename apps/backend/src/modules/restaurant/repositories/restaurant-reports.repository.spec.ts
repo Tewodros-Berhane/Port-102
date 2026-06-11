@@ -75,4 +75,21 @@ describe('RestaurantReportsRepository', () => {
     expect(result.outletGroups).toEqual([]);
     expect(result.paymentGroups).toEqual([]);
   });
+
+  it('applies outlet filters to dashboard counts', async () => {
+    prisma.posOrder.count.mockResolvedValue(0);
+    prisma.outlet.count.mockResolvedValue(1);
+    prisma.menuItem.count.mockResolvedValue(0);
+
+    await repository.getDashboardCounts({ outletId: 4 });
+
+    expect(prisma.outlet.count).toHaveBeenCalledWith({
+      where: { isActive: true, id: 4 },
+    });
+    expect(prisma.menuItem.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ outletId: 4 }),
+      }),
+    );
+  });
 });
