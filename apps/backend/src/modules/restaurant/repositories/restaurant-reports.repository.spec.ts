@@ -92,4 +92,16 @@ describe('RestaurantReportsRepository', () => {
       }),
     );
   });
+
+  it('applies date bounds to sales order queries', async () => {
+    mockEmptySalesSummary();
+    const createdFrom = new Date('2026-06-01T00:00:00.000Z');
+    const createdTo = new Date('2026-06-30T23:59:59.999Z');
+
+    await repository.getSalesSummary({ createdFrom, createdTo });
+
+    expect(prisma.posOrder.count).toHaveBeenCalledWith({
+      where: { createdAt: { gte: createdFrom, lte: createdTo } },
+    });
+  });
 });
