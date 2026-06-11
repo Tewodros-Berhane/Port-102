@@ -1436,4 +1436,13 @@ describe('RestaurantService', () => {
     expect(result.salesByOutlet[0].orderCount).toBe(2);
     expect(result.salesByPaymentMethod[0].amount).toBe('400');
   });
+
+  it('rejects reversed restaurant report date ranges', async () => {
+    await expect(
+      service.getSalesSummary(currentUser, {
+        createdFrom: '2026-06-30T00:00:00.000Z',
+        createdTo: '2026-06-01T00:00:00.000Z',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });
