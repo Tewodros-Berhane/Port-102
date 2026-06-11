@@ -252,6 +252,27 @@ describe('RestaurantController', () => {
     ).toEqual(['pos.receipts.generate']);
   });
 
+  it('declares restaurant reporting route permissions', () => {
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.getDashboard,
+      ),
+    ).toEqual(['pos.dashboard.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.getSalesSummary,
+      ),
+    ).toEqual(['outlet_sales.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.getOutletSalesSummary,
+      ),
+    ).toEqual(['outlet_sales.read']);
+  });
+
   it('delegates outlet operations to the service', async () => {
     const createDto = {
       name: 'Main Restaurant',
