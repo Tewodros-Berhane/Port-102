@@ -273,6 +273,15 @@ describe('RestaurantController', () => {
     ).toEqual(['outlet_sales.read']);
   });
 
+  it('protects in-house guest search with its read permission', () => {
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        RestaurantController.prototype.searchInHouseGuests,
+      ),
+    ).toEqual(['in_house_guests.read']);
+  });
+
   it('delegates outlet operations to the service', async () => {
     const createDto = {
       name: 'Main Restaurant',
