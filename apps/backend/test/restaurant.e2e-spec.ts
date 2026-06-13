@@ -608,6 +608,14 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(200);
   });
 
+  it('rejects POS item additions without update permission', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/items')
+      .set('Authorization', 'Bearer limited-token')
+      .send({ menuItemId: 7, quantity: 1 })
+      .expect(403);
+  });
+
   it('rejects invalid POS item quantities', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/items')
