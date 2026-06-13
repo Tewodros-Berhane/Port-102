@@ -786,6 +786,26 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(200);
   });
 
+  it('delegates POS item changes with parsed route IDs', async () => {
+    expect(restaurantService.addOrderItem).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      9,
+      expect.objectContaining({ menuItemId: 7, quantity: 2 }),
+    );
+    expect(restaurantService.updateOrderItem).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      9,
+      12,
+      expect.objectContaining({ quantity: 3 }),
+    );
+    expect(restaurantService.voidOrderItem).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      9,
+      12,
+      expect.objectContaining({ reason: 'Guest cancelled this item.' }),
+    );
+  });
+
   it('rejects POS item additions without update permission', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/items')
