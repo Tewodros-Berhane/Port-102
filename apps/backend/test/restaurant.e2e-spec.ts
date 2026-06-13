@@ -1149,6 +1149,20 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('accepts an empty optional POS close payload', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/9/close')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({})
+      .expect(200);
+
+    expect(restaurantService.closeOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      9,
+      {},
+    );
+  });
+
   it('rejects oversized POS close notes', async () => {
     await request(app.getHttpServer())
       .patch('/api/restaurant/orders/9/close')
