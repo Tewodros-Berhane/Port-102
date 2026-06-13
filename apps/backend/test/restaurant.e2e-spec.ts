@@ -488,6 +488,23 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(200);
   });
 
+  it('transforms restaurant outlet list filters', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/outlets?page=2&limit=10&type=CAFE&isActive=false')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(200);
+
+    expect(restaurantService.listOutlets).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      expect.objectContaining({
+        page: 2,
+        limit: 10,
+        type: OutletType.CAFE,
+        isActive: false,
+      }),
+    );
+  });
+
   it('rejects outlet creation without menu create permission', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/outlets')
