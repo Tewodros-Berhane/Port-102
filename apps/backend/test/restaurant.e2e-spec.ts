@@ -492,6 +492,14 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(200);
   });
 
+  it('rejects menu item creation without permission', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/menu-items')
+      .set('Authorization', 'Bearer limited-token')
+      .send({ outletId: 4, name: 'Tea', code: 'TEA', price: 50 })
+      .expect(403);
+  });
+
   it('returns and updates a menu item by ID', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/menu-items/7')
