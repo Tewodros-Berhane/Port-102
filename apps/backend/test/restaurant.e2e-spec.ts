@@ -366,6 +366,30 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('transforms restaurant sales date filters', async () => {
+    await request(app.getHttpServer())
+      .get(
+        '/api/restaurant/sales-summary?createdFrom=2026-06-01T00:00:00.000Z&createdTo=2026-06-30T23:59:59.999Z',
+      )
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(200);
+
+    expect(restaurantService.getSalesSummary).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      expect.objectContaining({
+        createdFrom: '2026-06-01T00:00:00.000Z',
+        createdTo: '2026-06-30T23:59:59.999Z',
+      }),
+    );
+  });
+
+  it('rejects invalid restaurant dashboard dates', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/dashboard?createdFrom=invalid')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('searches in-house guests before room charging', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/restaurant/in-house-guests/search?search=101&page=1&limit=10')
