@@ -857,6 +857,19 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(403);
   });
 
+  it('returns unsettled POS receipt conflicts from the service', async () => {
+    restaurantService.generateOrderReceipt.mockRejectedValueOnce(
+      new ConflictException(
+        'POS order must be fully settled before generating a receipt.',
+      ),
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/receipt')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(409);
+  });
+
   it('closes and cancels POS orders', async () => {
     await request(app.getHttpServer())
       .patch('/api/restaurant/orders/9/close')
