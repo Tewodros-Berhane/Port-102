@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access */
 import {
+  BadRequestException,
   ConflictException,
   ExecutionContext,
   ForbiddenException,
   INestApplication,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
