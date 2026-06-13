@@ -755,6 +755,20 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(403);
   });
 
+  it('returns POS overpayment errors from the service', async () => {
+    restaurantService.recordOrderPayment.mockRejectedValueOnce(
+      new BadRequestException(
+        'Payment amount cannot exceed the POS order balance.',
+      ),
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/payments')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ amount: 901, method: PosPaymentMethod.CASH })
+      .expect(400);
+  });
+
   it('rejects non-positive direct POS payments', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/payments')
