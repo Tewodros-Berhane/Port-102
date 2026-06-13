@@ -465,6 +465,13 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects outlet deactivation without menu delete permission', async () => {
+    await request(app.getHttpServer())
+      .delete('/api/restaurant/outlets/4')
+      .set('Authorization', 'Bearer limited-token')
+      .expect(403);
+  });
+
   it('supports menu item management operations', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/menu-items')
