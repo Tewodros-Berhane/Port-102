@@ -519,6 +519,24 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('returns and updates a POS order by ID', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/orders/9')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/9')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ tableNumber: 'T-14' })
+      .expect(200);
+
+    expect(restaurantService.updateOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      9,
+      expect.objectContaining({ tableNumber: 'T-14' }),
+    );
+  });
+
   it('adds, updates, and voids POS order items', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/items')
