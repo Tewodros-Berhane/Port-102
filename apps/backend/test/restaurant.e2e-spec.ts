@@ -1065,6 +1065,14 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects non-whitelisted room-charge fields', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/charge-to-room')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ stayId: 42, folioId: 7 })
+      .expect(400);
+  });
+
   it('returns a conflict when an order is charged to room twice', async () => {
     restaurantService.chargeOrderToRoom.mockRejectedValueOnce(
       new ConflictException('POS order has already been charged to a folio.'),
