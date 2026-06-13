@@ -862,6 +862,28 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('delegates direct POS payment details', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/payments')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({
+        amount: 450,
+        method: PosPaymentMethod.CARD,
+        reference: 'CARD-123',
+      })
+      .expect(201);
+
+    expect(restaurantService.recordOrderPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      9,
+      expect.objectContaining({
+        amount: 450,
+        method: PosPaymentMethod.CARD,
+        reference: 'CARD-123',
+      }),
+    );
+  });
+
   it('rejects direct POS payment recording without permission', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/payments')
