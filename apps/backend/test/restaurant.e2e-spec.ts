@@ -636,6 +636,14 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('rejects direct POS payment recording without permission', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/payments')
+      .set('Authorization', 'Bearer limited-token')
+      .send({ amount: 900, method: PosPaymentMethod.CASH })
+      .expect(403);
+  });
+
   it('rejects non-positive direct POS payments', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/payments')
