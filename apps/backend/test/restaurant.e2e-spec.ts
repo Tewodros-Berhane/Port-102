@@ -662,6 +662,14 @@ describe('Restaurant POS API (e2e)', () => {
     expect(response.body.data.folioCharge.totalAmount).toBe('900');
   });
 
+  it('rejects room charging without charge-to-room permission', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/charge-to-room')
+      .set('Authorization', 'Bearer limited-token')
+      .send({ stayId: 42 })
+      .expect(403);
+  });
+
   it('returns a conflict when an order is charged to room twice', async () => {
     restaurantService.chargeOrderToRoom.mockRejectedValueOnce(
       new ConflictException('POS order has already been charged to a folio.'),
