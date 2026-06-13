@@ -713,6 +713,14 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects unknown direct POS payment methods', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/payments')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ amount: 100, method: 'CHEQUE' })
+      .expect(400);
+  });
+
   it('charges an order to an active room folio', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/charge-to-room')
