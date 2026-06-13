@@ -315,6 +315,12 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(401);
   });
 
+  it('rejects unauthenticated restaurant dashboard requests', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/dashboard')
+      .expect(401);
+  });
+
   it('rejects restaurant users without the required permission', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders')
