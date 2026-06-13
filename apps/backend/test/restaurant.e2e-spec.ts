@@ -465,6 +465,21 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects empty restaurant outlet names', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/outlets')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ name: '', code: 'EMPTY', type: OutletType.CAFE })
+      .expect(400);
+  });
+
+  it('rejects restaurant outlet list limits above 100', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/outlets?limit=101')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('rejects outlet deactivation without menu delete permission', async () => {
     await request(app.getHttpServer())
       .delete('/api/restaurant/outlets/4')
