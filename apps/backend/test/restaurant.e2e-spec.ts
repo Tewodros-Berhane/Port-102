@@ -1001,6 +1001,18 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('delegates POS receipt generation with a parsed order ID', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/receipt')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(201);
+
+    expect(restaurantService.generateOrderReceipt).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      9,
+    );
+  });
+
   it('rejects POS receipt generation without permission', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/receipt')
