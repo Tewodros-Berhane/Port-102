@@ -518,6 +518,14 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('rejects menu item updates without permission', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/menu-items/7')
+      .set('Authorization', 'Bearer limited-token')
+      .send({ price: 500 })
+      .expect(403);
+  });
+
   it('deactivates a restaurant menu item', async () => {
     const response = await request(app.getHttpServer())
       .delete('/api/restaurant/menu-items/7')
