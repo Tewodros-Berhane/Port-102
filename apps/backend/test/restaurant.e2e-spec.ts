@@ -423,6 +423,13 @@ describe('Restaurant POS API (e2e)', () => {
     expect(restaurantService.getOutletById).not.toHaveBeenCalled();
   });
 
+  it('rejects malformed outlet sales summary path IDs', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/outlets/not-a-number/sales-summary')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('rejects invalid restaurant dashboard dates', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/dashboard?createdFrom=invalid')
