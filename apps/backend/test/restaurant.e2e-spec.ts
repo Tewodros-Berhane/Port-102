@@ -1046,6 +1046,19 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(200);
   });
 
+  it('delegates POS lifecycle payloads with parsed order IDs', async () => {
+    expect(restaurantService.closeOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      9,
+      { notes: 'Payment verified.' },
+    );
+    expect(restaurantService.cancelOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      10,
+      { reason: 'Guest cancelled.' },
+    );
+  });
+
   it('rejects oversized POS close notes', async () => {
     await request(app.getHttpServer())
       .patch('/api/restaurant/orders/9/close')
