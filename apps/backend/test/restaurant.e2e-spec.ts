@@ -620,6 +620,13 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('rejects POS receipt generation without permission', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/receipt')
+      .set('Authorization', 'Bearer limited-token')
+      .expect(403);
+  });
+
   it('closes and cancels POS orders', async () => {
     await request(app.getHttpServer())
       .patch('/api/restaurant/orders/9/close')
