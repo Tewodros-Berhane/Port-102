@@ -694,6 +694,27 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('transforms POS order list filters', async () => {
+    await request(app.getHttpServer())
+      .get(
+        '/api/restaurant/orders?page=2&limit=10&outletId=4&status=OPEN&paymentStatus=UNPAID&source=TABLE_SERVICE',
+      )
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(200);
+
+    expect(restaurantService.listOrders).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      expect.objectContaining({
+        page: 2,
+        limit: 10,
+        outletId: 4,
+        status: PosOrderStatus.OPEN,
+        paymentStatus: PosOrderPaymentStatus.UNPAID,
+        source: PosOrderSource.TABLE_SERVICE,
+      }),
+    );
+  });
+
   it('rejects unknown POS order sources', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders')
