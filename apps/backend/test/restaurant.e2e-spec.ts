@@ -358,6 +358,21 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('propagates dashboard range errors from the service', async () => {
+    restaurantService.getDashboard.mockRejectedValueOnce(
+      new BadRequestException(
+        'Report start date cannot be after the end date.',
+      ),
+    );
+
+    await request(app.getHttpServer())
+      .get(
+        '/api/restaurant/dashboard?createdFrom=2026-06-30T00:00:00.000Z&createdTo=2026-06-01T00:00:00.000Z',
+      )
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('returns restaurant sales summaries', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/sales-summary')
