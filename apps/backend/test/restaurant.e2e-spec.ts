@@ -870,6 +870,22 @@ describe('Restaurant POS API (e2e)', () => {
   });
 
   it('delegates POS item changes with parsed route IDs', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/items')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ menuItemId: 7, quantity: 2 })
+      .expect(201);
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/9/items/12')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ quantity: 3 })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/9/items/12/void')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ reason: 'Guest cancelled this item.' })
+      .expect(200);
+
     expect(restaurantService.addOrderItem).toHaveBeenCalledWith(
       expect.objectContaining({ sub: cashierUser.sub }),
       9,
@@ -1158,6 +1174,17 @@ describe('Restaurant POS API (e2e)', () => {
   });
 
   it('delegates POS lifecycle payloads with parsed order IDs', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/9/close')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ notes: 'Payment verified.' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/10/cancel')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ reason: 'Guest cancelled.' })
+      .expect(200);
+
     expect(restaurantService.closeOrder).toHaveBeenCalledWith(
       expect.objectContaining({ sub: cashierUser.sub }),
       9,
@@ -1230,6 +1257,14 @@ describe('Restaurant POS API (e2e)', () => {
       .patch('/api/restaurant/orders/10/cancel')
       .set('Authorization', 'Bearer cashier-token')
       .send({ reason: '' })
+      .expect(400);
+  });
+
+  it('rejects oversized POS cancellation reasons', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/10/cancel')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ reason: 'R'.repeat(501) })
       .expect(400);
   });
 
