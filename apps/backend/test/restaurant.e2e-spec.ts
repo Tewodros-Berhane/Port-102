@@ -332,6 +332,13 @@ describe('Restaurant POS API (e2e)', () => {
     });
   });
 
+  it('rejects dashboard access without the dashboard permission', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/dashboard')
+      .set('Authorization', 'Bearer limited-token')
+      .expect(403);
+  });
+
   it('transforms restaurant dashboard query parameters', async () => {
     await request(app.getHttpServer())
       .get(
