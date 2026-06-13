@@ -778,6 +778,28 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects POS order list limits above 100', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/orders?limit=101')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
+  it('rejects non-whitelisted POS order fields', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ outletId: 4, hotelId: 99 })
+      .expect(400);
+  });
+
+  it('rejects malformed POS order path IDs', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/orders/not-a-number')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('returns and updates a POS order by ID', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/orders/9')
