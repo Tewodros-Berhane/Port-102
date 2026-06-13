@@ -555,6 +555,26 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects non-whitelisted restaurant outlet fields', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/outlets')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({
+        name: 'Cafe',
+        code: 'CAFE',
+        type: OutletType.CAFE,
+        hotelId: 99,
+      })
+      .expect(400);
+  });
+
+  it('rejects malformed restaurant outlet path IDs', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/outlets/not-a-number')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('rejects outlet deactivation without menu delete permission', async () => {
     await request(app.getHttpServer())
       .delete('/api/restaurant/outlets/4')
