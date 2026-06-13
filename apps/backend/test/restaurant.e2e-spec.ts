@@ -1192,6 +1192,13 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(403);
   });
 
+  it('rejects invalid sales summary outlet IDs', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/sales-summary?outletId=0')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('rejects invalid order and cancellation payloads', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders')
