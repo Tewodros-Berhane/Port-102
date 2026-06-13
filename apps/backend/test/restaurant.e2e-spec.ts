@@ -437,6 +437,18 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('applies default pagination to in-house guest searches', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/in-house-guests/search')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(200);
+
+    expect(restaurantService.searchInHouseGuests).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      expect.objectContaining({ page: 1, limit: 20 }),
+    );
+  });
+
   it('rejects in-house guest search without permission', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/in-house-guests/search')
