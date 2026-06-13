@@ -332,6 +332,23 @@ describe('Restaurant POS API (e2e)', () => {
     });
   });
 
+  it('transforms restaurant dashboard query parameters', async () => {
+    await request(app.getHttpServer())
+      .get(
+        '/api/restaurant/dashboard?outletId=4&createdFrom=2026-06-01T00:00:00.000Z',
+      )
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(200);
+
+    expect(restaurantService.getDashboard).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      expect.objectContaining({
+        outletId: 4,
+        createdFrom: '2026-06-01T00:00:00.000Z',
+      }),
+    );
+  });
+
   it('returns restaurant sales summaries', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/sales-summary')
