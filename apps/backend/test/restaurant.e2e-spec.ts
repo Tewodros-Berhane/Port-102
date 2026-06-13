@@ -700,6 +700,27 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects non-whitelisted restaurant menu fields', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/menu-items')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({
+        outletId: 4,
+        name: 'Tea',
+        code: 'TEA',
+        price: 50,
+        costPrice: 10,
+      })
+      .expect(400);
+  });
+
+  it('rejects malformed restaurant menu item path IDs', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/menu-items/not-a-number')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('creates and lists POS orders', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders')
