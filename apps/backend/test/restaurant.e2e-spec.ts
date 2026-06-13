@@ -827,6 +827,18 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('returns inactive stay room-charge conflicts', async () => {
+    restaurantService.chargeOrderToRoom.mockRejectedValueOnce(
+      new ConflictException('Only active stays can receive POS room charges.'),
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/charge-to-room')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ stayId: 42 })
+      .expect(409);
+  });
+
   it('generates a settled POS order receipt', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/receipt')
