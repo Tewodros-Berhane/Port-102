@@ -558,6 +558,21 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects invalid restaurant menu outlet IDs', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/menu-items')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ outletId: 0, name: 'Tea', code: 'TEA', price: 50 })
+      .expect(400);
+  });
+
+  it('rejects unknown restaurant menu statuses', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/menu-items?status=DISCONTINUED')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('creates and lists POS orders', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders')
