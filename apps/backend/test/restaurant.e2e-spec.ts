@@ -613,6 +613,26 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('transforms restaurant menu list filters', async () => {
+    await request(app.getHttpServer())
+      .get(
+        '/api/restaurant/menu-items?page=2&limit=10&outletId=4&status=ACTIVE&category=Main',
+      )
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(200);
+
+    expect(restaurantService.listMenuItems).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      expect.objectContaining({
+        page: 2,
+        limit: 10,
+        outletId: 4,
+        status: MenuItemStatus.ACTIVE,
+        category: 'Main',
+      }),
+    );
+  });
+
   it('rejects menu item updates without permission', async () => {
     await request(app.getHttpServer())
       .patch('/api/restaurant/menu-items/7')
