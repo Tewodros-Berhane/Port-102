@@ -407,6 +407,16 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('keeps outlet sales summary routing ahead of outlet detail handling', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/outlets/4/sales-summary')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(200);
+
+    expect(restaurantService.getOutletSalesSummary).toHaveBeenCalled();
+    expect(restaurantService.getOutletById).not.toHaveBeenCalled();
+  });
+
   it('rejects invalid restaurant dashboard dates', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/dashboard?createdFrom=invalid')
