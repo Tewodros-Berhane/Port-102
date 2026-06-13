@@ -62,6 +62,7 @@ export class RestaurantController {
   @Permissions('pos.dashboard.read')
   @ApiOperation({ summary: 'Get restaurant POS operational dashboard totals' })
   @ApiOkResponse({ description: 'Restaurant dashboard returned successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid dashboard date range.' })
   @ApiUnauthorizedResponse({ description: 'Authentication required.' })
   @ApiForbiddenResponse({ description: 'Missing required permission.' })
   getDashboard(
@@ -75,6 +76,7 @@ export class RestaurantController {
   @Permissions('outlet_sales.read')
   @ApiOperation({ summary: 'Get sales totals across restaurant POS outlets' })
   @ApiOkResponse({ description: 'Sales summary returned successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid sales summary date range.' })
   @ApiUnauthorizedResponse({ description: 'Authentication required.' })
   @ApiForbiddenResponse({ description: 'Missing required permission.' })
   getSalesSummary(
@@ -145,6 +147,7 @@ export class RestaurantController {
   @Permissions('outlet_sales.read')
   @ApiOperation({ summary: 'Get sales totals for one restaurant POS outlet' })
   @ApiOkResponse({ description: 'Outlet sales summary returned successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid sales summary date range.' })
   @ApiUnauthorizedResponse({ description: 'Authentication required.' })
   @ApiForbiddenResponse({ description: 'Missing required permission.' })
   @ApiNotFoundResponse({ description: 'Outlet was not found.' })
