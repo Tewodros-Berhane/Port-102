@@ -403,6 +403,13 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('rejects oversized in-house guest search limits', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/in-house-guests/search?limit=101')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('supports outlet CRUD operations', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/outlets')
