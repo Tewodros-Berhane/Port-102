@@ -463,6 +463,41 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(200);
   });
 
+  it('returns and updates a menu item by ID', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/menu-items/7')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/menu-items/7')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ price: 475 })
+      .expect(200);
+
+    expect(restaurantService.updateMenuItem).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      7,
+      expect.objectContaining({ price: 475 }),
+    );
+  });
+
+  it('deactivates a restaurant menu item', async () => {
+    const response = await request(app.getHttpServer())
+      .delete('/api/restaurant/menu-items/7')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(200);
+
+    expect(response.body.data.status).toBe(MenuItemStatus.INACTIVE);
+  });
+
+  it('rejects non-positive restaurant menu prices', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/menu-items')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ outletId: 4, name: 'Invalid', code: 'INVALID', price: 0 })
+      .expect(400);
+  });
+
   it('creates and lists POS orders', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders')
