@@ -920,6 +920,14 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects malformed POS order item path IDs', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/9/items/not-a-number')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ quantity: 2 })
+      .expect(400);
+  });
+
   it('records a direct POS payment', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/payments')
