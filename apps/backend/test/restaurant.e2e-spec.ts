@@ -555,6 +555,14 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(200);
   });
 
+  it('rejects invalid POS item quantities', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/items')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ menuItemId: 7, quantity: 0 })
+      .expect(400);
+  });
+
   it('records a direct POS payment', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/payments')
