@@ -932,6 +932,20 @@ describe('Restaurant POS API (e2e)', () => {
     expect(response.body.data.folioCharge.totalAmount).toBe('900');
   });
 
+  it('delegates room charges that keep the order open', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/charge-to-room')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ stayId: 42, closeOrder: false })
+      .expect(201);
+
+    expect(restaurantService.chargeOrderToRoom).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: cashierUser.sub }),
+      9,
+      { stayId: 42, closeOrder: false },
+    );
+  });
+
   it('rejects room charging without charge-to-room permission', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/charge-to-room')
