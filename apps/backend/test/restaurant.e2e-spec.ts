@@ -459,6 +459,18 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(403);
   });
 
+  it('returns outlet uniqueness conflicts from the service', async () => {
+    restaurantService.createOutlet.mockRejectedValueOnce(
+      new ConflictException('Outlet code already exists.'),
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/restaurant/outlets')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ name: 'Duplicate', code: 'MAIN', type: OutletType.CAFE })
+      .expect(409);
+  });
+
   it('rejects unknown restaurant outlet types', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/outlets')
