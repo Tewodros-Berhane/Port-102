@@ -435,6 +435,14 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(200);
   });
 
+  it('rejects unknown restaurant outlet types', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/outlets')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ name: 'Unknown', code: 'UNKNOWN', type: 'KIOSK' })
+      .expect(400);
+  });
+
   it('supports menu item management operations', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/menu-items')
