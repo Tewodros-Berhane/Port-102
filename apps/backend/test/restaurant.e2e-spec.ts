@@ -529,6 +529,18 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(403);
   });
 
+  it('returns menu item uniqueness conflicts from the service', async () => {
+    restaurantService.createMenuItem.mockRejectedValueOnce(
+      new ConflictException('Menu item code already exists for this outlet.'),
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/restaurant/menu-items')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ outletId: 4, name: 'Duplicate', code: 'TIBS-01', price: 450 })
+      .expect(409);
+  });
+
   it('returns and updates a menu item by ID', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/menu-items/7')
