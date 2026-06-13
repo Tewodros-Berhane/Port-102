@@ -594,6 +594,21 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('rejects unknown POS order sources', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ outletId: 4, source: 'PHONE_APP' })
+      .expect(400);
+  });
+
+  it('rejects unknown POS order status filters', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/orders?status=ARCHIVED')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('returns and updates a POS order by ID', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/orders/9')
