@@ -661,6 +661,18 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(403);
   });
 
+  it('returns invalid POS order transition conflicts', async () => {
+    restaurantService.updateOrder.mockRejectedValueOnce(
+      new ConflictException('Only open POS orders can be updated.'),
+    );
+
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/9')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ tableNumber: 'T-15' })
+      .expect(409);
+  });
+
   it('adds, updates, and voids POS order items', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/items')
