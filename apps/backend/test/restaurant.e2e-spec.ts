@@ -582,6 +582,14 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('rejects POS order updates without permission', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/9')
+      .set('Authorization', 'Bearer limited-token')
+      .send({ tableNumber: 'T-15' })
+      .expect(403);
+  });
+
   it('adds, updates, and voids POS order items', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/items')
