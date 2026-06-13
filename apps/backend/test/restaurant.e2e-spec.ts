@@ -699,6 +699,18 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(403);
   });
 
+  it('returns unavailable menu item conflicts from the service', async () => {
+    restaurantService.addOrderItem.mockRejectedValueOnce(
+      new ConflictException('Only active menu items can be added to an order.'),
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/items')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ menuItemId: 7, quantity: 1 })
+      .expect(409);
+  });
+
   it('rejects invalid POS item quantities', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/items')
