@@ -424,6 +424,13 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects invalid restaurant dashboard outlet IDs', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/dashboard?outletId=0')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(400);
+  });
+
   it('searches in-house guests before room charging', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/restaurant/in-house-guests/search?search=101&page=1&limit=10')
