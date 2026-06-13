@@ -640,6 +640,21 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(200);
   });
 
+  it('rejects oversized POS close notes', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/9/close')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ notes: 'N'.repeat(501) })
+      .expect(400);
+  });
+
+  it('rejects sales summary access without permission', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/sales-summary')
+      .set('Authorization', 'Bearer limited-token')
+      .expect(403);
+  });
+
   it('rejects invalid order and cancellation payloads', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/orders')
