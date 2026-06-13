@@ -575,6 +575,14 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('rejects non-positive direct POS payments', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/orders/9/payments')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ amount: 0, method: PosPaymentMethod.CASH })
+      .expect(400);
+  });
+
   it('charges an order to an active room folio', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/restaurant/orders/9/charge-to-room')
