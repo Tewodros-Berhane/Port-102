@@ -410,6 +410,13 @@ describe('Restaurant POS API (e2e)', () => {
     );
   });
 
+  it('rejects in-house guest search without permission', async () => {
+    await request(app.getHttpServer())
+      .get('/api/restaurant/in-house-guests/search')
+      .set('Authorization', 'Bearer limited-token')
+      .expect(403);
+  });
+
   it('rejects oversized in-house guest search limits', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/in-house-guests/search?limit=101')
