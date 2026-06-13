@@ -891,6 +891,20 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(400);
   });
 
+  it('returns unpaid POS order close conflicts', async () => {
+    restaurantService.closeOrder.mockRejectedValueOnce(
+      new ConflictException(
+        'POS order must have no unpaid balance before closing.',
+      ),
+    );
+
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/9/close')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({})
+      .expect(409);
+  });
+
   it('rejects sales summary access without permission', async () => {
     await request(app.getHttpServer())
       .get('/api/restaurant/sales-summary')
