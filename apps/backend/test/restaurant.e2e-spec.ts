@@ -449,6 +449,14 @@ describe('Restaurant POS API (e2e)', () => {
       .expect(200);
   });
 
+  it('rejects outlet creation without menu create permission', async () => {
+    await request(app.getHttpServer())
+      .post('/api/restaurant/outlets')
+      .set('Authorization', 'Bearer limited-token')
+      .send({ name: 'Cafe', code: 'CAFE', type: OutletType.CAFE })
+      .expect(403);
+  });
+
   it('rejects unknown restaurant outlet types', async () => {
     await request(app.getHttpServer())
       .post('/api/restaurant/outlets')
