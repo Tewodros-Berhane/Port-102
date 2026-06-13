@@ -924,4 +924,27 @@ describe('Restaurant POS API (e2e)', () => {
       .send({ reason: '' })
       .expect(400);
   });
+
+  it('returns closed POS order cancellation conflicts', async () => {
+    restaurantService.cancelOrder.mockRejectedValueOnce(
+      new ConflictException('Only open POS orders can be modified.'),
+    );
+
+    await request(app.getHttpServer())
+      .patch('/api/restaurant/orders/10/cancel')
+      .set('Authorization', 'Bearer cashier-token')
+      .send({ reason: 'Too late.' })
+      .expect(409);
+  });
+
+  it('returns missing outlet report errors from the service', async () => {
+    restaurantService.getOutletSalesSummary.mockRejectedValueOnce(
+      new NotFoundException('Outlet was not found.'),
+    );
+
+    await request(app.getHttpServer())
+      .get('/api/restaurant/outlets/404/sales-summary')
+      .set('Authorization', 'Bearer cashier-token')
+      .expect(404);
+  });
 });
