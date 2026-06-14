@@ -75,4 +75,37 @@ describe('InventoryController', () => {
     ]);
   });
 
+  it('declares inventory location permissions', () => {
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.createLocation,
+      ),
+    ).toEqual(['inventory.items.create']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.listLocations,
+      ),
+    ).toEqual(['inventory.items.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.getLocationById,
+      ),
+    ).toEqual(['inventory.items.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.updateLocation,
+      ),
+    ).toEqual(['inventory.items.update']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.deactivateLocation,
+      ),
+    ).toEqual(['inventory.items.delete']);
+  });
+
 });
