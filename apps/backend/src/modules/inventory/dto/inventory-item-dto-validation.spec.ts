@@ -75,4 +75,21 @@ describe('Inventory item DTO validation', () => {
     ).resolves.toHaveLength(0);
   });
 
+  it('transforms and validates inventory item query filters', async () => {
+    const query = plainToInstance(GetInventoryItemsQueryDto, {
+      page: '2',
+      limit: '25',
+      status: InventoryItemStatus.ACTIVE,
+      type: InventoryItemType.FOOD,
+    });
+
+    expect(query).toMatchObject({
+      page: 2,
+      limit: 25,
+      status: InventoryItemStatus.ACTIVE,
+      type: InventoryItemType.FOOD,
+    });
+    await expect(validate(query)).resolves.toHaveLength(0);
+  });
+
 });
