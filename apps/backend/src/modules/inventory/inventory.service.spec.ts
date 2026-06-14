@@ -308,4 +308,17 @@ describe('InventoryService', () => {
     );
   });
 
+  it('rejects a duplicate location code', async () => {
+    locationsRepository.findLocationByCode.mockResolvedValue(location);
+
+    await expect(
+      service.createLocation(currentUser, {
+        name: 'Duplicate Store',
+        code: 'main-store',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(locationsRepository.createLocation).not.toHaveBeenCalled();
+  });
+
 });
