@@ -321,4 +321,32 @@ describe('InventoryService', () => {
     expect(locationsRepository.createLocation).not.toHaveBeenCalled();
   });
 
+  it('lists locations with normalized search and pagination', async () => {
+    locationsRepository.listLocations.mockResolvedValue([1, [location]]);
+
+    await expect(
+      service.listLocations(currentUser, {
+        page: 2,
+        limit: 10,
+        search: ' main ',
+        isActive: true,
+      }),
+    ).resolves.toEqual({
+      items: [location],
+      pagination: {
+        page: 2,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+
+    expect(locationsRepository.listLocations).toHaveBeenCalledWith({
+      skip: 10,
+      take: 10,
+      search: 'main',
+      isActive: true,
+    });
+  });
+
 });
