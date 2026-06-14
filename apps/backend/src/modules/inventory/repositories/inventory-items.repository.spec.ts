@@ -66,4 +66,21 @@ describe('InventoryItemsRepository', () => {
     );
   });
 
+  it('finds inventory items by id and item number', async () => {
+    await repository.findItem(7);
+    await repository.findItemByNumber('INV-FOOD-0001', 7);
+
+    expect(prisma.inventoryItem.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 7 } }),
+    );
+    expect(prisma.inventoryItem.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          itemNumber: 'INV-FOOD-0001',
+          id: { not: 7 },
+        },
+      }),
+    );
+  });
+
 });
