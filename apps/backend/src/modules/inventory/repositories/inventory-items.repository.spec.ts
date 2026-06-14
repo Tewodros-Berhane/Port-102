@@ -116,4 +116,16 @@ describe('InventoryItemsRepository', () => {
     );
   });
 
+  it('updates inventory items through PrismaService', async () => {
+    await repository.updateItem(7, {
+      status: InventoryItemStatus.INACTIVE,
+    });
+
+    expect(prisma.inventoryItem.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 7 },
+        data: { status: InventoryItemStatus.INACTIVE },
+      }),
+    );
+  });
 });
