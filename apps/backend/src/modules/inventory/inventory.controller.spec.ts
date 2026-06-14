@@ -141,4 +141,51 @@ describe('InventoryController', () => {
     ).toEqual(['inventory.items.delete']);
   });
 
+  it('delegates inventory item operations to InventoryService', async () => {
+    const createDto = {
+      itemNumber: 'INV-FOOD-0001',
+      name: 'Basmati Rice',
+      type: 'FOOD' as const,
+      unitOfMeasure: 'KG',
+    };
+    const query = { page: 1, limit: 20 };
+    const item = { id: 7, ...createDto };
+    inventoryService.createItem.mockResolvedValue(item);
+    inventoryService.listItems.mockResolvedValue({
+      items: [item],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+    inventoryService.getItemById.mockResolvedValue(item);
+    inventoryService.updateItem.mockResolvedValue(item);
+    inventoryService.deactivateItem.mockResolvedValue({
+      ...item,
+      status: 'INACTIVE',
+    });
+
+    await controller.createItem(currentUser, createDto);
+    await controller.listItems(currentUser, query);
+    await controller.getItemById(currentUser, 7);
+    await controller.updateItem(currentUser, 7, { name: 'Premium Rice' });
+    await controller.deactivateItem(currentUser, 7);
+
+    expect(inventoryService.createItem).toHaveBeenCalledWith(
+      currentUser,
+      createDto,
+    );
+    expect(inventoryService.listItems).toHaveBeenCalledWith(currentUser, query);
+    expect(inventoryService.getItemById).toHaveBeenCalledWith(currentUser, 7);
+    expect(inventoryService.updateItem).toHaveBeenCalledWith(currentUser, 7, {
+      name: 'Premium Rice',
+    });
+    expect(inventoryService.deactivateItem).toHaveBeenCalledWith(
+      currentUser,
+      7,
+    );
+  });
+
 });
