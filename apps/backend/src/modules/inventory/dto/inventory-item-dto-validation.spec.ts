@@ -31,4 +31,18 @@ describe('Inventory item DTO validation', () => {
     ).resolves.toHaveLength(0);
   });
 
+  it('rejects invalid item numbers and missing units of measure', async () => {
+    const errors = await validationErrors(CreateInventoryItemDto, {
+      itemNumber: 'INV FOOD 0001',
+      name: 'Basmati Rice',
+      type: InventoryItemType.FOOD,
+      unitOfMeasure: '',
+    });
+
+    expect(errors.some((error) => error.property === 'itemNumber')).toBe(true);
+    expect(errors.some((error) => error.property === 'unitOfMeasure')).toBe(
+      true,
+    );
+  });
+
 });
