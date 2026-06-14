@@ -349,4 +349,12 @@ describe('InventoryService', () => {
     });
   });
 
+  it('throws when an inventory location does not exist', async () => {
+    locationsRepository.findLocation.mockResolvedValue(null);
+
+    await expect(
+      service.getLocationById(currentUser, 99),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
 });
