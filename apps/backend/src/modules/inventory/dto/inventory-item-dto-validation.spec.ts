@@ -45,4 +45,24 @@ describe('Inventory item DTO validation', () => {
     );
   });
 
+  it('rejects negative and over-precision inventory values', async () => {
+    const errors = await validationErrors(CreateInventoryItemDto, {
+      itemNumber: 'INV-FOOD-0001',
+      name: 'Basmati Rice',
+      type: InventoryItemType.FOOD,
+      unitOfMeasure: 'KG',
+      reorderLevel: -1,
+      reorderQuantity: 10.123,
+      averageCost: -5,
+    });
+
+    expect(errors.some((error) => error.property === 'reorderLevel')).toBe(
+      true,
+    );
+    expect(errors.some((error) => error.property === 'reorderQuantity')).toBe(
+      true,
+    );
+    expect(errors.some((error) => error.property === 'averageCost')).toBe(true);
+  });
+
 });
