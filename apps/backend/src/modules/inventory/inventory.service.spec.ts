@@ -268,4 +268,17 @@ describe('InventoryService', () => {
     );
   });
 
+  it('returns an inactive item without another write', async () => {
+    const inactiveItem = {
+      ...item,
+      status: InventoryItemStatus.INACTIVE,
+    };
+    itemsRepository.findItem.mockResolvedValue(inactiveItem);
+
+    await service.deactivateItem(currentUser, item.id);
+
+    expect(itemsRepository.updateItem).not.toHaveBeenCalled();
+    expect(auditLogsService.record).not.toHaveBeenCalled();
+  });
+
 });
