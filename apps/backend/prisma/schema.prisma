@@ -422,6 +422,12 @@ model User {
   requestedStockAdjustments   StockAdjustment[]           @relation("StockAdjustmentRequestedBy")
   approvedStockAdjustments    StockAdjustment[]           @relation("StockAdjustmentApprovedBy")
   rejectedStockAdjustments    StockAdjustment[]           @relation("StockAdjustmentRejectedBy")
+  requestedPurchaseRequests   PurchaseRequest[]           @relation("PurchaseRequestRequestedBy")
+  approvedPurchaseRequests    PurchaseRequest[]           @relation("PurchaseRequestApprovedBy")
+  rejectedPurchaseRequests    PurchaseRequest[]           @relation("PurchaseRequestRejectedBy")
+  approvedPurchaseOrders      PurchaseOrder[]             @relation("PurchaseOrderApprovedBy")
+  createdPurchaseOrders       PurchaseOrder[]             @relation("PurchaseOrderCreatedBy")
+  receivedGoods               GoodsReceived[]             @relation("GoodsReceivedBy")
 
   @@index([roleId])
   @@index([departmentId])
@@ -517,6 +523,7 @@ model Department {
   updatedAt        DateTime          @updatedAt
   users            User[]
   employees        Employee[]
+  purchaseRequests PurchaseRequest[]
 
   @@index([isActive])
   @@map("departments")
@@ -1374,6 +1381,150 @@ model StockAdjustment {
   @@index([locationId])
   @@index([status])
   @@map("stock_adjustments")
+}
+
+model Supplier {
+  id             Int             @id @default(autoincrement())
+  supplierNumber String          @unique
+  name           String
+  contactName    String?
+  phone          String?
+  email          String?
+  address        String?
+  status         SupplierStatus  @default(ACTIVE)
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  purchaseOrders PurchaseOrder[]
+  goodsReceived  GoodsReceived[]
+
+  @@index([status])
+  @@map("suppliers")
+}
+
+model PurchaseRequest {
+  id                Int                   @id @default(autoincrement())
+  requestNumber     String                @unique
+  status            PurchaseRequestStatus @default(DRAFT)
+  departmentId      Int?
+  requestedByUserId Int?
+  approvedByUserId  Int?
+  rejectedByUserId  Int?
+  submittedAt       DateTime?
+  decidedAt         DateTime?
+  reason            String?
+  decisionNote      String?
+  notes             String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  department        Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  requestedBy       User?                 @relation("PurchaseRequestRequestedBy", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  approvedBy        User?                 @relation("PurchaseRequestApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejectedBy        User?                 @relation("PurchaseRequestRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  items             PurchaseRequestItem[]
+  purchaseOrders    PurchaseOrder[]
+
+  @@index([status])
+  @@index([departmentId])
+  @@index([requestedByUserId])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id                Int             @id @default(autoincrement())
+  purchaseRequestId Int
+  itemId            Int
+  quantity          Decimal         @db.Decimal(12, 2)
+  estimatedUnitCost Decimal?        @db.Decimal(12, 2)
+  notes             String?
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  item              InventoryItem   @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseRequestId])
+  @@index([itemId])
+  @@map("purchase_request_items")
+}
+
+model PurchaseOrder {
+  id                Int                 @id @default(autoincrement())
+  orderNumber       String              @unique
+  supplierId        Int?
+  purchaseRequestId Int?
+  status            PurchaseOrderStatus @default(DRAFT)
+  orderedAt         DateTime?
+  expectedAt        DateTime?
+  approvedByUserId  Int?
+  createdByUserId   Int?
+  notes             String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  supplier          Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  purchaseRequest   PurchaseRequest?    @relation(fields: [purchaseRequestId], references: [id], onDelete: SetNull)
+  approvedBy        User?               @relation("PurchaseOrderApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  createdBy         User?               @relation("PurchaseOrderCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  items             PurchaseOrderItem[]
+  goodsReceived     GoodsReceived[]
+
+  @@index([supplierId])
+  @@index([purchaseRequestId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               Int           @id @default(autoincrement())
+  purchaseOrderId  Int
+  itemId           Int
+  quantity         Decimal       @db.Decimal(12, 2)
+  unitCost         Decimal?      @db.Decimal(12, 2)
+  receivedQuantity Decimal       @default(0) @db.Decimal(12, 2)
+  notes            String?
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  item             InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseOrderId])
+  @@index([itemId])
+  @@map("purchase_order_items")
+}
+
+model GoodsReceived {
+  id               Int                 @id @default(autoincrement())
+  grnNumber        String              @unique
+  purchaseOrderId  Int?
+  supplierId       Int?
+  locationId       Int
+  status           GoodsReceivedStatus @default(DRAFT)
+  receivedByUserId Int?
+  postedAt         DateTime?
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  purchaseOrder    PurchaseOrder?      @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  supplier         Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  location         InventoryLocation   @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  receivedBy       User?               @relation("GoodsReceivedBy", fields: [receivedByUserId], references: [id], onDelete: SetNull)
+  items            GoodsReceivedItem[]
+
+  @@index([purchaseOrderId])
+  @@index([supplierId])
+  @@index([locationId])
+  @@index([status])
+  @@map("goods_received")
+}
+
+model GoodsReceivedItem {
+  id              Int           @id @default(autoincrement())
+  goodsReceivedId Int
+  itemId          Int
+  quantity        Decimal       @db.Decimal(12, 2)
+  unitCost        Decimal?      @db.Decimal(12, 2)
+  notes           String?
+  goodsReceived   GoodsReceived @relation(fields: [goodsReceivedId], references: [id], onDelete: Cascade)
+  item            InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([goodsReceivedId])
+  @@index([itemId])
+  @@map("goods_received_items")
 }
 
 model AuditLog {
