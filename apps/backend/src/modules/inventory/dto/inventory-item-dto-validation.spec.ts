@@ -92,4 +92,15 @@ describe('Inventory item DTO validation', () => {
     await expect(validate(query)).resolves.toHaveLength(0);
   });
 
+  it('rejects item query limits above 100 and unknown enums', async () => {
+    const errors = await validationErrors(GetInventoryItemsQueryDto, {
+      limit: 101,
+      status: 'ARCHIVED',
+      type: 'MEDICINE',
+    });
+
+    expect(errors.some((error) => error.property === 'limit')).toBe(true);
+    expect(errors.some((error) => error.property === 'status')).toBe(true);
+    expect(errors.some((error) => error.property === 'type')).toBe(true);
+  });
 });
