@@ -201,4 +201,44 @@ describe('InventoryService', () => {
     );
   });
 
+  it('updates item master data and audits previous and current values', async () => {
+    const updatedItem = {
+      ...item,
+      itemNumber: 'INV-FOOD-0099',
+      name: 'Premium Rice',
+      reorderLevel: null,
+    };
+    itemsRepository.findItem.mockResolvedValue(item);
+    itemsRepository.findItemByNumber.mockResolvedValue(null);
+    itemsRepository.updateItem.mockResolvedValue(updatedItem);
+
+    await expect(
+      service.updateItem(currentUser, item.id, {
+        itemNumber: ' inv-food-0099 ',
+        name: ' Premium Rice ',
+        reorderLevel: null,
+      }),
+    ).resolves.toEqual({
+      ...updatedItem,
+      reorderLevel: null,
+      reorderQuantity: '100.00',
+      averageCost: '145.50',
+    });
+
+    expect(itemsRepository.findItemByNumber).toHaveBeenCalledWith(
+      'INV-FOOD-0099',
+      item.id,
+    );
+    expect(itemsRepository.updateItem).toHaveBeenCalledWith(item.id, {
+      itemNumber: 'INV-FOOD-0099',
+      name: 'Premium Rice',
+      reorderLevel: null,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'inventory.items.updated',
+      }),
+    );
+  });
+
 });
