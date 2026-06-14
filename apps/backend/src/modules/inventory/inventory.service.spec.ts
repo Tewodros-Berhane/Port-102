@@ -357,4 +357,46 @@ describe('InventoryService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('updates a location and records previous and current values', async () => {
+    const updatedLocation = {
+      ...location,
+      name: 'Central Store',
+      code: 'CENTRAL',
+    };
+    locationsRepository.findLocation.mockResolvedValue(location);
+    locationsRepository.findLocationByCode.mockResolvedValue(null);
+    locationsRepository.updateLocation.mockResolvedValue(updatedLocation);
+
+    await expect(
+      service.updateLocation(currentUser, location.id, {
+        name: ' Central Store ',
+        code: ' central ',
+      }),
+    ).resolves.toEqual(updatedLocation);
+
+    expect(locationsRepository.findLocationByCode).toHaveBeenCalledWith(
+      'CENTRAL',
+      location.id,
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'inventory.locations.updated',
+        metadata: {
+          previous: {
+            name: 'Main Store',
+            code: 'MAIN-STORE',
+            description: null,
+            isActive: true,
+          },
+          current: {
+            name: 'Central Store',
+            code: 'CENTRAL',
+            description: null,
+            isActive: true,
+          },
+        },
+      }),
+    );
+  });
+
 });
