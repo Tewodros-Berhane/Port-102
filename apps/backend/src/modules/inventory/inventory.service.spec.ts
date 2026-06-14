@@ -161,4 +161,36 @@ describe('InventoryService', () => {
     expect(itemsRepository.createItem).not.toHaveBeenCalled();
   });
 
+  it('lists serialized items with normalized filters and pagination', async () => {
+    itemsRepository.listItems.mockResolvedValue([1, [item]]);
+
+    await expect(
+      service.listItems(currentUser, {
+        page: 2,
+        limit: 10,
+        search: ' rice ',
+        status: InventoryItemStatus.ACTIVE,
+        type: InventoryItemType.FOOD,
+        category: ' Dry Goods ',
+      }),
+    ).resolves.toEqual({
+      items: [serializedItem],
+      pagination: {
+        page: 2,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+
+    expect(itemsRepository.listItems).toHaveBeenCalledWith({
+      skip: 10,
+      take: 10,
+      search: 'rice',
+      status: InventoryItemStatus.ACTIVE,
+      type: InventoryItemType.FOOD,
+      category: 'Dry Goods',
+    });
+  });
+
 });
