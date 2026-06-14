@@ -65,4 +65,14 @@ describe('Inventory item DTO validation', () => {
     expect(errors.some((error) => error.property === 'averageCost')).toBe(true);
   });
 
+  it('accepts nullable cost and reorder fields on update', async () => {
+    await expect(
+      validationErrors(UpdateInventoryItemDto, {
+        reorderLevel: null,
+        reorderQuantity: null,
+        averageCost: null,
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
 });
