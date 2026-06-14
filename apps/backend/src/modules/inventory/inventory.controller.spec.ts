@@ -188,4 +188,64 @@ describe('InventoryController', () => {
     );
   });
 
+  it('delegates location operations to InventoryService', async () => {
+    const createDto = {
+      name: 'Main Store',
+      code: 'MAIN-STORE',
+    };
+    const query = {
+      page: 1,
+      limit: 20,
+    };
+    const location = {
+      id: 4,
+      ...createDto,
+    };
+    inventoryService.createLocation.mockResolvedValue(location);
+    inventoryService.listLocations.mockResolvedValue({
+      items: [location],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+    inventoryService.getLocationById.mockResolvedValue(location);
+    inventoryService.updateLocation.mockResolvedValue(location);
+    inventoryService.deactivateLocation.mockResolvedValue({
+      ...location,
+      isActive: false,
+    });
+
+    await controller.createLocation(currentUser, createDto);
+    await controller.listLocations(currentUser, query);
+    await controller.getLocationById(currentUser, 4);
+    await controller.updateLocation(currentUser, 4, {
+      name: 'Central Store',
+    });
+    await controller.deactivateLocation(currentUser, 4);
+
+    expect(inventoryService.createLocation).toHaveBeenCalledWith(
+      currentUser,
+      createDto,
+    );
+    expect(inventoryService.listLocations).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+    expect(inventoryService.getLocationById).toHaveBeenCalledWith(
+      currentUser,
+      4,
+    );
+    expect(inventoryService.updateLocation).toHaveBeenCalledWith(
+      currentUser,
+      4,
+      { name: 'Central Store' },
+    );
+    expect(inventoryService.deactivateLocation).toHaveBeenCalledWith(
+      currentUser,
+      4,
+    );
+  });
 });
