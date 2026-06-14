@@ -281,4 +281,31 @@ describe('InventoryService', () => {
     expect(auditLogsService.record).not.toHaveBeenCalled();
   });
 
+  it('creates a normalized location and records an audit log', async () => {
+    locationsRepository.findLocationByCode.mockResolvedValue(null);
+    locationsRepository.createLocation.mockResolvedValue(location);
+
+    await expect(
+      service.createLocation(currentUser, {
+        name: ' Main Store ',
+        code: ' main-store ',
+        description: ' Primary store ',
+      }),
+    ).resolves.toEqual(location);
+
+    expect(locationsRepository.createLocation).toHaveBeenCalledWith({
+      name: 'Main Store',
+      code: 'MAIN-STORE',
+      description: 'Primary store',
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: currentUser.sub,
+        action: 'inventory.locations.created',
+        entityType: 'InventoryLocation',
+        entityId: '4',
+      }),
+    );
+  });
+
 });
