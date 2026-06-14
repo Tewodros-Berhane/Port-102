@@ -361,7 +361,6 @@ enum SupplierStatus {
   INACTIVE
 }
 
-
 model User {
   id                          Int                         @id @default(autoincrement())
   email                       String                      @unique
@@ -419,6 +418,10 @@ model User {
   closedPosOrders             PosOrder[]                  @relation("PosOrderClosedBy")
   cancelledPosOrders          PosOrder[]                  @relation("PosOrderCancelledBy")
   recordedPosOrderPayments    PosOrderPayment[]           @relation("PosOrderPaymentRecordedBy")
+  createdStockMovements       StockMovement[]             @relation("StockMovementCreatedBy")
+  requestedStockAdjustments   StockAdjustment[]           @relation("StockAdjustmentRequestedBy")
+  approvedStockAdjustments    StockAdjustment[]           @relation("StockAdjustmentApprovedBy")
+  rejectedStockAdjustments    StockAdjustment[]           @relation("StockAdjustmentRejectedBy")
 
   @@index([roleId])
   @@index([departmentId])
@@ -505,15 +508,15 @@ model RefreshToken {
 }
 
 model Department {
-  id          Int        @id @default(autoincrement())
-  key         String     @unique
-  name        String
-  description String?
-  isActive    Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  users       User[]
-  employees   Employee[]
+  id               Int               @id @default(autoincrement())
+  key              String            @unique
+  name             String
+  description      String?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  users            User[]
+  employees        Employee[]
 
   @@index([isActive])
   @@map("departments")
@@ -1262,6 +1265,11 @@ model InventoryLocation {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   balances      StockBalance[]
+  movements     StockMovement[]   @relation("StockMovementLocation")
+  fromTransfers StockMovement[]   @relation("StockTransferFromLocation")
+  toTransfers   StockMovement[]   @relation("StockTransferToLocation")
+  adjustments   StockAdjustment[]
+  goodsReceived GoodsReceived[]
 
   @@index([isActive])
   @@map("inventory_locations")
@@ -1282,6 +1290,11 @@ model InventoryItem {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   balances             StockBalance[]
+  movements            StockMovement[]
+  adjustments          StockAdjustment[]
+  purchaseRequestItems PurchaseRequestItem[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  goodsReceivedItems   GoodsReceivedItem[]
 
   @@index([type])
   @@index([status])
@@ -1304,6 +1317,64 @@ model StockBalance {
   @@map("stock_balances")
 }
 
+model StockMovement {
+  id              Int                @id @default(autoincrement())
+  movementNumber  String             @unique
+  itemId          Int
+  locationId      Int?
+  fromLocationId  Int?
+  toLocationId    Int?
+  type            StockMovementType
+  quantity        Decimal            @db.Decimal(12, 2)
+  unitCost        Decimal?           @db.Decimal(12, 2)
+  totalCost       Decimal?           @db.Decimal(12, 2)
+  referenceType   String?
+  referenceId     Int?
+  reason          String?
+  notes           String?
+  createdByUserId Int?
+  createdAt       DateTime           @default(now())
+  item            InventoryItem      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location        InventoryLocation? @relation("StockMovementLocation", fields: [locationId], references: [id], onDelete: SetNull)
+  fromLocation    InventoryLocation? @relation("StockTransferFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  toLocation      InventoryLocation? @relation("StockTransferToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
+  createdBy       User?              @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([itemId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([locationId])
+  @@index([fromLocationId])
+  @@index([toLocationId])
+  @@map("stock_movements")
+}
+
+model StockAdjustment {
+  id                Int                   @id @default(autoincrement())
+  adjustmentNumber  String                @unique
+  itemId            Int
+  locationId        Int
+  status            StockAdjustmentStatus @default(PENDING)
+  quantity          Decimal               @db.Decimal(12, 2)
+  reason            String
+  requestedByUserId Int?
+  approvedByUserId  Int?
+  rejectedByUserId  Int?
+  decidedAt         DateTime?
+  decisionNote      String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  item              InventoryItem         @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location          InventoryLocation     @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  requestedBy       User?                 @relation("StockAdjustmentRequestedBy", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  approvedBy        User?                 @relation("StockAdjustmentApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejectedBy        User?                 @relation("StockAdjustmentRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([itemId])
+  @@index([locationId])
+  @@index([status])
+  @@map("stock_adjustments")
+}
 
 model AuditLog {
   id          Int      @id @default(autoincrement())
