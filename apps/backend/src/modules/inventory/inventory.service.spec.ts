@@ -419,4 +419,15 @@ describe('InventoryService', () => {
     );
   });
 
+  it('returns an already inactive location without another write', async () => {
+    const inactiveLocation = { ...location, isActive: false };
+    locationsRepository.findLocation.mockResolvedValue(inactiveLocation);
+
+    await expect(
+      service.deactivateLocation(currentUser, location.id),
+    ).resolves.toEqual(inactiveLocation);
+
+    expect(locationsRepository.updateLocation).not.toHaveBeenCalled();
+    expect(auditLogsService.record).not.toHaveBeenCalled();
+  });
 });
