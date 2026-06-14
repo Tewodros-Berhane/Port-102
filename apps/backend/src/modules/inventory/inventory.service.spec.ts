@@ -399,4 +399,24 @@ describe('InventoryService', () => {
     );
   });
 
+  it('soft-deactivates a location and audits the change', async () => {
+    const inactiveLocation = { ...location, isActive: false };
+    locationsRepository.findLocation.mockResolvedValue(location);
+    locationsRepository.updateLocation.mockResolvedValue(inactiveLocation);
+
+    await expect(
+      service.deactivateLocation(currentUser, location.id),
+    ).resolves.toEqual(inactiveLocation);
+
+    expect(locationsRepository.updateLocation).toHaveBeenCalledWith(
+      location.id,
+      { isActive: false },
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'inventory.locations.deactivated',
+      }),
+    );
+  });
+
 });
