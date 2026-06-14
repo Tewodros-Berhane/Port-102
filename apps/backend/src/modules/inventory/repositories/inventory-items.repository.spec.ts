@@ -83,4 +83,37 @@ describe('InventoryItemsRepository', () => {
     );
   });
 
+  it('lists items with pagination and filters', async () => {
+    prisma.inventoryItem.count.mockResolvedValue(0);
+    prisma.inventoryItem.findMany.mockResolvedValue([]);
+
+    await repository.listItems({
+      skip: 20,
+      take: 20,
+      search: 'rice',
+      status: InventoryItemStatus.ACTIVE,
+      type: InventoryItemType.FOOD,
+      category: 'Dry Goods',
+    });
+
+    expect(prisma.inventoryItem.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        status: InventoryItemStatus.ACTIVE,
+        type: InventoryItemType.FOOD,
+        category: {
+          equals: 'Dry Goods',
+          mode: 'insensitive',
+        },
+        OR: expect.any(Array),
+      }),
+    });
+    expect(prisma.inventoryItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 20,
+        take: 20,
+        orderBy: [{ itemNumber: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
 });
