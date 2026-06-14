@@ -193,4 +193,12 @@ describe('InventoryService', () => {
     });
   });
 
+  it('throws when an inventory item does not exist', async () => {
+    itemsRepository.findItem.mockResolvedValue(null);
+
+    await expect(service.getItemById(currentUser, 99)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
 });
