@@ -75,4 +75,30 @@ describe('InventoryLocationsRepository', () => {
     );
   });
 
+  it('lists locations with pagination and filters', async () => {
+    prisma.inventoryLocation.count.mockResolvedValue(0);
+    prisma.inventoryLocation.findMany.mockResolvedValue([]);
+
+    await repository.listLocations({
+      skip: 20,
+      take: 20,
+      search: 'main',
+      isActive: true,
+    });
+
+    expect(prisma.inventoryLocation.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        isActive: true,
+        OR: expect.any(Array),
+      }),
+    });
+    expect(prisma.inventoryLocation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 20,
+        take: 20,
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
 });
