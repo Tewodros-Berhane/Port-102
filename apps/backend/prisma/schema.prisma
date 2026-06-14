@@ -294,6 +294,74 @@ enum PosPaymentMethod {
   OTHER
 }
 
+enum InventoryItemStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum InventoryItemType {
+  FOOD
+  BEVERAGE
+  HOUSEKEEPING_SUPPLY
+  LINEN
+  ROOM_AMENITY
+  CLEANING_SUPPLY
+  MAINTENANCE_PART
+  OFFICE_SUPPLY
+  STORE_PRODUCT
+  OTHER
+}
+
+enum StockMovementType {
+  RECEIPT
+  ISSUE
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  POS_CONSUMPTION
+  WASTE
+  RETURN
+}
+
+enum StockAdjustmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  CONVERTED_TO_PO
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum GoodsReceivedStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+}
+
+
 model User {
   id                          Int                         @id @default(autoincrement())
   email                       String                      @unique
