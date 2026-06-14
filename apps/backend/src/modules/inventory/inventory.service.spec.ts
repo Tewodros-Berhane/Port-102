@@ -146,4 +146,19 @@ describe('InventoryService', () => {
     );
   });
 
+  it('rejects a duplicate inventory item number', async () => {
+    itemsRepository.findItemByNumber.mockResolvedValue(item);
+
+    await expect(
+      service.createItem(currentUser, {
+        itemNumber: 'inv-food-0001',
+        name: 'Duplicate Rice',
+        type: InventoryItemType.FOOD,
+        unitOfMeasure: 'KG',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(itemsRepository.createItem).not.toHaveBeenCalled();
+  });
+
 });
