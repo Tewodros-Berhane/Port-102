@@ -108,4 +108,37 @@ describe('InventoryController', () => {
     ).toEqual(['inventory.items.delete']);
   });
 
+  it('declares inventory item permissions', () => {
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.createItem,
+      ),
+    ).toEqual(['inventory.items.create']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.listItems,
+      ),
+    ).toEqual(['inventory.items.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.getItemById,
+      ),
+    ).toEqual(['inventory.items.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.updateItem,
+      ),
+    ).toEqual(['inventory.items.update']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.deactivateItem,
+      ),
+    ).toEqual(['inventory.items.delete']);
+  });
+
 });
