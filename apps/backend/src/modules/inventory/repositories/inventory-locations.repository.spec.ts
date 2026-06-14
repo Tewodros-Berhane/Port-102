@@ -58,4 +58,21 @@ describe('InventoryLocationsRepository', () => {
     );
   });
 
+  it('finds locations by id and normalized code', async () => {
+    await repository.findLocation(4);
+    await repository.findLocationByCode('MAIN-STORE', 4);
+
+    expect(prisma.inventoryLocation.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 4 } }),
+    );
+    expect(prisma.inventoryLocation.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          code: 'MAIN-STORE',
+          id: { not: 4 },
+        },
+      }),
+    );
+  });
+
 });
