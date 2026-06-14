@@ -241,4 +241,31 @@ describe('InventoryService', () => {
     );
   });
 
+  it('soft-deactivates an inventory item and audits the change', async () => {
+    const inactiveItem = {
+      ...item,
+      status: InventoryItemStatus.INACTIVE,
+    };
+    itemsRepository.findItem.mockResolvedValue(item);
+    itemsRepository.updateItem.mockResolvedValue(inactiveItem);
+
+    await expect(service.deactivateItem(currentUser, item.id)).resolves.toEqual(
+      {
+        ...inactiveItem,
+        reorderLevel: '25.00',
+        reorderQuantity: '100.00',
+        averageCost: '145.50',
+      },
+    );
+
+    expect(itemsRepository.updateItem).toHaveBeenCalledWith(item.id, {
+      status: InventoryItemStatus.INACTIVE,
+    });
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'inventory.items.deactivated',
+      }),
+    );
+  });
+
 });
