@@ -101,4 +101,14 @@ describe('InventoryLocationsRepository', () => {
     );
   });
 
+  it('updates locations through PrismaService', async () => {
+    await repository.updateLocation(4, { isActive: false });
+
+    expect(prisma.inventoryLocation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 4 },
+        data: { isActive: false },
+      }),
+    );
+  });
 });
