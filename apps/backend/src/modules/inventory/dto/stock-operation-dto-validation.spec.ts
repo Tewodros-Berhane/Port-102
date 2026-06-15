@@ -24,4 +24,17 @@ describe('Stock operation DTO validation', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
 
+  it('rejects invalid stock balance limits and identifiers', async () => {
+    const dto = plainToInstance(GetStockBalancesQueryDto, {
+      limit: 101,
+      itemId: 0,
+      locationId: -1,
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'limit')).toBe(true);
+    expect(errors.some((error) => error.property === 'itemId')).toBe(true);
+    expect(errors.some((error) => error.property === 'locationId')).toBe(true);
+  });
+
 });
