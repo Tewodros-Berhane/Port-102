@@ -280,6 +280,19 @@ describe('InventoryService', () => {
     });
   });
 
+  it('rejects an inverted movement date range', async () => {
+    await expect(
+      service.listStockMovements(currentUser, {
+        page: 1,
+        limit: 20,
+        createdFrom: '2026-06-30T00:00:00.000Z',
+        createdTo: '2026-06-01T00:00:00.000Z',
+      }),
+    ).rejects.toThrow(
+      'Movement createdFrom must be before or equal to createdTo.',
+    );
+  });
+
   it('creates a normalized inventory item and records an audit log', async () => {
     itemsRepository.findItemByNumber.mockResolvedValue(null);
     itemsRepository.createItem.mockResolvedValue(item);
