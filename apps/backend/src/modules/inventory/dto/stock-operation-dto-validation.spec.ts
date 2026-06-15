@@ -94,4 +94,26 @@ describe('Stock operation DTO validation', () => {
     expect(errors.some((error) => error.property === 'quantity')).toBe(true);
   });
 
+  it('rejects negative and over-precision receipt costs', async () => {
+    const negative = await validate(
+      plainToInstance(ReceiveStockDto, {
+        itemId: 7,
+        locationId: 4,
+        quantity: 1,
+        unitCost: -1,
+      }),
+    );
+    const precision = await validate(
+      plainToInstance(ReceiveStockDto, {
+        itemId: 7,
+        locationId: 4,
+        quantity: 1,
+        unitCost: 1.123,
+      }),
+    );
+
+    expect(negative.some((error) => error.property === 'unitCost')).toBe(true);
+    expect(precision.some((error) => error.property === 'unitCost')).toBe(true);
+  });
+
 });
