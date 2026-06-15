@@ -87,4 +87,13 @@ describe('StockMovementsRepository', () => {
     });
   });
 
+  it('finds a movement number for collision checks', async () => {
+    await repository.findByMovementNumber('MOV-20260615-000001');
+
+    expect(prisma.stockMovement.findUnique).toHaveBeenCalledWith({
+      where: { movementNumber: 'MOV-20260615-000001' },
+      select: { id: true },
+    });
+  });
+
 });
