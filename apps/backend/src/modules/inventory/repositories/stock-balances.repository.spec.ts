@@ -13,6 +13,7 @@ describe('StockBalancesRepository', () => {
       findMany: jest.Mock;
       findUnique: jest.Mock;
       upsert: jest.Mock;
+      updateMany: jest.Mock;
     };
   };
 
@@ -23,6 +24,7 @@ describe('StockBalancesRepository', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         upsert: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
 
@@ -108,5 +110,39 @@ describe('StockBalancesRepository', () => {
         },
       }),
     );
+  });
+
+  it('conditionally decrements an available stock balance', async () => {
+    const quantity = new Prisma.Decimal(10);
+    prisma.stockBalance.updateMany.mockResolvedValue({ count: 1 });
+    prisma.stockBalance.findUnique.mockResolvedValue({
+      id: 1,
+      quantity: new Prisma.Decimal(15),
+    });
+
+    await expect(repository.decreaseBalance(7, 4, quantity)).resolves.toEqual(
+      expect.objectContaining({ id: 1 }),
+    );
+
+    expect(prisma.stockBalance.updateMany).toHaveBeenCalledWith({
+      where: {
+        itemId: 7,
+        locationId: 4,
+        quantity: { gte: quantity },
+      },
+      data: {
+        quantity: { decrement: quantity },
+      },
+    });
+  });
+
+  it('does not decrement when the available stock is insufficient', async () => {
+    prisma.stockBalance.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      repository.decreaseBalance(7, 4, new Prisma.Decimal(10)),
+    ).resolves.toBeNull();
+
+    expect(prisma.stockBalance.findUnique).not.toHaveBeenCalled();
   });
 });
