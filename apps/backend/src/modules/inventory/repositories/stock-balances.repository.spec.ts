@@ -96,4 +96,17 @@ describe('StockBalancesRepository', () => {
     );
   });
 
+  it('increments an existing balance when increasing stock', async () => {
+    const quantity = new Prisma.Decimal(10);
+
+    await repository.increaseBalance(7, 4, quantity);
+
+    expect(prisma.stockBalance.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: {
+          quantity: { increment: quantity },
+        },
+      }),
+    );
+  });
 });
