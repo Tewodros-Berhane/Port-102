@@ -130,4 +130,32 @@ describe('StockReceiptsRepository', () => {
     expect(tx.inventoryItem.update).not.toHaveBeenCalled();
   });
 
+  it('uses receipt cost as average cost when no valued stock exists', async () => {
+    tx.inventoryItem.findFirst.mockResolvedValue({
+      id: 7,
+      averageCost: null,
+    });
+    tx.inventoryLocation.findFirst.mockResolvedValue({ id: 4 });
+    balancesRepository.findBalance.mockResolvedValue(null);
+    balancesRepository.increaseBalance.mockResolvedValue({
+      id: 1,
+      quantity: new Prisma.Decimal(5),
+    });
+    movementsRepository.createMovement.mockResolvedValue({
+      id: 9,
+      totalCost: new Prisma.Decimal(750),
+    });
+
+    const result = await repository.receiveStock({
+      movementNumber: 'MOV-20260615-000003',
+      itemId: 7,
+      locationId: 4,
+      quantity: new Prisma.Decimal(5),
+      unitCost: new Prisma.Decimal(150),
+      createdByUserId: 1,
+    });
+
+    expect(result?.averageCost?.toFixed(2)).toBe('150.00');
+  });
+
 });
