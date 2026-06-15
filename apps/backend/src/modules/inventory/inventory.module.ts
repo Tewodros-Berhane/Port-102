@@ -7,6 +7,9 @@ import { InventoryController } from './inventory.controller';
 import { InventoryService } from './inventory.service';
 import { InventoryItemsRepository } from './repositories/inventory-items.repository';
 import { InventoryLocationsRepository } from './repositories/inventory-locations.repository';
+import { StockBalancesRepository } from './repositories/stock-balances.repository';
+import { StockMovementsRepository } from './repositories/stock-movements.repository';
+import { StockReceiptsRepository } from './repositories/stock-receipts.repository';
 
 @Module({
   imports: [PrismaModule, AuditLogsModule],
@@ -15,12 +18,18 @@ import { InventoryLocationsRepository } from './repositories/inventory-locations
     InventoryService,
     InventoryLocationsRepository,
     InventoryItemsRepository,
+    StockBalancesRepository,
+    StockMovementsRepository,
+    StockReceiptsRepository,
     PermissionsGuard,
   ],
   exports: [
     InventoryService,
     InventoryLocationsRepository,
     InventoryItemsRepository,
+    StockBalancesRepository,
+    StockMovementsRepository,
+    StockReceiptsRepository,
   ],
 })
 export class InventoryModule {}
