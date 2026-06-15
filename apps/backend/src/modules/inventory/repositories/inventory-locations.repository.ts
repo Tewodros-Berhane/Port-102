@@ -17,6 +17,11 @@ export type InventoryLocationRecord = Prisma.InventoryLocationGetPayload<{
   select: typeof inventoryLocationSelect;
 }>;
 
+type InventoryLocationClient = Pick<
+  PrismaService | Prisma.TransactionClient,
+  'inventoryLocation'
+>;
+
 @Injectable()
 export class InventoryLocationsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -28,9 +33,25 @@ export class InventoryLocationsRepository {
     });
   }
 
-  findLocation(locationId: number) {
-    return this.prisma.inventoryLocation.findUnique({
+  findLocation(
+    locationId: number,
+    client: InventoryLocationClient = this.prisma,
+  ) {
+    return client.inventoryLocation.findUnique({
       where: { id: locationId },
+      select: inventoryLocationSelect,
+    });
+  }
+
+  findActiveLocation(
+    locationId: number,
+    client: InventoryLocationClient = this.prisma,
+  ) {
+    return client.inventoryLocation.findFirst({
+      where: {
+        id: locationId,
+        isActive: true,
+      },
       select: inventoryLocationSelect,
     });
   }
@@ -84,8 +105,9 @@ export class InventoryLocationsRepository {
   updateLocation(
     locationId: number,
     data: Prisma.InventoryLocationUncheckedUpdateInput,
+    client: InventoryLocationClient = this.prisma,
   ) {
-    return this.prisma.inventoryLocation.update({
+    return client.inventoryLocation.update({
       where: { id: locationId },
       data,
       select: inventoryLocationSelect,
