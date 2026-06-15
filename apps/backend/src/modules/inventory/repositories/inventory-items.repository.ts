@@ -27,6 +27,11 @@ export type InventoryItemRecord = Prisma.InventoryItemGetPayload<{
   select: typeof inventoryItemSelect;
 }>;
 
+type InventoryItemClient = Pick<
+  PrismaService | Prisma.TransactionClient,
+  'inventoryItem'
+>;
+
 @Injectable()
 export class InventoryItemsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -38,9 +43,19 @@ export class InventoryItemsRepository {
     });
   }
 
-  findItem(itemId: number) {
-    return this.prisma.inventoryItem.findUnique({
+  findItem(itemId: number, client: InventoryItemClient = this.prisma) {
+    return client.inventoryItem.findUnique({
       where: { id: itemId },
+      select: inventoryItemSelect,
+    });
+  }
+
+  findActiveItem(itemId: number, client: InventoryItemClient = this.prisma) {
+    return client.inventoryItem.findFirst({
+      where: {
+        id: itemId,
+        status: InventoryItemStatus.ACTIVE,
+      },
       select: inventoryItemSelect,
     });
   }
@@ -106,8 +121,12 @@ export class InventoryItemsRepository {
     ]);
   }
 
-  updateItem(itemId: number, data: Prisma.InventoryItemUncheckedUpdateInput) {
-    return this.prisma.inventoryItem.update({
+  updateItem(
+    itemId: number,
+    data: Prisma.InventoryItemUncheckedUpdateInput,
+    client: InventoryItemClient = this.prisma,
+  ) {
+    return client.inventoryItem.update({
       where: { id: itemId },
       data,
       select: inventoryItemSelect,
