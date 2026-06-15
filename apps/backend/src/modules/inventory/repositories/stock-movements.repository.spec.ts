@@ -70,4 +70,21 @@ describe('StockMovementsRepository', () => {
     );
   });
 
+  it('matches location filters across direct and transfer locations', async () => {
+    prisma.stockMovement.count.mockResolvedValue(0);
+    prisma.stockMovement.findMany.mockResolvedValue([]);
+
+    await repository.listMovements({
+      skip: 0,
+      take: 20,
+      locationId: 4,
+    });
+
+    expect(prisma.stockMovement.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        OR: [{ locationId: 4 }, { fromLocationId: 4 }, { toLocationId: 4 }],
+      }),
+    });
+  });
+
 });
