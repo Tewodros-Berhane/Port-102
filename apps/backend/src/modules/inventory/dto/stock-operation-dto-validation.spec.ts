@@ -4,6 +4,7 @@ import { validate } from 'class-validator';
 import { StockMovementType } from '../../../generated/prisma/client';
 import { GetStockBalancesQueryDto } from './get-stock-balances-query.dto';
 import { GetStockMovementsQueryDto } from './get-stock-movements-query.dto';
+import { IssueStockDto } from './issue-stock.dto';
 import { ReceiveStockDto } from './receive-stock.dto';
 
 describe('Stock operation DTO validation', () => {
@@ -125,6 +126,50 @@ describe('Stock operation DTO validation', () => {
     });
     const errors = await validate(dto);
 
+    expect(errors.some((error) => error.property === 'notes')).toBe(true);
+  });
+
+  it('accepts and transforms a valid stock issue payload', async () => {
+    const dto = plainToInstance(IssueStockDto, {
+      itemId: '7',
+      locationId: '4',
+      quantity: '10.50',
+      referenceType: 'DEPARTMENT',
+      referenceId: '6',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toMatchObject({
+      itemId: 7,
+      locationId: 4,
+      quantity: 10.5,
+      referenceId: 6,
+    });
+  });
+
+  it('rejects invalid stock issue quantities and identifiers', async () => {
+    const dto = plainToInstance(IssueStockDto, {
+      itemId: 0,
+      locationId: -1,
+      quantity: 0,
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'itemId')).toBe(true);
+    expect(errors.some((error) => error.property === 'locationId')).toBe(true);
+    expect(errors.some((error) => error.property === 'quantity')).toBe(true);
+  });
+
+  it('rejects over-precision issue quantities and oversized notes', async () => {
+    const dto = plainToInstance(IssueStockDto, {
+      itemId: 7,
+      locationId: 4,
+      quantity: 1.123,
+      notes: 'N'.repeat(501),
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'quantity')).toBe(true);
     expect(errors.some((error) => error.property === 'notes')).toBe(true);
   });
 });
