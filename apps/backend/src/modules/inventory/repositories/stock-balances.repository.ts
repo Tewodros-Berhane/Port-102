@@ -124,4 +124,28 @@ export class StockBalancesRepository {
       select: stockBalanceSelect,
     });
   }
+
+  async decreaseBalance(
+    itemId: number,
+    locationId: number,
+    quantity: Prisma.Decimal,
+    client: StockBalanceClient = this.prisma,
+  ) {
+    const result = await client.stockBalance.updateMany({
+      where: {
+        itemId,
+        locationId,
+        quantity: { gte: quantity },
+      },
+      data: {
+        quantity: { decrement: quantity },
+      },
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return this.findBalance(itemId, locationId, client);
+  }
 }
