@@ -205,6 +205,19 @@ describe('InventoryService', () => {
     });
   });
 
+  it('requires an existing item before listing its balances', async () => {
+    itemsRepository.findItem.mockResolvedValue(null);
+
+    await expect(
+      service.getStockBalancesByItem(currentUser, 99, {
+        page: 1,
+        limit: 20,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(balancesRepository.listBalances).not.toHaveBeenCalled();
+  });
+
   it('creates a normalized inventory item and records an audit log', async () => {
     itemsRepository.findItemByNumber.mockResolvedValue(null);
     itemsRepository.createItem.mockResolvedValue(item);
