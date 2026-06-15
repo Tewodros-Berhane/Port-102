@@ -116,4 +116,15 @@ describe('Stock operation DTO validation', () => {
     expect(precision.some((error) => error.property === 'unitCost')).toBe(true);
   });
 
+  it('rejects oversized receipt notes', async () => {
+    const dto = plainToInstance(ReceiveStockDto, {
+      itemId: 7,
+      locationId: 4,
+      quantity: 1,
+      notes: 'N'.repeat(501),
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'notes')).toBe(true);
+  });
 });
