@@ -12,6 +12,7 @@ import { InventoryService } from './inventory.service';
 import { InventoryItemsRepository } from './repositories/inventory-items.repository';
 import { InventoryLocationsRepository } from './repositories/inventory-locations.repository';
 import { StockBalancesRepository } from './repositories/stock-balances.repository';
+import { StockIssuesRepository } from './repositories/stock-issues.repository';
 import { StockMovementsRepository } from './repositories/stock-movements.repository';
 import { StockReceiptsRepository } from './repositories/stock-receipts.repository';
 
@@ -40,6 +41,9 @@ describe('InventoryService', () => {
   };
   let receiptsRepository: {
     receiveStock: jest.Mock;
+  };
+  let issuesRepository: {
+    issueStock: jest.Mock;
   };
   let auditLogsService: { record: jest.Mock };
 
@@ -107,6 +111,9 @@ describe('InventoryService', () => {
     receiptsRepository = {
       receiveStock: jest.fn(),
     };
+    issuesRepository = {
+      issueStock: jest.fn(),
+    };
     auditLogsService = {
       record: jest.fn(),
     };
@@ -133,6 +140,10 @@ describe('InventoryService', () => {
         {
           provide: StockReceiptsRepository,
           useValue: receiptsRepository,
+        },
+        {
+          provide: StockIssuesRepository,
+          useValue: issuesRepository,
         },
         {
           provide: AuditLogsService,
@@ -419,6 +430,165 @@ describe('InventoryService', () => {
       }),
     ).rejects.toThrow(
       'Inventory item or location became inactive before stock was received.',
+    );
+  });
+
+  it('issues stock, returns updated values, and records an audit log', async () => {
+    itemsRepository.findItem.mockResolvedValue(item);
+    locationsRepository.findLocation.mockResolvedValue(location);
+    movementsRepository.findByMovementNumber.mockResolvedValue(null);
+    const movement = {
+      id: 10,
+      movementNumber: 'MOV-20260615-000002',
+      itemId: 7,
+      locationId: 4,
+      fromLocationId: null,
+      toLocationId: null,
+      type: StockMovementType.ISSUE,
+      quantity: new Prisma.Decimal(10),
+      unitCost: new Prisma.Decimal(145.5),
+      totalCost: new Prisma.Decimal(1455),
+      referenceType: 'DEPARTMENT',
+      referenceId: 6,
+      reason: 'Issued to the main kitchen.',
+      notes: null,
+      createdByUserId: 1,
+      createdAt: new Date(),
+      item: {
+        id: 7,
+        itemNumber: item.itemNumber,
+        name: item.name,
+        unitOfMeasure: item.unitOfMeasure,
+      },
+      location: { id: 4, code: location.code, name: location.name },
+      fromLocation: null,
+      toLocation: null,
+      createdBy: null,
+    };
+    const balance = {
+      id: 1,
+      itemId: 7,
+      locationId: 4,
+      quantity: new Prisma.Decimal(15),
+      updatedAt: new Date(),
+      item: {
+        id: 7,
+        itemNumber: item.itemNumber,
+        name: item.name,
+        type: item.type,
+        category: item.category,
+        unitOfMeasure: item.unitOfMeasure,
+        averageCost: item.averageCost,
+        status: item.status,
+      },
+      location: {
+        id: 4,
+        code: location.code,
+        name: location.name,
+        isActive: true,
+      },
+    };
+    issuesRepository.issueStock.mockResolvedValue({
+      status: 'ISSUED',
+      movement,
+      balance,
+    });
+
+    const result = await service.issueStock(currentUser, {
+      itemId: 7,
+      locationId: 4,
+      quantity: 10,
+      referenceType: ' DEPARTMENT ',
+      referenceId: 6,
+      reason: ' Issued to the main kitchen. ',
+    });
+
+    expect(result.balance.quantity).toBe('15.00');
+    expect(result.movement.type).toBe(StockMovementType.ISSUE);
+    expect(result.movement.totalCost).toBe('1455.00');
+    expect(issuesRepository.issueStock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 7,
+        locationId: 4,
+        quantity: new Prisma.Decimal(10),
+        referenceType: 'DEPARTMENT',
+        reason: 'Issued to the main kitchen.',
+        createdByUserId: currentUser.sub,
+      }),
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'inventory.stock.issued',
+        entityType: 'StockMovement',
+        entityId: '10',
+      }),
+    );
+  });
+
+  it('rejects stock issues for inactive items and locations', async () => {
+    itemsRepository.findItem.mockResolvedValue({
+      ...item,
+      status: InventoryItemStatus.INACTIVE,
+    });
+    locationsRepository.findLocation.mockResolvedValue(location);
+
+    await expect(
+      service.issueStock(currentUser, {
+        itemId: 7,
+        locationId: 4,
+        quantity: 1,
+      }),
+    ).rejects.toThrow('Inactive inventory item cannot issue stock.');
+
+    itemsRepository.findItem.mockResolvedValue(item);
+    locationsRepository.findLocation.mockResolvedValue({
+      ...location,
+      isActive: false,
+    });
+
+    await expect(
+      service.issueStock(currentUser, {
+        itemId: 7,
+        locationId: 4,
+        quantity: 1,
+      }),
+    ).rejects.toThrow('Inactive inventory location cannot issue stock.');
+  });
+
+  it('reports available quantity when stock is insufficient', async () => {
+    itemsRepository.findItem.mockResolvedValue(item);
+    locationsRepository.findLocation.mockResolvedValue(location);
+    movementsRepository.findByMovementNumber.mockResolvedValue(null);
+    issuesRepository.issueStock.mockResolvedValue({
+      status: 'INSUFFICIENT',
+      availableQuantity: new Prisma.Decimal(5),
+    });
+
+    await expect(
+      service.issueStock(currentUser, {
+        itemId: 7,
+        locationId: 4,
+        quantity: 10,
+      }),
+    ).rejects.toThrow('Insufficient stock. Available quantity is 5.00.');
+
+    expect(auditLogsService.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects an issue when active state changes during its transaction', async () => {
+    itemsRepository.findItem.mockResolvedValue(item);
+    locationsRepository.findLocation.mockResolvedValue(location);
+    movementsRepository.findByMovementNumber.mockResolvedValue(null);
+    issuesRepository.issueStock.mockResolvedValue({ status: 'INACTIVE' });
+
+    await expect(
+      service.issueStock(currentUser, {
+        itemId: 7,
+        locationId: 4,
+        quantity: 1,
+      }),
+    ).rejects.toThrow(
+      'Inventory item or location became inactive before stock was issued.',
     );
   });
 
