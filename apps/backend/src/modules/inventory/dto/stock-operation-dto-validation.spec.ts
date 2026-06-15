@@ -37,4 +37,19 @@ describe('Stock operation DTO validation', () => {
     expect(errors.some((error) => error.property === 'locationId')).toBe(true);
   });
 
+  it('accepts valid stock movement filters', async () => {
+    const dto = plainToInstance(GetStockMovementsQueryDto, {
+      page: '1',
+      limit: '50',
+      type: StockMovementType.RECEIPT,
+      itemId: '7',
+      locationId: '4',
+      createdFrom: '2026-06-01T00:00:00.000Z',
+      createdTo: '2026-06-30T23:59:59.999Z',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.itemId).toBe(7);
+  });
+
 });
