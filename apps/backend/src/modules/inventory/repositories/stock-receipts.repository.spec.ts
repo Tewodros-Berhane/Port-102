@@ -102,4 +102,32 @@ describe('StockReceiptsRepository', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps average cost unchanged when a receipt has no unit cost', async () => {
+    tx.inventoryItem.findFirst.mockResolvedValue({
+      id: 7,
+      averageCost: new Prisma.Decimal(100),
+    });
+    tx.inventoryLocation.findFirst.mockResolvedValue({ id: 4 });
+    balancesRepository.findBalance.mockResolvedValue(null);
+    balancesRepository.increaseBalance.mockResolvedValue({
+      id: 1,
+      quantity: new Prisma.Decimal(5),
+    });
+    movementsRepository.createMovement.mockResolvedValue({
+      id: 9,
+      totalCost: null,
+    });
+
+    const result = await repository.receiveStock({
+      movementNumber: 'MOV-20260615-000002',
+      itemId: 7,
+      locationId: 4,
+      quantity: new Prisma.Decimal(5),
+      createdByUserId: 1,
+    });
+
+    expect(result?.averageCost?.toFixed(2)).toBe('100.00');
+    expect(tx.inventoryItem.update).not.toHaveBeenCalled();
+  });
+
 });
