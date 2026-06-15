@@ -36,6 +36,7 @@ import { GetInventoryItemsQueryDto } from './dto/get-inventory-items-query.dto';
 import { GetInventoryLocationsQueryDto } from './dto/get-inventory-locations-query.dto';
 import { GetStockBalancesQueryDto } from './dto/get-stock-balances-query.dto';
 import { GetStockMovementsQueryDto } from './dto/get-stock-movements-query.dto';
+import { IssueStockDto } from './dto/issue-stock.dto';
 import { ReceiveStockDto } from './dto/receive-stock.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { UpdateInventoryLocationDto } from './dto/update-inventory-location.dto';
@@ -112,6 +113,27 @@ export class InventoryController {
     @Body() receiveStockDto: ReceiveStockDto,
   ) {
     return this.inventoryService.receiveStock(currentUser, receiveStockDto);
+  }
+
+  @Post('issue')
+  @Permissions('inventory.stock.issue')
+  @ApiOperation({ summary: 'Issue stock from an active inventory location' })
+  @ApiCreatedResponse({ description: 'Stock issued successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid stock issue payload.' })
+  @ApiConflictResponse({
+    description:
+      'Inventory item or location is inactive, or available stock is insufficient.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Inventory item or location was not found.',
+  })
+  issueStock(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Body() issueStockDto: IssueStockDto,
+  ) {
+    return this.inventoryService.issueStock(currentUser, issueStockDto);
   }
 
   @Post('items')
