@@ -96,4 +96,24 @@ describe('StockMovementsRepository', () => {
     });
   });
 
+  it('creates immutable stock movements through PrismaService', async () => {
+    const quantity = new Prisma.Decimal(5);
+
+    await repository.createMovement({
+      movementNumber: 'MOV-20260615-000001',
+      itemId: 7,
+      locationId: 4,
+      type: StockMovementType.RECEIPT,
+      quantity,
+    });
+
+    expect(prisma.stockMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          movementNumber: 'MOV-20260615-000001',
+          quantity,
+        }),
+      }),
+    );
+  });
 });
