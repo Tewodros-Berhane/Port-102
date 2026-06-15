@@ -26,6 +26,7 @@ describe('InventoryController', () => {
     getStockBalancesByItem: jest.Mock;
     listStockMovements: jest.Mock;
     receiveStock: jest.Mock;
+    issueStock: jest.Mock;
   };
 
   const currentUser = {
@@ -53,6 +54,7 @@ describe('InventoryController', () => {
       getStockBalancesByItem: jest.fn(),
       listStockMovements: jest.fn(),
       receiveStock: jest.fn(),
+      issueStock: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -149,7 +151,7 @@ describe('InventoryController', () => {
     ).toEqual(['inventory.items.delete']);
   });
 
-  it('declares stock read and receive permissions', () => {
+  it('declares stock read, receive, and issue permissions', () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSIONS_KEY,
@@ -174,6 +176,12 @@ describe('InventoryController', () => {
         InventoryController.prototype.receiveStock,
       ),
     ).toEqual(['inventory.stock.receive']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.issueStock,
+      ),
+    ).toEqual(['inventory.stock.issue']);
   });
 
   it('delegates stock balance and movement queries', async () => {
@@ -217,6 +225,21 @@ describe('InventoryController', () => {
       currentUser,
       dto,
     );
+  });
+
+  it('delegates stock issue creation', async () => {
+    const dto = {
+      itemId: 7,
+      locationId: 4,
+      quantity: 10,
+      referenceType: 'DEPARTMENT',
+      referenceId: 6,
+    };
+    inventoryService.issueStock.mockResolvedValue({ movement: { id: 10 } });
+
+    await controller.issueStock(currentUser, dto);
+
+    expect(inventoryService.issueStock).toHaveBeenCalledWith(currentUser, dto);
   });
 
   it('delegates inventory item operations to InventoryService', async () => {
