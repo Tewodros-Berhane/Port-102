@@ -218,6 +218,68 @@ describe('InventoryService', () => {
     expect(balancesRepository.listBalances).not.toHaveBeenCalled();
   });
 
+  it('lists movements with normalized filters and decimal serialization', async () => {
+    const movement = {
+      id: 9,
+      movementNumber: 'MOV-20260615-000001',
+      itemId: 7,
+      locationId: 4,
+      fromLocationId: null,
+      toLocationId: null,
+      type: StockMovementType.RECEIPT,
+      quantity: new Prisma.Decimal(5),
+      unitCost: new Prisma.Decimal(150),
+      totalCost: new Prisma.Decimal(750),
+      referenceType: 'DELIVERY',
+      referenceId: 42,
+      reason: null,
+      notes: null,
+      createdByUserId: 1,
+      createdAt: new Date('2026-06-15T08:00:00.000Z'),
+      item: {
+        id: 7,
+        itemNumber: 'INV-FOOD-0001',
+        name: 'Basmati Rice',
+        unitOfMeasure: 'KG',
+      },
+      location: { id: 4, code: 'MAIN-STORE', name: 'Main Store' },
+      fromLocation: null,
+      toLocation: null,
+      createdBy: {
+        id: 1,
+        email: 'admin@demo-hotel.com',
+        fullName: 'Hotel Admin',
+      },
+    };
+    movementsRepository.listMovements.mockResolvedValue([1, [movement]]);
+
+    await expect(
+      service.listStockMovements(currentUser, {
+        page: 1,
+        limit: 20,
+        search: ' delivery ',
+        type: StockMovementType.RECEIPT,
+        createdFrom: '2026-06-01T00:00:00.000Z',
+        createdTo: '2026-06-30T23:59:59.999Z',
+      }),
+    ).resolves.toEqual({
+      items: [
+        {
+          ...movement,
+          quantity: '5.00',
+          unitCost: '150.00',
+          totalCost: '750.00',
+        },
+      ],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+  });
+
   it('creates a normalized inventory item and records an audit log', async () => {
     itemsRepository.findItemByNumber.mockResolvedValue(null);
     itemsRepository.createItem.mockResolvedValue(item);
