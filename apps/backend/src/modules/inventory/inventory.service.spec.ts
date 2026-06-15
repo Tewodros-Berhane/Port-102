@@ -405,6 +405,23 @@ describe('InventoryService', () => {
     ).rejects.toThrow('Inactive inventory location cannot receive stock.');
   });
 
+  it('rejects a receipt when active state changes during its transaction', async () => {
+    itemsRepository.findItem.mockResolvedValue(item);
+    locationsRepository.findLocation.mockResolvedValue(location);
+    movementsRepository.findByMovementNumber.mockResolvedValue(null);
+    receiptsRepository.receiveStock.mockResolvedValue(null);
+
+    await expect(
+      service.receiveStock(currentUser, {
+        itemId: 7,
+        locationId: 4,
+        quantity: 5,
+      }),
+    ).rejects.toThrow(
+      'Inventory item or location became inactive before stock was received.',
+    );
+  });
+
   it('creates a normalized inventory item and records an audit log', async () => {
     itemsRepository.findItemByNumber.mockResolvedValue(null);
     itemsRepository.createItem.mockResolvedValue(item);
