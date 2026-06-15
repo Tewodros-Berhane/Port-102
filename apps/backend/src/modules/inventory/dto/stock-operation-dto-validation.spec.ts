@@ -83,4 +83,15 @@ describe('Stock operation DTO validation', () => {
     });
   });
 
+  it('rejects non-positive receipt quantities', async () => {
+    const dto = plainToInstance(ReceiveStockDto, {
+      itemId: 7,
+      locationId: 4,
+      quantity: 0,
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'quantity')).toBe(true);
+  });
+
 });
