@@ -158,4 +158,22 @@ describe('StockReceiptsRepository', () => {
     expect(result?.averageCost?.toFixed(2)).toBe('150.00');
   });
 
+  it('rejects the transaction when item or location is no longer active', async () => {
+    tx.inventoryItem.findFirst.mockResolvedValue(null);
+    tx.inventoryLocation.findFirst.mockResolvedValue({ id: 4 });
+    balancesRepository.findBalance.mockResolvedValue(null);
+
+    await expect(
+      repository.receiveStock({
+        movementNumber: 'MOV-20260615-000004',
+        itemId: 7,
+        locationId: 4,
+        quantity: new Prisma.Decimal(5),
+        createdByUserId: 1,
+      }),
+    ).resolves.toBeNull();
+
+    expect(balancesRepository.increaseBalance).not.toHaveBeenCalled();
+    expect(movementsRepository.createMovement).not.toHaveBeenCalled();
+  });
 });
