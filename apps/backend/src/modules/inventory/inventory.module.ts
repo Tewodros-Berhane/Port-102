@@ -8,6 +8,7 @@ import { InventoryService } from './inventory.service';
 import { InventoryItemsRepository } from './repositories/inventory-items.repository';
 import { InventoryLocationsRepository } from './repositories/inventory-locations.repository';
 import { StockBalancesRepository } from './repositories/stock-balances.repository';
+import { StockIssuesRepository } from './repositories/stock-issues.repository';
 import { StockMovementsRepository } from './repositories/stock-movements.repository';
 import { StockReceiptsRepository } from './repositories/stock-receipts.repository';
 
@@ -19,6 +20,7 @@ import { StockReceiptsRepository } from './repositories/stock-receipts.repositor
     InventoryLocationsRepository,
     InventoryItemsRepository,
     StockBalancesRepository,
+    StockIssuesRepository,
     StockMovementsRepository,
     StockReceiptsRepository,
     PermissionsGuard,
@@ -28,6 +30,7 @@ import { StockReceiptsRepository } from './repositories/stock-receipts.repositor
     InventoryLocationsRepository,
     InventoryItemsRepository,
     StockBalancesRepository,
+    StockIssuesRepository,
     StockMovementsRepository,
     StockReceiptsRepository,
   ],
