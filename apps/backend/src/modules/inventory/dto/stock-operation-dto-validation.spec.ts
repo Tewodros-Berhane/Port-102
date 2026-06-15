@@ -63,4 +63,24 @@ describe('Stock operation DTO validation', () => {
     expect(errors.some((error) => error.property === 'createdFrom')).toBe(true);
   });
 
+  it('accepts a valid stock receipt payload', async () => {
+    const dto = plainToInstance(ReceiveStockDto, {
+      itemId: '7',
+      locationId: '4',
+      quantity: '25.50',
+      unitCost: '150.75',
+      referenceType: 'DELIVERY',
+      referenceId: '42',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toMatchObject({
+      itemId: 7,
+      locationId: 4,
+      quantity: 25.5,
+      unitCost: 150.75,
+      referenceId: 42,
+    });
+  });
+
 });
