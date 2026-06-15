@@ -12,6 +12,9 @@ import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { CreateInventoryLocationDto } from './dto/create-inventory-location.dto';
 import { GetInventoryItemsQueryDto } from './dto/get-inventory-items-query.dto';
 import { GetInventoryLocationsQueryDto } from './dto/get-inventory-locations-query.dto';
+import { GetStockBalancesQueryDto } from './dto/get-stock-balances-query.dto';
+import { GetStockMovementsQueryDto } from './dto/get-stock-movements-query.dto';
+import { ReceiveStockDto } from './dto/receive-stock.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { UpdateInventoryLocationDto } from './dto/update-inventory-location.dto';
 import {
@@ -22,14 +25,174 @@ import {
   InventoryLocationRecord,
   InventoryLocationsRepository,
 } from './repositories/inventory-locations.repository';
+import {
+  StockBalanceRecord,
+  StockBalancesRepository,
+} from './repositories/stock-balances.repository';
+import {
+  StockMovementRecord,
+  StockMovementsRepository,
+} from './repositories/stock-movements.repository';
+import { StockReceiptsRepository } from './repositories/stock-receipts.repository';
 
 @Injectable()
 export class InventoryService {
   constructor(
     private readonly inventoryLocationsRepository: InventoryLocationsRepository,
     private readonly inventoryItemsRepository: InventoryItemsRepository,
+    private readonly stockBalancesRepository: StockBalancesRepository,
+    private readonly stockMovementsRepository: StockMovementsRepository,
+    private readonly stockReceiptsRepository: StockReceiptsRepository,
     private readonly auditLogsService: AuditLogsService,
   ) {}
+
+  async listStockBalances(
+    _currentUser: CurrentUserPayload,
+    query: GetStockBalancesQueryDto,
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const [total, balances] = await this.stockBalancesRepository.listBalances({
+      skip: (page - 1) * limit,
+      take: limit,
+      search: this.normalizeOptionalString(query.search) ?? undefined,
+      itemId: query.itemId,
+      locationId: query.locationId,
+    });
+
+    return {
+      items: balances.map((balance) => this.serializeBalance(balance)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getStockBalancesByItem(
+    currentUser: CurrentUserPayload,
+    itemId: number,
+    query: GetStockBalancesQueryDto,
+  ) {
+    await this.findRequiredItem(itemId);
+
+    return this.listStockBalances(currentUser, {
+      ...query,
+      itemId,
+    });
+  }
+
+  async listStockMovements(
+    _currentUser: CurrentUserPayload,
+    query: GetStockMovementsQueryDto,
+  ) {
+    const createdFrom = this.parseOptionalDate(query.createdFrom);
+    const createdTo = this.parseOptionalDate(query.createdTo);
+
+    if (createdFrom && createdTo && createdFrom > createdTo) {
+      throw new BadRequestException(
+        'Movement createdFrom must be before or equal to createdTo.',
+      );
+    }
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const [total, movements] =
+      await this.stockMovementsRepository.listMovements({
+        skip: (page - 1) * limit,
+        take: limit,
+        search: this.normalizeOptionalString(query.search) ?? undefined,
+        type: query.type,
+        itemId: query.itemId,
+        locationId: query.locationId,
+        createdFrom,
+        createdTo,
+      });
+
+    return {
+      items: movements.map((movement) => this.serializeMovement(movement)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async receiveStock(
+    currentUser: CurrentUserPayload,
+    receiveStockDto: ReceiveStockDto,
+  ) {
+    const [item, location] = await Promise.all([
+      this.findRequiredItem(receiveStockDto.itemId),
+      this.findRequiredLocation(receiveStockDto.locationId),
+    ]);
+
+    if (item.status !== InventoryItemStatus.ACTIVE) {
+      throw new ConflictException(
+        'Inactive inventory item cannot receive stock.',
+      );
+    }
+
+    if (!location.isActive) {
+      throw new ConflictException(
+        'Inactive inventory location cannot receive stock.',
+      );
+    }
+
+    const quantity = new Prisma.Decimal(receiveStockDto.quantity);
+    const unitCost =
+      receiveStockDto.unitCost === undefined
+        ? undefined
+        : new Prisma.Decimal(receiveStockDto.unitCost);
+    const movementNumber = await this.generateMovementNumber();
+    const receipt = await this.stockReceiptsRepository.receiveStock({
+      movementNumber,
+      itemId: item.id,
+      locationId: location.id,
+      quantity,
+      unitCost,
+      referenceType: this.normalizeOptionalString(
+        receiveStockDto.referenceType,
+      ),
+      referenceId: receiveStockDto.referenceId,
+      reason: this.normalizeOptionalString(receiveStockDto.reason),
+      notes: this.normalizeOptionalString(receiveStockDto.notes),
+      createdByUserId: currentUser.sub,
+    });
+
+    if (!receipt) {
+      throw new ConflictException(
+        'Inventory item or location became inactive before stock was received.',
+      );
+    }
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'inventory.stock.received',
+      entityType: 'StockMovement',
+      entityId: receipt.movement.id.toString(),
+      metadata: {
+        movementNumber,
+        itemId: item.id,
+        locationId: location.id,
+        quantity: quantity.toFixed(2),
+        unitCost: unitCost?.toFixed(2) ?? null,
+        totalCost: receipt.movement.totalCost?.toFixed(2) ?? null,
+        balanceQuantity: receipt.balance.quantity.toFixed(2),
+        averageCost: receipt.averageCost?.toFixed(2) ?? null,
+      },
+    });
+
+    return {
+      movement: this.serializeMovement(receipt.movement),
+      balance: this.serializeBalance(receipt.balance),
+      averageCost: receipt.averageCost?.toFixed(2) ?? null,
+    };
+  }
 
   async createItem(
     currentUser: CurrentUserPayload,
@@ -426,6 +589,10 @@ export class InventoryService {
     return normalized || null;
   }
 
+  private parseOptionalDate(value?: string) {
+    return value ? new Date(value) : undefined;
+  }
+
   private toNullableDecimal(value?: number | null) {
     return value === null || value === undefined
       ? null
@@ -438,6 +605,26 @@ export class InventoryService {
       reorderLevel: item.reorderLevel?.toFixed(2) ?? null,
       reorderQuantity: item.reorderQuantity?.toFixed(2) ?? null,
       averageCost: item.averageCost?.toFixed(2) ?? null,
+    };
+  }
+
+  private serializeBalance(balance: StockBalanceRecord) {
+    return {
+      ...balance,
+      quantity: balance.quantity.toFixed(2),
+      item: {
+        ...balance.item,
+        averageCost: balance.item.averageCost?.toFixed(2) ?? null,
+      },
+    };
+  }
+
+  private serializeMovement(movement: StockMovementRecord) {
+    return {
+      ...movement,
+      quantity: movement.quantity.toFixed(2),
+      unitCost: movement.unitCost?.toFixed(2) ?? null,
+      totalCost: movement.totalCost?.toFixed(2) ?? null,
     };
   }
 
@@ -493,5 +680,24 @@ export class InventoryService {
       entityId: item.id.toString(),
       metadata,
     });
+  }
+
+  private async generateMovementNumber() {
+    const datePart = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const sequence = `${Date.now().toString().slice(-6)}${attempt}`.slice(-6);
+      const movementNumber = `MOV-${datePart}-${sequence}`;
+      const existing =
+        await this.stockMovementsRepository.findByMovementNumber(
+          movementNumber,
+        );
+
+      if (!existing) {
+        return movementNumber;
+      }
+    }
+
+    throw new ConflictException('Unable to generate a unique movement number.');
   }
 }
