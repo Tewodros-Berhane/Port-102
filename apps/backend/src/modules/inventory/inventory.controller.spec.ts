@@ -22,6 +22,10 @@ describe('InventoryController', () => {
     getLocationById: jest.Mock;
     updateLocation: jest.Mock;
     deactivateLocation: jest.Mock;
+    listStockBalances: jest.Mock;
+    getStockBalancesByItem: jest.Mock;
+    listStockMovements: jest.Mock;
+    receiveStock: jest.Mock;
   };
 
   const currentUser = {
@@ -45,6 +49,10 @@ describe('InventoryController', () => {
       getLocationById: jest.fn(),
       updateLocation: jest.fn(),
       deactivateLocation: jest.fn(),
+      listStockBalances: jest.fn(),
+      getStockBalancesByItem: jest.fn(),
+      listStockMovements: jest.fn(),
+      receiveStock: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -139,6 +147,76 @@ describe('InventoryController', () => {
         InventoryController.prototype.deactivateItem,
       ),
     ).toEqual(['inventory.items.delete']);
+  });
+
+  it('declares stock read and receive permissions', () => {
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.listStockBalances,
+      ),
+    ).toEqual(['inventory.items.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.getStockBalancesByItem,
+      ),
+    ).toEqual(['inventory.items.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.listStockMovements,
+      ),
+    ).toEqual(['inventory.movements.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.receiveStock,
+      ),
+    ).toEqual(['inventory.stock.receive']);
+  });
+
+  it('delegates stock balance and movement queries', async () => {
+    const balanceQuery = { page: 1, limit: 20, locationId: 4 };
+    const movementQuery = { page: 1, limit: 20 };
+    inventoryService.listStockBalances.mockResolvedValue({ items: [] });
+    inventoryService.getStockBalancesByItem.mockResolvedValue({ items: [] });
+    inventoryService.listStockMovements.mockResolvedValue({ items: [] });
+
+    await controller.listStockBalances(currentUser, balanceQuery);
+    await controller.getStockBalancesByItem(currentUser, 7, balanceQuery);
+    await controller.listStockMovements(currentUser, movementQuery);
+
+    expect(inventoryService.listStockBalances).toHaveBeenCalledWith(
+      currentUser,
+      balanceQuery,
+    );
+    expect(inventoryService.getStockBalancesByItem).toHaveBeenCalledWith(
+      currentUser,
+      7,
+      balanceQuery,
+    );
+    expect(inventoryService.listStockMovements).toHaveBeenCalledWith(
+      currentUser,
+      movementQuery,
+    );
+  });
+
+  it('delegates stock receipt creation', async () => {
+    const dto = {
+      itemId: 7,
+      locationId: 4,
+      quantity: 25,
+      unitCost: 150,
+    };
+    inventoryService.receiveStock.mockResolvedValue({ movement: { id: 9 } });
+
+    await controller.receiveStock(currentUser, dto);
+
+    expect(inventoryService.receiveStock).toHaveBeenCalledWith(
+      currentUser,
+      dto,
+    );
   });
 
   it('delegates inventory item operations to InventoryService', async () => {

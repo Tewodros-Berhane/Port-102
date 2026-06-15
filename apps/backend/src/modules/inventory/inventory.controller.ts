@@ -34,6 +34,9 @@ import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { CreateInventoryLocationDto } from './dto/create-inventory-location.dto';
 import { GetInventoryItemsQueryDto } from './dto/get-inventory-items-query.dto';
 import { GetInventoryLocationsQueryDto } from './dto/get-inventory-locations-query.dto';
+import { GetStockBalancesQueryDto } from './dto/get-stock-balances-query.dto';
+import { GetStockMovementsQueryDto } from './dto/get-stock-movements-query.dto';
+import { ReceiveStockDto } from './dto/receive-stock.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { UpdateInventoryLocationDto } from './dto/update-inventory-location.dto';
 import { InventoryService } from './inventory.service';
@@ -44,6 +47,72 @@ import { InventoryService } from './inventory.service';
 @Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
+
+  @Get('balances')
+  @Permissions('inventory.items.read')
+  @ApiOperation({ summary: 'List stock balances by item and location' })
+  @ApiOkResponse({ description: 'Stock balances returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listStockBalances(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: GetStockBalancesQueryDto,
+  ) {
+    return this.inventoryService.listStockBalances(currentUser, query);
+  }
+
+  @Get('balances/:itemId')
+  @Permissions('inventory.items.read')
+  @ApiOperation({ summary: 'List stock balances for one inventory item' })
+  @ApiOkResponse({ description: 'Item stock balances returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Inventory item was not found.' })
+  getStockBalancesByItem(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Query() query: GetStockBalancesQueryDto,
+  ) {
+    return this.inventoryService.getStockBalancesByItem(
+      currentUser,
+      itemId,
+      query,
+    );
+  }
+
+  @Get('movements')
+  @Permissions('inventory.movements.read')
+  @ApiOperation({ summary: 'List immutable inventory stock movement history' })
+  @ApiOkResponse({ description: 'Stock movements returned successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid movement date range.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listStockMovements(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: GetStockMovementsQueryDto,
+  ) {
+    return this.inventoryService.listStockMovements(currentUser, query);
+  }
+
+  @Post('receive')
+  @Permissions('inventory.stock.receive')
+  @ApiOperation({ summary: 'Receive stock into an active inventory location' })
+  @ApiCreatedResponse({ description: 'Stock received successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid stock receipt payload.' })
+  @ApiConflictResponse({
+    description: 'Inventory item or location is inactive.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Inventory item or location was not found.',
+  })
+  receiveStock(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Body() receiveStockDto: ReceiveStockDto,
+  ) {
+    return this.inventoryService.receiveStock(currentUser, receiveStockDto);
+  }
 
   @Post('items')
   @Permissions('inventory.items.create')
