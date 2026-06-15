@@ -95,4 +95,49 @@ describe('StockIssuesRepository', () => {
     );
   });
 
+  it('returns available stock when the conditional decrement fails', async () => {
+    tx.inventoryItem.findFirst.mockResolvedValue({
+      id: 7,
+      averageCost: new Prisma.Decimal(145.5),
+    });
+    tx.inventoryLocation.findFirst.mockResolvedValue({ id: 4 });
+    balancesRepository.findBalance.mockResolvedValue({
+      quantity: new Prisma.Decimal(5),
+    });
+    balancesRepository.decreaseBalance.mockResolvedValue(null);
+
+    await expect(
+      repository.issueStock({
+        movementNumber: 'MOV-20260615-000002',
+        itemId: 7,
+        locationId: 4,
+        quantity: new Prisma.Decimal(10),
+        createdByUserId: 1,
+      }),
+    ).resolves.toEqual({
+      status: 'INSUFFICIENT',
+      availableQuantity: new Prisma.Decimal(5),
+    });
+
+    expect(movementsRepository.createMovement).not.toHaveBeenCalled();
+  });
+
+  it('rejects issuing when the item or location is no longer active', async () => {
+    tx.inventoryItem.findFirst.mockResolvedValue(null);
+    tx.inventoryLocation.findFirst.mockResolvedValue({ id: 4 });
+    balancesRepository.findBalance.mockResolvedValue(null);
+
+    await expect(
+      repository.issueStock({
+        movementNumber: 'MOV-20260615-000003',
+        itemId: 7,
+        locationId: 4,
+        quantity: new Prisma.Decimal(1),
+        createdByUserId: 1,
+      }),
+    ).resolves.toEqual({ status: 'INACTIVE' });
+
+    expect(balancesRepository.decreaseBalance).not.toHaveBeenCalled();
+    expect(movementsRepository.createMovement).not.toHaveBeenCalled();
+  });
 });
