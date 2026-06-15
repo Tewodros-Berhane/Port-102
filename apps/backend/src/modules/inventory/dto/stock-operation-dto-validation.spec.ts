@@ -52,4 +52,15 @@ describe('Stock operation DTO validation', () => {
     expect(dto.itemId).toBe(7);
   });
 
+  it('rejects invalid movement enums and dates', async () => {
+    const dto = plainToInstance(GetStockMovementsQueryDto, {
+      type: 'PURCHASE',
+      createdFrom: 'not-a-date',
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'type')).toBe(true);
+    expect(errors.some((error) => error.property === 'createdFrom')).toBe(true);
+  });
+
 });
