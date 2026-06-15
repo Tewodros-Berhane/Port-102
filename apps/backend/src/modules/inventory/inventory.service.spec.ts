@@ -293,6 +293,86 @@ describe('InventoryService', () => {
     );
   });
 
+  it('receives stock, returns updated values, and records an audit log', async () => {
+    itemsRepository.findItem.mockResolvedValue(item);
+    locationsRepository.findLocation.mockResolvedValue(location);
+    movementsRepository.findByMovementNumber.mockResolvedValue(null);
+    const movement = {
+      id: 9,
+      movementNumber: 'MOV-20260615-000001',
+      itemId: 7,
+      locationId: 4,
+      fromLocationId: null,
+      toLocationId: null,
+      type: StockMovementType.RECEIPT,
+      quantity: new Prisma.Decimal(5),
+      unitCost: new Prisma.Decimal(150),
+      totalCost: new Prisma.Decimal(750),
+      referenceType: null,
+      referenceId: null,
+      reason: null,
+      notes: null,
+      createdByUserId: 1,
+      createdAt: new Date(),
+      item: {
+        id: 7,
+        itemNumber: item.itemNumber,
+        name: item.name,
+        unitOfMeasure: item.unitOfMeasure,
+      },
+      location: { id: 4, code: location.code, name: location.name },
+      fromLocation: null,
+      toLocation: null,
+      createdBy: null,
+    };
+    const balance = {
+      id: 1,
+      itemId: 7,
+      locationId: 4,
+      quantity: new Prisma.Decimal(15),
+      updatedAt: new Date(),
+      item: {
+        id: 7,
+        itemNumber: item.itemNumber,
+        name: item.name,
+        type: item.type,
+        category: item.category,
+        unitOfMeasure: item.unitOfMeasure,
+        averageCost: new Prisma.Decimal('147.00'),
+        status: item.status,
+      },
+      location: {
+        id: 4,
+        code: location.code,
+        name: location.name,
+        isActive: true,
+      },
+    };
+    receiptsRepository.receiveStock.mockResolvedValue({
+      movement,
+      balance,
+      averageCost: new Prisma.Decimal('147.00'),
+    });
+
+    const result = await service.receiveStock(currentUser, {
+      itemId: 7,
+      locationId: 4,
+      quantity: 5,
+      unitCost: 150,
+    });
+
+    expect(result.averageCost).toBe('147.00');
+    expect(result.balance.quantity).toBe('15.00');
+    expect(result.movement.totalCost).toBe('750.00');
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'inventory.stock.received',
+        entityType: 'StockMovement',
+        entityId: '9',
+      }),
+    );
+  });
+
   it('creates a normalized inventory item and records an audit log', async () => {
     itemsRepository.findItemByNumber.mockResolvedValue(null);
     itemsRepository.createItem.mockResolvedValue(item);
