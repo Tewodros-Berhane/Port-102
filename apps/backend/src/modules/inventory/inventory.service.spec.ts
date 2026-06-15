@@ -5,11 +5,15 @@ import {
   InventoryItemStatus,
   InventoryItemType,
   Prisma,
+  StockMovementType,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { InventoryService } from './inventory.service';
 import { InventoryItemsRepository } from './repositories/inventory-items.repository';
 import { InventoryLocationsRepository } from './repositories/inventory-locations.repository';
+import { StockBalancesRepository } from './repositories/stock-balances.repository';
+import { StockMovementsRepository } from './repositories/stock-movements.repository';
+import { StockReceiptsRepository } from './repositories/stock-receipts.repository';
 
 describe('InventoryService', () => {
   let service: InventoryService;
@@ -26,6 +30,16 @@ describe('InventoryService', () => {
     findItemByNumber: jest.Mock;
     listItems: jest.Mock;
     updateItem: jest.Mock;
+  };
+  let balancesRepository: {
+    listBalances: jest.Mock;
+  };
+  let movementsRepository: {
+    listMovements: jest.Mock;
+    findByMovementNumber: jest.Mock;
+  };
+  let receiptsRepository: {
+    receiveStock: jest.Mock;
   };
   let auditLogsService: { record: jest.Mock };
 
@@ -83,6 +97,16 @@ describe('InventoryService', () => {
       listItems: jest.fn(),
       updateItem: jest.fn(),
     };
+    balancesRepository = {
+      listBalances: jest.fn(),
+    };
+    movementsRepository = {
+      listMovements: jest.fn(),
+      findByMovementNumber: jest.fn(),
+    };
+    receiptsRepository = {
+      receiveStock: jest.fn(),
+    };
     auditLogsService = {
       record: jest.fn(),
     };
@@ -99,6 +123,18 @@ describe('InventoryService', () => {
           useValue: itemsRepository,
         },
         {
+          provide: StockBalancesRepository,
+          useValue: balancesRepository,
+        },
+        {
+          provide: StockMovementsRepository,
+          useValue: movementsRepository,
+        },
+        {
+          provide: StockReceiptsRepository,
+          useValue: receiptsRepository,
+        },
+        {
           provide: AuditLogsService,
           useValue: auditLogsService,
         },
@@ -106,6 +142,67 @@ describe('InventoryService', () => {
     }).compile();
 
     service = module.get(InventoryService);
+  });
+
+  it('lists and serializes stock balances', async () => {
+    const balance = {
+      id: 1,
+      itemId: 7,
+      locationId: 4,
+      quantity: new Prisma.Decimal(25),
+      updatedAt: new Date('2026-06-15T08:00:00.000Z'),
+      item: {
+        id: 7,
+        itemNumber: 'INV-FOOD-0001',
+        name: 'Basmati Rice',
+        type: InventoryItemType.FOOD,
+        category: 'Dry Goods',
+        unitOfMeasure: 'KG',
+        averageCost: new Prisma.Decimal(145.5),
+        status: InventoryItemStatus.ACTIVE,
+      },
+      location: {
+        id: 4,
+        code: 'MAIN-STORE',
+        name: 'Main Store',
+        isActive: true,
+      },
+    };
+    balancesRepository.listBalances.mockResolvedValue([1, [balance]]);
+
+    await expect(
+      service.listStockBalances(currentUser, {
+        page: 2,
+        limit: 10,
+        search: ' rice ',
+        locationId: 4,
+      }),
+    ).resolves.toEqual({
+      items: [
+        {
+          ...balance,
+          quantity: '25.00',
+          item: {
+            ...balance.item,
+            averageCost: '145.50',
+          },
+        },
+      ],
+      pagination: {
+        page: 2,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+
+    expect(balancesRepository.listBalances).toHaveBeenCalledWith({
+      skip: 10,
+      take: 10,
+      search: 'rice',
+      itemId: undefined,
+      locationId: 4,
+    });
   });
 
   it('creates a normalized inventory item and records an audit log', async () => {
