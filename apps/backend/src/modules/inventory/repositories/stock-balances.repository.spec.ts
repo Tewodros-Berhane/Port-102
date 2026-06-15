@@ -68,4 +68,16 @@ describe('StockBalancesRepository', () => {
     );
   });
 
+  it('finds one balance by the compound item and location key', async () => {
+    await repository.findBalance(7, 4);
+
+    expect(prisma.stockBalance.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          itemId_locationId: { itemId: 7, locationId: 4 },
+        },
+      }),
+    );
+  });
+
 });
