@@ -14,6 +14,7 @@ import { GetInventoryItemsQueryDto } from './dto/get-inventory-items-query.dto';
 import { GetInventoryLocationsQueryDto } from './dto/get-inventory-locations-query.dto';
 import { GetStockBalancesQueryDto } from './dto/get-stock-balances-query.dto';
 import { GetStockMovementsQueryDto } from './dto/get-stock-movements-query.dto';
+import { IssueStockDto } from './dto/issue-stock.dto';
 import { ReceiveStockDto } from './dto/receive-stock.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { UpdateInventoryLocationDto } from './dto/update-inventory-location.dto';
@@ -29,6 +30,7 @@ import {
   StockBalanceRecord,
   StockBalancesRepository,
 } from './repositories/stock-balances.repository';
+import { StockIssuesRepository } from './repositories/stock-issues.repository';
 import {
   StockMovementRecord,
   StockMovementsRepository,
@@ -43,6 +45,7 @@ export class InventoryService {
     private readonly stockBalancesRepository: StockBalancesRepository,
     private readonly stockMovementsRepository: StockMovementsRepository,
     private readonly stockReceiptsRepository: StockReceiptsRepository,
+    private readonly stockIssuesRepository: StockIssuesRepository,
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
@@ -191,6 +194,77 @@ export class InventoryService {
       movement: this.serializeMovement(receipt.movement),
       balance: this.serializeBalance(receipt.balance),
       averageCost: receipt.averageCost?.toFixed(2) ?? null,
+    };
+  }
+
+  async issueStock(
+    currentUser: CurrentUserPayload,
+    issueStockDto: IssueStockDto,
+  ) {
+    const [item, location] = await Promise.all([
+      this.findRequiredItem(issueStockDto.itemId),
+      this.findRequiredLocation(issueStockDto.locationId),
+    ]);
+
+    if (item.status !== InventoryItemStatus.ACTIVE) {
+      throw new ConflictException(
+        'Inactive inventory item cannot issue stock.',
+      );
+    }
+
+    if (!location.isActive) {
+      throw new ConflictException(
+        'Inactive inventory location cannot issue stock.',
+      );
+    }
+
+    const quantity = new Prisma.Decimal(issueStockDto.quantity);
+    const movementNumber = await this.generateMovementNumber();
+    const issue = await this.stockIssuesRepository.issueStock({
+      movementNumber,
+      itemId: item.id,
+      locationId: location.id,
+      quantity,
+      referenceType: this.normalizeOptionalString(issueStockDto.referenceType),
+      referenceId: issueStockDto.referenceId,
+      reason: this.normalizeOptionalString(issueStockDto.reason),
+      notes: this.normalizeOptionalString(issueStockDto.notes),
+      createdByUserId: currentUser.sub,
+    });
+
+    if (issue.status === 'INACTIVE') {
+      throw new ConflictException(
+        'Inventory item or location became inactive before stock was issued.',
+      );
+    }
+
+    if (issue.status === 'INSUFFICIENT') {
+      throw new ConflictException(
+        `Insufficient stock. Available quantity is ${issue.availableQuantity.toFixed(2)}.`,
+      );
+    }
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'inventory.stock.issued',
+      entityType: 'StockMovement',
+      entityId: issue.movement.id.toString(),
+      metadata: {
+        movementNumber,
+        itemId: item.id,
+        locationId: location.id,
+        quantity: quantity.toFixed(2),
+        unitCost: issue.movement.unitCost?.toFixed(2) ?? null,
+        totalCost: issue.movement.totalCost?.toFixed(2) ?? null,
+        balanceQuantity: issue.balance.quantity.toFixed(2),
+        referenceType: issue.movement.referenceType,
+        referenceId: issue.movement.referenceId,
+      },
+    });
+
+    return {
+      movement: this.serializeMovement(issue.movement),
+      balance: this.serializeBalance(issue.balance),
     };
   }
 
