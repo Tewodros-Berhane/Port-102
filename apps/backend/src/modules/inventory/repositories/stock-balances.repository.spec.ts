@@ -80,4 +80,20 @@ describe('StockBalancesRepository', () => {
     );
   });
 
+  it('creates a missing balance when increasing stock', async () => {
+    const quantity = new Prisma.Decimal(25);
+
+    await repository.increaseBalance(7, 4, quantity);
+
+    expect(prisma.stockBalance.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: {
+          itemId: 7,
+          locationId: 4,
+          quantity,
+        },
+      }),
+    );
+  });
+
 });
