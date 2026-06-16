@@ -588,3 +588,16 @@ describe('Stock adjustment query status APPROVED', () => {
     expect(dto.status).toBe(StockAdjustmentStatus.APPROVED);
   });
 });
+
+describe('Stock adjustment query status REJECTED', () => {
+  it('accepts REJECTED adjustment status filters', async () => {
+    const dto = plainToInstance(GetStockAdjustmentsQueryDto, {
+      status: StockAdjustmentStatus.REJECTED,
+      page: '1',
+      limit: '20',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.status).toBe(StockAdjustmentStatus.REJECTED);
+  });
+});
