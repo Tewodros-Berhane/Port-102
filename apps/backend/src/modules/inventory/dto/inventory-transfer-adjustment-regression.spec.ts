@@ -1,0 +1,30 @@
+﻿import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+
+import { StockAdjustmentStatus } from '../../../generated/prisma/client';
+import { ApproveStockAdjustmentDto } from './approve-stock-adjustment.dto';
+import { CancelStockAdjustmentDto } from './cancel-stock-adjustment.dto';
+import { CreateStockAdjustmentDto } from './create-stock-adjustment.dto';
+import { GetStockAdjustmentsQueryDto } from './get-stock-adjustments-query.dto';
+import { RejectStockAdjustmentDto } from './reject-stock-adjustment.dto';
+import { TransferStockDto } from './transfer-stock.dto';
+
+describe('Inventory transfer and adjustment regression coverage', () => {
+  it('accepts a transfer to a different location with a trimmed reason', async () => {
+    const dto = plainToInstance(TransferStockDto, {
+      itemId: '7',
+      fromLocationId: '4',
+      toLocationId: '5',
+      quantity: '1.25',
+      reason: ' Kitchen replenishment ',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toMatchObject({
+      itemId: 7,
+      fromLocationId: 4,
+      toLocationId: 5,
+      quantity: 1.25,
+    });
+  });
+});
