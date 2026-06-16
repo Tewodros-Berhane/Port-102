@@ -562,3 +562,16 @@ describe('Stock adjustment decision validation for cancellation note', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
 });
+
+describe('Stock adjustment query status PENDING', () => {
+  it('accepts PENDING adjustment status filters', async () => {
+    const dto = plainToInstance(GetStockAdjustmentsQueryDto, {
+      status: StockAdjustmentStatus.PENDING,
+      page: '1',
+      limit: '20',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.status).toBe(StockAdjustmentStatus.PENDING);
+  });
+});
