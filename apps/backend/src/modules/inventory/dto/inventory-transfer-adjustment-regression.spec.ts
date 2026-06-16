@@ -88,3 +88,18 @@ describe('Transfer quantity acceptance 4', () => {
     expect(dto.quantity).toBe(4.50);
   });
 });
+
+describe('Transfer quantity acceptance 5', () => {
+  it('accepts transfer quantity 5.50 for active-location movement', async () => {
+    const dto = plainToInstance(TransferStockDto, {
+      itemId: 7,
+      fromLocationId: 4,
+      toLocationId: 15,
+      quantity: 5.50,
+      referenceType: 'STORE_REPLENISHMENT',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.quantity).toBe(5.50);
+  });
+});
