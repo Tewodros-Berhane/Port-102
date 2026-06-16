@@ -30,14 +30,20 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
+import { ApproveStockAdjustmentDto } from './dto/approve-stock-adjustment.dto';
+import { CancelStockAdjustmentDto } from './dto/cancel-stock-adjustment.dto';
+import { CreateStockAdjustmentDto } from './dto/create-stock-adjustment.dto';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { CreateInventoryLocationDto } from './dto/create-inventory-location.dto';
 import { GetInventoryItemsQueryDto } from './dto/get-inventory-items-query.dto';
 import { GetInventoryLocationsQueryDto } from './dto/get-inventory-locations-query.dto';
+import { GetStockAdjustmentsQueryDto } from './dto/get-stock-adjustments-query.dto';
 import { GetStockBalancesQueryDto } from './dto/get-stock-balances-query.dto';
 import { GetStockMovementsQueryDto } from './dto/get-stock-movements-query.dto';
 import { IssueStockDto } from './dto/issue-stock.dto';
 import { ReceiveStockDto } from './dto/receive-stock.dto';
+import { RejectStockAdjustmentDto } from './dto/reject-stock-adjustment.dto';
+import { TransferStockDto } from './dto/transfer-stock.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { UpdateInventoryLocationDto } from './dto/update-inventory-location.dto';
 import { InventoryService } from './inventory.service';
@@ -134,6 +140,152 @@ export class InventoryController {
     @Body() issueStockDto: IssueStockDto,
   ) {
     return this.inventoryService.issueStock(currentUser, issueStockDto);
+  }
+
+  @Post('transfer')
+  @Permissions('inventory.stock.transfer')
+  @ApiOperation({
+    summary: 'Transfer stock between active inventory locations',
+  })
+  @ApiCreatedResponse({ description: 'Stock transferred successfully.' })
+  @ApiBadRequestResponse({
+    description: 'Invalid transfer payload or same source/destination.',
+  })
+  @ApiConflictResponse({
+    description:
+      'Inventory item or location is inactive, or source stock is insufficient.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Inventory item or location was not found.',
+  })
+  transferStock(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Body() transferStockDto: TransferStockDto,
+  ) {
+    return this.inventoryService.transferStock(currentUser, transferStockDto);
+  }
+
+  @Post('adjustments')
+  @Permissions('inventory.stock.adjust.request')
+  @ApiOperation({ summary: 'Request a stock adjustment' })
+  @ApiCreatedResponse({
+    description: 'Stock adjustment requested successfully.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid adjustment payload.' })
+  @ApiConflictResponse({
+    description: 'Inventory item or location is inactive.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({
+    description: 'Inventory item or location was not found.',
+  })
+  createStockAdjustment(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Body() createAdjustmentDto: CreateStockAdjustmentDto,
+  ) {
+    return this.inventoryService.createStockAdjustment(
+      currentUser,
+      createAdjustmentDto,
+    );
+  }
+
+  @Get('adjustments')
+  @Permissions('inventory.stock.adjust')
+  @ApiOperation({ summary: 'List stock adjustments' })
+  @ApiOkResponse({ description: 'Stock adjustments returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listStockAdjustments(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: GetStockAdjustmentsQueryDto,
+  ) {
+    return this.inventoryService.listStockAdjustments(currentUser, query);
+  }
+
+  @Get('adjustments/:id')
+  @Permissions('inventory.stock.adjust')
+  @ApiOperation({ summary: 'Get one stock adjustment' })
+  @ApiOkResponse({ description: 'Stock adjustment returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Stock adjustment was not found.' })
+  getStockAdjustmentById(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) adjustmentId: number,
+  ) {
+    return this.inventoryService.getStockAdjustmentById(
+      currentUser,
+      adjustmentId,
+    );
+  }
+
+  @Patch('adjustments/:id/approve')
+  @Permissions('inventory.stock.adjust.approve')
+  @ApiOperation({ summary: 'Approve and apply a pending stock adjustment' })
+  @ApiOkResponse({ description: 'Stock adjustment approved successfully.' })
+  @ApiBadRequestResponse({ description: 'Invalid approval payload.' })
+  @ApiConflictResponse({
+    description:
+      'Adjustment is not pending, inventory state is inactive, or stock is insufficient.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Stock adjustment was not found.' })
+  approveStockAdjustment(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) adjustmentId: number,
+    @Body() approveAdjustmentDto: ApproveStockAdjustmentDto,
+  ) {
+    return this.inventoryService.approveStockAdjustment(
+      currentUser,
+      adjustmentId,
+      approveAdjustmentDto,
+    );
+  }
+
+  @Patch('adjustments/:id/reject')
+  @Permissions('inventory.stock.adjust.approve')
+  @ApiOperation({ summary: 'Reject a pending stock adjustment' })
+  @ApiOkResponse({ description: 'Stock adjustment rejected successfully.' })
+  @ApiBadRequestResponse({ description: 'Rejection reason is required.' })
+  @ApiConflictResponse({ description: 'Adjustment is not pending.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Stock adjustment was not found.' })
+  rejectStockAdjustment(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) adjustmentId: number,
+    @Body() rejectAdjustmentDto: RejectStockAdjustmentDto,
+  ) {
+    return this.inventoryService.rejectStockAdjustment(
+      currentUser,
+      adjustmentId,
+      rejectAdjustmentDto,
+    );
+  }
+
+  @Patch('adjustments/:id/cancel')
+  @Permissions('inventory.stock.adjust.request')
+  @ApiOperation({ summary: 'Cancel a pending stock adjustment' })
+  @ApiOkResponse({ description: 'Stock adjustment cancelled successfully.' })
+  @ApiBadRequestResponse({ description: 'Cancellation reason is required.' })
+  @ApiConflictResponse({ description: 'Adjustment is not pending.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  @ApiNotFoundResponse({ description: 'Stock adjustment was not found.' })
+  cancelStockAdjustment(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Param('id', ParseIntPipe) adjustmentId: number,
+    @Body() cancelAdjustmentDto: CancelStockAdjustmentDto,
+  ) {
+    return this.inventoryService.cancelStockAdjustment(
+      currentUser,
+      adjustmentId,
+      cancelAdjustmentDto,
+    );
   }
 
   @Post('items')

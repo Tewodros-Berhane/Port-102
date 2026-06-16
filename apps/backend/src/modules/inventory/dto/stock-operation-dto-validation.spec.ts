@@ -6,6 +6,10 @@ import { GetStockBalancesQueryDto } from './get-stock-balances-query.dto';
 import { GetStockMovementsQueryDto } from './get-stock-movements-query.dto';
 import { IssueStockDto } from './issue-stock.dto';
 import { ReceiveStockDto } from './receive-stock.dto';
+import { TransferStockDto } from './transfer-stock.dto';
+import { CreateStockAdjustmentDto } from './create-stock-adjustment.dto';
+import { GetStockAdjustmentsQueryDto } from './get-stock-adjustments-query.dto';
+import { RejectStockAdjustmentDto } from './reject-stock-adjustment.dto';
 
 describe('Stock operation DTO validation', () => {
   it('transforms stock balance pagination and identifiers', async () => {
@@ -171,5 +175,82 @@ describe('Stock operation DTO validation', () => {
 
     expect(errors.some((error) => error.property === 'quantity')).toBe(true);
     expect(errors.some((error) => error.property === 'notes')).toBe(true);
+  });
+
+  it('accepts a valid transfer payload', async () => {
+    const dto = plainToInstance(TransferStockDto, {
+      itemId: '7',
+      fromLocationId: '4',
+      toLocationId: '5',
+      quantity: '8.25',
+      referenceType: 'STORE_REPLENISHMENT',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toMatchObject({
+      itemId: 7,
+      fromLocationId: 4,
+      toLocationId: 5,
+      quantity: 8.25,
+    });
+  });
+
+  it('rejects same-location transfer payloads', async () => {
+    const dto = plainToInstance(TransferStockDto, {
+      itemId: 7,
+      fromLocationId: 4,
+      toLocationId: 4,
+      quantity: 1,
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'toLocationId')).toBe(
+      true,
+    );
+  });
+
+  it('accepts stock adjustment queries and signed quantities', async () => {
+    const query = plainToInstance(GetStockAdjustmentsQueryDto, {
+      page: '2',
+      limit: '25',
+      itemId: '7',
+      locationId: '4',
+      status: 'PENDING',
+    });
+    const create = plainToInstance(CreateStockAdjustmentDto, {
+      itemId: '7',
+      locationId: '4',
+      quantity: '-2.5',
+      reason: 'Physical count variance.',
+    });
+
+    await expect(validate(query)).resolves.toHaveLength(0);
+    await expect(validate(create)).resolves.toHaveLength(0);
+    expect(query).toMatchObject({ page: 2, limit: 25, itemId: 7 });
+    expect(create.quantity).toBe(-2.5);
+  });
+
+  it('rejects zero stock adjustment quantities and missing reasons', async () => {
+    const dto = plainToInstance(CreateStockAdjustmentDto, {
+      itemId: 7,
+      locationId: 4,
+      quantity: 0,
+      reason: '',
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'quantity')).toBe(true);
+    expect(errors.some((error) => error.property === 'reason')).toBe(true);
+  });
+
+  it('requires stock adjustment rejection notes', async () => {
+    const dto = plainToInstance(RejectStockAdjustmentDto, {
+      decisionNote: '',
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'decisionNote')).toBe(
+      true,
+    );
   });
 });

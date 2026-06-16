@@ -5,17 +5,27 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { InventoryItemStatus, Prisma } from '../../generated/prisma/client';
+import {
+  InventoryItemStatus,
+  Prisma,
+  StockAdjustmentStatus,
+} from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
+import { ApproveStockAdjustmentDto } from './dto/approve-stock-adjustment.dto';
+import { CancelStockAdjustmentDto } from './dto/cancel-stock-adjustment.dto';
+import { CreateStockAdjustmentDto } from './dto/create-stock-adjustment.dto';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { CreateInventoryLocationDto } from './dto/create-inventory-location.dto';
 import { GetInventoryItemsQueryDto } from './dto/get-inventory-items-query.dto';
 import { GetInventoryLocationsQueryDto } from './dto/get-inventory-locations-query.dto';
+import { GetStockAdjustmentsQueryDto } from './dto/get-stock-adjustments-query.dto';
 import { GetStockBalancesQueryDto } from './dto/get-stock-balances-query.dto';
 import { GetStockMovementsQueryDto } from './dto/get-stock-movements-query.dto';
 import { IssueStockDto } from './dto/issue-stock.dto';
 import { ReceiveStockDto } from './dto/receive-stock.dto';
+import { RejectStockAdjustmentDto } from './dto/reject-stock-adjustment.dto';
+import { TransferStockDto } from './dto/transfer-stock.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { UpdateInventoryLocationDto } from './dto/update-inventory-location.dto';
 import {
@@ -27,6 +37,10 @@ import {
   InventoryLocationsRepository,
 } from './repositories/inventory-locations.repository';
 import {
+  StockAdjustmentRecord,
+  StockAdjustmentsRepository,
+} from './repositories/stock-adjustments.repository';
+import {
   StockBalanceRecord,
   StockBalancesRepository,
 } from './repositories/stock-balances.repository';
@@ -36,16 +50,19 @@ import {
   StockMovementsRepository,
 } from './repositories/stock-movements.repository';
 import { StockReceiptsRepository } from './repositories/stock-receipts.repository';
+import { StockTransfersRepository } from './repositories/stock-transfers.repository';
 
 @Injectable()
 export class InventoryService {
   constructor(
     private readonly inventoryLocationsRepository: InventoryLocationsRepository,
     private readonly inventoryItemsRepository: InventoryItemsRepository,
+    private readonly stockAdjustmentsRepository: StockAdjustmentsRepository,
     private readonly stockBalancesRepository: StockBalancesRepository,
     private readonly stockMovementsRepository: StockMovementsRepository,
     private readonly stockReceiptsRepository: StockReceiptsRepository,
     private readonly stockIssuesRepository: StockIssuesRepository,
+    private readonly stockTransfersRepository: StockTransfersRepository,
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
@@ -266,6 +283,297 @@ export class InventoryService {
       movement: this.serializeMovement(issue.movement),
       balance: this.serializeBalance(issue.balance),
     };
+  }
+
+  async transferStock(
+    currentUser: CurrentUserPayload,
+    transferStockDto: TransferStockDto,
+  ) {
+    if (transferStockDto.fromLocationId === transferStockDto.toLocationId) {
+      throw new BadRequestException(
+        'Transfer source and destination locations must be different.',
+      );
+    }
+
+    const [item, fromLocation, toLocation] = await Promise.all([
+      this.findRequiredItem(transferStockDto.itemId),
+      this.findRequiredLocation(transferStockDto.fromLocationId),
+      this.findRequiredLocation(transferStockDto.toLocationId),
+    ]);
+
+    if (item.status !== InventoryItemStatus.ACTIVE) {
+      throw new ConflictException(
+        'Inactive inventory item cannot be transferred.',
+      );
+    }
+
+    if (!fromLocation.isActive || !toLocation.isActive) {
+      throw new ConflictException(
+        'Inactive inventory location cannot transfer stock.',
+      );
+    }
+
+    const quantity = new Prisma.Decimal(transferStockDto.quantity);
+    const transferOutMovementNumber = await this.generateMovementNumber();
+    const transferInMovementNumber = await this.generateMovementNumber();
+    const transfer = await this.stockTransfersRepository.transferStock({
+      transferOutMovementNumber,
+      transferInMovementNumber,
+      itemId: item.id,
+      fromLocationId: fromLocation.id,
+      toLocationId: toLocation.id,
+      quantity,
+      referenceType: this.normalizeOptionalString(
+        transferStockDto.referenceType,
+      ),
+      referenceId: transferStockDto.referenceId,
+      reason: this.normalizeOptionalString(transferStockDto.reason),
+      notes: this.normalizeOptionalString(transferStockDto.notes),
+      createdByUserId: currentUser.sub,
+    });
+
+    if (transfer.status === 'INACTIVE') {
+      throw new ConflictException(
+        'Inventory item or location became inactive before stock was transferred.',
+      );
+    }
+
+    if (transfer.status === 'INSUFFICIENT') {
+      throw new ConflictException(
+        `Insufficient stock. Available quantity is ${transfer.availableQuantity.toFixed(2)}.`,
+      );
+    }
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'inventory.stock.transferred',
+      entityType: 'StockMovement',
+      entityId: transfer.transferOutMovement.id.toString(),
+      metadata: {
+        transferOutMovementNumber,
+        transferInMovementNumber,
+        itemId: item.id,
+        fromLocationId: fromLocation.id,
+        toLocationId: toLocation.id,
+        quantity: quantity.toFixed(2),
+        fromBalanceQuantity: transfer.fromBalance.quantity.toFixed(2),
+        toBalanceQuantity: transfer.toBalance.quantity.toFixed(2),
+      },
+    });
+
+    return {
+      transferOutMovement: this.serializeMovement(transfer.transferOutMovement),
+      transferInMovement: this.serializeMovement(transfer.transferInMovement),
+      fromBalance: this.serializeBalance(transfer.fromBalance),
+      toBalance: this.serializeBalance(transfer.toBalance),
+    };
+  }
+
+  async createStockAdjustment(
+    currentUser: CurrentUserPayload,
+    createAdjustmentDto: CreateStockAdjustmentDto,
+  ) {
+    const [item, location] = await Promise.all([
+      this.findRequiredItem(createAdjustmentDto.itemId),
+      this.findRequiredLocation(createAdjustmentDto.locationId),
+    ]);
+
+    if (item.status !== InventoryItemStatus.ACTIVE) {
+      throw new ConflictException(
+        'Inactive inventory item cannot be adjusted.',
+      );
+    }
+
+    if (!location.isActive) {
+      throw new ConflictException(
+        'Inactive inventory location cannot be adjusted.',
+      );
+    }
+
+    const adjustmentNumber = await this.generateAdjustmentNumber();
+    const adjustment = await this.stockAdjustmentsRepository.createAdjustment({
+      adjustmentNumber,
+      itemId: item.id,
+      locationId: location.id,
+      quantity: new Prisma.Decimal(createAdjustmentDto.quantity),
+      reason: this.normalizeRequiredString(
+        createAdjustmentDto.reason,
+        'Stock adjustment reason is required.',
+      ),
+      requestedByUserId: currentUser.sub,
+    });
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'inventory.stock.adjustment.requested',
+      entityType: 'StockAdjustment',
+      entityId: adjustment.id.toString(),
+      metadata: {
+        adjustmentNumber,
+        itemId: item.id,
+        locationId: location.id,
+        quantity: adjustment.quantity.toFixed(2),
+        reason: adjustment.reason,
+      },
+    });
+
+    return this.serializeAdjustment(adjustment);
+  }
+
+  async listStockAdjustments(
+    _currentUser: CurrentUserPayload,
+    query: GetStockAdjustmentsQueryDto,
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const [total, adjustments] =
+      await this.stockAdjustmentsRepository.listAdjustments({
+        skip: (page - 1) * limit,
+        take: limit,
+        search: this.normalizeOptionalString(query.search) ?? undefined,
+        status: query.status,
+        itemId: query.itemId,
+        locationId: query.locationId,
+      });
+
+    return {
+      items: adjustments.map((adjustment) =>
+        this.serializeAdjustment(adjustment),
+      ),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getStockAdjustmentById(
+    _currentUser: CurrentUserPayload,
+    adjustmentId: number,
+  ) {
+    return this.serializeAdjustment(
+      await this.findRequiredAdjustment(adjustmentId),
+    );
+  }
+
+  async approveStockAdjustment(
+    currentUser: CurrentUserPayload,
+    adjustmentId: number,
+    approveAdjustmentDto: ApproveStockAdjustmentDto,
+  ) {
+    const adjustment = await this.findRequiredAdjustment(adjustmentId);
+    this.assertPendingAdjustment(adjustment);
+
+    const movementNumber = await this.generateMovementNumber();
+    const result = await this.stockAdjustmentsRepository.approveAdjustment({
+      adjustmentId: adjustment.id,
+      movementNumber,
+      approvedByUserId: currentUser.sub,
+      decisionNote: this.normalizeOptionalString(
+        approveAdjustmentDto.decisionNote,
+      ),
+    });
+
+    if (result.status === 'INACTIVE') {
+      throw new ConflictException(
+        'Inventory item or location became inactive before adjustment approval.',
+      );
+    }
+
+    if (result.status === 'INSUFFICIENT') {
+      throw new ConflictException(
+        `Insufficient stock. Available quantity is ${result.availableQuantity.toFixed(2)}.`,
+      );
+    }
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'inventory.stock.adjustment.approved',
+      entityType: 'StockAdjustment',
+      entityId: result.adjustment.id.toString(),
+      metadata: {
+        adjustmentNumber: result.adjustment.adjustmentNumber,
+        movementNumber,
+        itemId: result.adjustment.itemId,
+        locationId: result.adjustment.locationId,
+        quantity: result.adjustment.quantity.toFixed(2),
+        balanceQuantity: result.balance.quantity.toFixed(2),
+      },
+    });
+
+    return {
+      adjustment: this.serializeAdjustment(result.adjustment),
+      balance: this.serializeBalance(result.balance),
+      movement: this.serializeMovement(result.movement),
+    };
+  }
+
+  async rejectStockAdjustment(
+    currentUser: CurrentUserPayload,
+    adjustmentId: number,
+    rejectAdjustmentDto: RejectStockAdjustmentDto,
+  ) {
+    const adjustment = await this.findRequiredAdjustment(adjustmentId);
+    this.assertPendingAdjustment(adjustment);
+
+    const rejectedAdjustment =
+      await this.stockAdjustmentsRepository.rejectAdjustment(adjustment.id, {
+        status: StockAdjustmentStatus.REJECTED,
+        rejectedByUserId: currentUser.sub,
+        decidedAt: new Date(),
+        decisionNote: this.normalizeRequiredString(
+          rejectAdjustmentDto.decisionNote,
+          'Stock adjustment rejection reason is required.',
+        ),
+      });
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'inventory.stock.adjustment.rejected',
+      entityType: 'StockAdjustment',
+      entityId: rejectedAdjustment.id.toString(),
+      metadata: {
+        adjustmentNumber: rejectedAdjustment.adjustmentNumber,
+        decisionNote: rejectedAdjustment.decisionNote,
+      },
+    });
+
+    return this.serializeAdjustment(rejectedAdjustment);
+  }
+
+  async cancelStockAdjustment(
+    currentUser: CurrentUserPayload,
+    adjustmentId: number,
+    cancelAdjustmentDto: CancelStockAdjustmentDto,
+  ) {
+    const adjustment = await this.findRequiredAdjustment(adjustmentId);
+    this.assertPendingAdjustment(adjustment);
+
+    const cancelledAdjustment =
+      await this.stockAdjustmentsRepository.cancelAdjustment(adjustment.id, {
+        status: StockAdjustmentStatus.CANCELLED,
+        rejectedByUserId: currentUser.sub,
+        decidedAt: new Date(),
+        decisionNote: this.normalizeRequiredString(
+          cancelAdjustmentDto.decisionNote,
+          'Stock adjustment cancellation reason is required.',
+        ),
+      });
+
+    await this.auditLogsService.record({
+      actorUserId: currentUser.sub,
+      action: 'inventory.stock.adjustment.cancelled',
+      entityType: 'StockAdjustment',
+      entityId: cancelledAdjustment.id.toString(),
+      metadata: {
+        adjustmentNumber: cancelledAdjustment.adjustmentNumber,
+        decisionNote: cancelledAdjustment.decisionNote,
+      },
+    });
+
+    return this.serializeAdjustment(cancelledAdjustment);
   }
 
   async createItem(
@@ -633,6 +941,25 @@ export class InventoryService {
     return item;
   }
 
+  private async findRequiredAdjustment(adjustmentId: number) {
+    const adjustment =
+      await this.stockAdjustmentsRepository.findAdjustment(adjustmentId);
+
+    if (!adjustment) {
+      throw new NotFoundException('Stock adjustment was not found.');
+    }
+
+    return adjustment;
+  }
+
+  private assertPendingAdjustment(adjustment: StockAdjustmentRecord) {
+    if (adjustment.status !== StockAdjustmentStatus.PENDING) {
+      throw new ConflictException(
+        'Only pending stock adjustments can be decided.',
+      );
+    }
+  }
+
   private normalizeItemNumber(value: string) {
     return this.normalizeRequiredString(
       value,
@@ -699,6 +1026,17 @@ export class InventoryService {
       quantity: movement.quantity.toFixed(2),
       unitCost: movement.unitCost?.toFixed(2) ?? null,
       totalCost: movement.totalCost?.toFixed(2) ?? null,
+    };
+  }
+
+  private serializeAdjustment(adjustment: StockAdjustmentRecord) {
+    return {
+      ...adjustment,
+      quantity: adjustment.quantity.toFixed(2),
+      item: {
+        ...adjustment.item,
+        averageCost: adjustment.item.averageCost?.toFixed(2) ?? null,
+      },
     };
   }
 
@@ -773,5 +1111,26 @@ export class InventoryService {
     }
 
     throw new ConflictException('Unable to generate a unique movement number.');
+  }
+
+  private async generateAdjustmentNumber() {
+    const datePart = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const sequence = `${Date.now().toString().slice(-6)}${attempt}`.slice(-6);
+      const adjustmentNumber = `ADJ-${datePart}-${sequence}`;
+      const existing =
+        await this.stockAdjustmentsRepository.findByAdjustmentNumber(
+          adjustmentNumber,
+        );
+
+      if (!existing) {
+        return adjustmentNumber;
+      }
+    }
+
+    throw new ConflictException(
+      'Unable to generate a unique adjustment number.',
+    );
   }
 }

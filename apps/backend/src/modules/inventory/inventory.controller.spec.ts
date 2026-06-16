@@ -27,6 +27,13 @@ describe('InventoryController', () => {
     listStockMovements: jest.Mock;
     receiveStock: jest.Mock;
     issueStock: jest.Mock;
+    transferStock: jest.Mock;
+    createStockAdjustment: jest.Mock;
+    listStockAdjustments: jest.Mock;
+    getStockAdjustmentById: jest.Mock;
+    approveStockAdjustment: jest.Mock;
+    rejectStockAdjustment: jest.Mock;
+    cancelStockAdjustment: jest.Mock;
   };
 
   const currentUser = {
@@ -55,6 +62,13 @@ describe('InventoryController', () => {
       listStockMovements: jest.fn(),
       receiveStock: jest.fn(),
       issueStock: jest.fn(),
+      transferStock: jest.fn(),
+      createStockAdjustment: jest.fn(),
+      listStockAdjustments: jest.fn(),
+      getStockAdjustmentById: jest.fn(),
+      approveStockAdjustment: jest.fn(),
+      rejectStockAdjustment: jest.fn(),
+      cancelStockAdjustment: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -151,7 +165,7 @@ describe('InventoryController', () => {
     ).toEqual(['inventory.items.delete']);
   });
 
-  it('declares stock read, receive, and issue permissions', () => {
+  it('declares stock operation permissions', () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSIONS_KEY,
@@ -182,6 +196,36 @@ describe('InventoryController', () => {
         InventoryController.prototype.issueStock,
       ),
     ).toEqual(['inventory.stock.issue']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.transferStock,
+      ),
+    ).toEqual(['inventory.stock.transfer']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.createStockAdjustment,
+      ),
+    ).toEqual(['inventory.stock.adjust.request']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.approveStockAdjustment,
+      ),
+    ).toEqual(['inventory.stock.adjust.approve']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.rejectStockAdjustment,
+      ),
+    ).toEqual(['inventory.stock.adjust.approve']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.cancelStockAdjustment,
+      ),
+    ).toEqual(['inventory.stock.adjust.request']);
   });
 
   it('delegates stock balance and movement queries', async () => {
@@ -240,6 +284,82 @@ describe('InventoryController', () => {
     await controller.issueStock(currentUser, dto);
 
     expect(inventoryService.issueStock).toHaveBeenCalledWith(currentUser, dto);
+  });
+
+  it('delegates stock transfer creation', async () => {
+    const dto = {
+      itemId: 7,
+      fromLocationId: 4,
+      toLocationId: 5,
+      quantity: 8,
+    };
+    inventoryService.transferStock.mockResolvedValue({
+      transferOutMovement: { id: 11 },
+    });
+
+    await controller.transferStock(currentUser, dto);
+
+    expect(inventoryService.transferStock).toHaveBeenCalledWith(
+      currentUser,
+      dto,
+    );
+  });
+
+  it('delegates stock adjustment operations', async () => {
+    const createDto = {
+      itemId: 7,
+      locationId: 4,
+      quantity: -2,
+      reason: 'Physical count variance.',
+    };
+    const query = { page: 1, limit: 20 };
+    inventoryService.createStockAdjustment.mockResolvedValue({ id: 3 });
+    inventoryService.listStockAdjustments.mockResolvedValue({ items: [] });
+    inventoryService.getStockAdjustmentById.mockResolvedValue({ id: 3 });
+    inventoryService.approveStockAdjustment.mockResolvedValue({ id: 3 });
+    inventoryService.rejectStockAdjustment.mockResolvedValue({ id: 3 });
+    inventoryService.cancelStockAdjustment.mockResolvedValue({ id: 3 });
+
+    await controller.createStockAdjustment(currentUser, createDto);
+    await controller.listStockAdjustments(currentUser, query);
+    await controller.getStockAdjustmentById(currentUser, 3);
+    await controller.approveStockAdjustment(currentUser, 3, {
+      decisionNote: 'Approved.',
+    });
+    await controller.rejectStockAdjustment(currentUser, 3, {
+      decisionNote: 'Rejected.',
+    });
+    await controller.cancelStockAdjustment(currentUser, 3, {
+      decisionNote: 'Cancelled.',
+    });
+
+    expect(inventoryService.createStockAdjustment).toHaveBeenCalledWith(
+      currentUser,
+      createDto,
+    );
+    expect(inventoryService.listStockAdjustments).toHaveBeenCalledWith(
+      currentUser,
+      query,
+    );
+    expect(inventoryService.getStockAdjustmentById).toHaveBeenCalledWith(
+      currentUser,
+      3,
+    );
+    expect(inventoryService.approveStockAdjustment).toHaveBeenCalledWith(
+      currentUser,
+      3,
+      { decisionNote: 'Approved.' },
+    );
+    expect(inventoryService.rejectStockAdjustment).toHaveBeenCalledWith(
+      currentUser,
+      3,
+      { decisionNote: 'Rejected.' },
+    );
+    expect(inventoryService.cancelStockAdjustment).toHaveBeenCalledWith(
+      currentUser,
+      3,
+      { decisionNote: 'Cancelled.' },
+    );
   });
 
   it('delegates inventory item operations to InventoryService', async () => {

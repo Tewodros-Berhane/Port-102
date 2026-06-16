@@ -1,20 +1,27 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import {
   InventoryItemStatus,
   InventoryItemType,
   Prisma,
+  StockAdjustmentStatus,
   StockMovementType,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { InventoryService } from './inventory.service';
 import { InventoryItemsRepository } from './repositories/inventory-items.repository';
 import { InventoryLocationsRepository } from './repositories/inventory-locations.repository';
+import { StockAdjustmentsRepository } from './repositories/stock-adjustments.repository';
 import { StockBalancesRepository } from './repositories/stock-balances.repository';
 import { StockIssuesRepository } from './repositories/stock-issues.repository';
 import { StockMovementsRepository } from './repositories/stock-movements.repository';
 import { StockReceiptsRepository } from './repositories/stock-receipts.repository';
+import { StockTransfersRepository } from './repositories/stock-transfers.repository';
 
 describe('InventoryService', () => {
   let service: InventoryService;
@@ -44,6 +51,18 @@ describe('InventoryService', () => {
   };
   let issuesRepository: {
     issueStock: jest.Mock;
+  };
+  let transfersRepository: {
+    transferStock: jest.Mock;
+  };
+  let adjustmentsRepository: {
+    listAdjustments: jest.Mock;
+    findAdjustment: jest.Mock;
+    findByAdjustmentNumber: jest.Mock;
+    createAdjustment: jest.Mock;
+    approveAdjustment: jest.Mock;
+    rejectAdjustment: jest.Mock;
+    cancelAdjustment: jest.Mock;
   };
   let auditLogsService: { record: jest.Mock };
 
@@ -85,6 +104,39 @@ describe('InventoryService', () => {
     reorderQuantity: '100.00',
     averageCost: '145.50',
   };
+  const adjustmentRecord = {
+    id: 3,
+    adjustmentNumber: 'ADJ-20260616-000001',
+    itemId: 7,
+    locationId: 4,
+    status: StockAdjustmentStatus.PENDING,
+    quantity: new Prisma.Decimal(-2),
+    reason: 'Physical count variance.',
+    requestedByUserId: 1,
+    approvedByUserId: null,
+    rejectedByUserId: null,
+    decidedAt: null,
+    decisionNote: null,
+    createdAt: new Date('2026-06-16T06:00:00.000Z'),
+    updatedAt: new Date('2026-06-16T06:00:00.000Z'),
+    item: {
+      id: 7,
+      itemNumber: item.itemNumber,
+      name: item.name,
+      unitOfMeasure: item.unitOfMeasure,
+      averageCost: item.averageCost,
+      status: item.status,
+    },
+    location: {
+      id: 4,
+      code: location.code,
+      name: location.name,
+      isActive: true,
+    },
+    requestedBy: null,
+    approvedBy: null,
+    rejectedBy: null,
+  };
 
   beforeEach(async () => {
     locationsRepository = {
@@ -114,6 +166,18 @@ describe('InventoryService', () => {
     issuesRepository = {
       issueStock: jest.fn(),
     };
+    transfersRepository = {
+      transferStock: jest.fn(),
+    };
+    adjustmentsRepository = {
+      listAdjustments: jest.fn(),
+      findAdjustment: jest.fn(),
+      findByAdjustmentNumber: jest.fn(),
+      createAdjustment: jest.fn(),
+      approveAdjustment: jest.fn(),
+      rejectAdjustment: jest.fn(),
+      cancelAdjustment: jest.fn(),
+    };
     auditLogsService = {
       record: jest.fn(),
     };
@@ -130,6 +194,10 @@ describe('InventoryService', () => {
           useValue: itemsRepository,
         },
         {
+          provide: StockAdjustmentsRepository,
+          useValue: adjustmentsRepository,
+        },
+        {
           provide: StockBalancesRepository,
           useValue: balancesRepository,
         },
@@ -144,6 +212,10 @@ describe('InventoryService', () => {
         {
           provide: StockIssuesRepository,
           useValue: issuesRepository,
+        },
+        {
+          provide: StockTransfersRepository,
+          useValue: transfersRepository,
         },
         {
           provide: AuditLogsService,
@@ -589,6 +661,356 @@ describe('InventoryService', () => {
       }),
     ).rejects.toThrow(
       'Inventory item or location became inactive before stock was issued.',
+    );
+  });
+
+  it('transfers stock between active locations and records an audit log', async () => {
+    const toLocation = { ...location, id: 5, code: 'KITCHEN' };
+    itemsRepository.findItem.mockResolvedValue(item);
+    locationsRepository.findLocation
+      .mockResolvedValueOnce(location)
+      .mockResolvedValueOnce(toLocation);
+    movementsRepository.findByMovementNumber.mockResolvedValue(null);
+    const transferOutMovement = {
+      id: 11,
+      movementNumber: 'MOV-20260616-000001',
+      itemId: 7,
+      locationId: null,
+      fromLocationId: 4,
+      toLocationId: 5,
+      type: StockMovementType.TRANSFER_OUT,
+      quantity: new Prisma.Decimal(8),
+      unitCost: item.averageCost,
+      totalCost: new Prisma.Decimal(1164),
+      referenceType: null,
+      referenceId: null,
+      reason: null,
+      notes: null,
+      createdByUserId: 1,
+      createdAt: new Date(),
+      item: {
+        id: 7,
+        itemNumber: item.itemNumber,
+        name: item.name,
+        unitOfMeasure: item.unitOfMeasure,
+      },
+      location: null,
+      fromLocation: { id: 4, code: location.code, name: location.name },
+      toLocation: { id: 5, code: toLocation.code, name: toLocation.name },
+      createdBy: null,
+    };
+    const transferInMovement = {
+      ...transferOutMovement,
+      id: 12,
+      movementNumber: 'MOV-20260616-000002',
+      type: StockMovementType.TRANSFER_IN,
+    };
+    const fromBalance = {
+      id: 1,
+      itemId: 7,
+      locationId: 4,
+      quantity: new Prisma.Decimal(12),
+      updatedAt: new Date(),
+      item: {
+        id: 7,
+        itemNumber: item.itemNumber,
+        name: item.name,
+        type: item.type,
+        category: item.category,
+        unitOfMeasure: item.unitOfMeasure,
+        averageCost: item.averageCost,
+        status: item.status,
+      },
+      location: {
+        id: 4,
+        code: location.code,
+        name: location.name,
+        isActive: true,
+      },
+    };
+    const toBalance = {
+      ...fromBalance,
+      id: 2,
+      locationId: 5,
+      quantity: new Prisma.Decimal(8),
+      location: {
+        id: 5,
+        code: toLocation.code,
+        name: toLocation.name,
+        isActive: true,
+      },
+    };
+    transfersRepository.transferStock.mockResolvedValue({
+      status: 'TRANSFERRED',
+      fromBalance,
+      toBalance,
+      transferOutMovement,
+      transferInMovement,
+    });
+
+    const result = await service.transferStock(currentUser, {
+      itemId: 7,
+      fromLocationId: 4,
+      toLocationId: 5,
+      quantity: 8,
+    });
+
+    expect(result.fromBalance.quantity).toBe('12.00');
+    expect(result.toBalance.quantity).toBe('8.00');
+    expect(result.transferOutMovement.type).toBe(
+      StockMovementType.TRANSFER_OUT,
+    );
+    expect(transfersRepository.transferStock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 7,
+        fromLocationId: 4,
+        toLocationId: 5,
+        quantity: new Prisma.Decimal(8),
+        createdByUserId: currentUser.sub,
+      }),
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'inventory.stock.transferred',
+        entityType: 'StockMovement',
+        entityId: '11',
+      }),
+    );
+  });
+
+  it('rejects transfers between the same location', async () => {
+    await expect(
+      service.transferStock(currentUser, {
+        itemId: 7,
+        fromLocationId: 4,
+        toLocationId: 4,
+        quantity: 1,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(transfersRepository.transferStock).not.toHaveBeenCalled();
+  });
+
+  it('reports available quantity when transfer stock is insufficient', async () => {
+    itemsRepository.findItem.mockResolvedValue(item);
+    locationsRepository.findLocation
+      .mockResolvedValueOnce(location)
+      .mockResolvedValueOnce({ ...location, id: 5, code: 'KITCHEN' });
+    movementsRepository.findByMovementNumber.mockResolvedValue(null);
+    transfersRepository.transferStock.mockResolvedValue({
+      status: 'INSUFFICIENT',
+      availableQuantity: new Prisma.Decimal(2),
+    });
+
+    await expect(
+      service.transferStock(currentUser, {
+        itemId: 7,
+        fromLocationId: 4,
+        toLocationId: 5,
+        quantity: 8,
+      }),
+    ).rejects.toThrow('Insufficient stock. Available quantity is 2.00.');
+  });
+
+  it('creates a pending stock adjustment and records an audit log', async () => {
+    itemsRepository.findItem.mockResolvedValue(item);
+    locationsRepository.findLocation.mockResolvedValue(location);
+    adjustmentsRepository.findByAdjustmentNumber.mockResolvedValue(null);
+    adjustmentsRepository.createAdjustment.mockResolvedValue(adjustmentRecord);
+
+    await expect(
+      service.createStockAdjustment(currentUser, {
+        itemId: 7,
+        locationId: 4,
+        quantity: -2,
+        reason: ' Physical count variance. ',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        adjustmentNumber: 'ADJ-20260616-000001',
+        quantity: '-2.00',
+      }),
+    );
+    expect(adjustmentsRepository.createAdjustment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 7,
+        locationId: 4,
+        quantity: new Prisma.Decimal(-2),
+        reason: 'Physical count variance.',
+        requestedByUserId: currentUser.sub,
+      }),
+    );
+    expect(auditLogsService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'inventory.stock.adjustment.requested',
+        entityType: 'StockAdjustment',
+      }),
+    );
+  });
+
+  it('lists and reads stock adjustments', async () => {
+    adjustmentsRepository.listAdjustments.mockResolvedValue([
+      1,
+      [adjustmentRecord],
+    ]);
+    adjustmentsRepository.findAdjustment.mockResolvedValue(adjustmentRecord);
+
+    await expect(
+      service.listStockAdjustments(currentUser, {
+        page: 2,
+        limit: 10,
+        search: ' rice ',
+        status: StockAdjustmentStatus.PENDING,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        items: [expect.objectContaining({ quantity: '-2.00' })],
+      }),
+    );
+    await expect(
+      service.getStockAdjustmentById(currentUser, 3),
+    ).resolves.toEqual(expect.objectContaining({ quantity: '-2.00' }));
+    expect(adjustmentsRepository.listAdjustments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 10,
+        take: 10,
+        search: 'rice',
+        status: StockAdjustmentStatus.PENDING,
+      }),
+    );
+  });
+
+  it('approves a pending stock adjustment and records the applied movement', async () => {
+    adjustmentsRepository.findAdjustment.mockResolvedValue(adjustmentRecord);
+    movementsRepository.findByMovementNumber.mockResolvedValue(null);
+    const balance = {
+      id: 1,
+      itemId: 7,
+      locationId: 4,
+      quantity: new Prisma.Decimal(8),
+      updatedAt: new Date(),
+      item: {
+        id: 7,
+        itemNumber: item.itemNumber,
+        name: item.name,
+        type: item.type,
+        category: item.category,
+        unitOfMeasure: item.unitOfMeasure,
+        averageCost: item.averageCost,
+        status: item.status,
+      },
+      location: {
+        id: 4,
+        code: location.code,
+        name: location.name,
+        isActive: true,
+      },
+    };
+    const movement = {
+      id: 14,
+      movementNumber: 'MOV-20260616-000003',
+      itemId: 7,
+      locationId: 4,
+      fromLocationId: null,
+      toLocationId: null,
+      type: StockMovementType.ADJUSTMENT_OUT,
+      quantity: new Prisma.Decimal(2),
+      unitCost: item.averageCost,
+      totalCost: new Prisma.Decimal(291),
+      referenceType: 'STOCK_ADJUSTMENT',
+      referenceId: 3,
+      reason: adjustmentRecord.reason,
+      notes: 'Approved.',
+      createdByUserId: 1,
+      createdAt: new Date(),
+      item: {
+        id: 7,
+        itemNumber: item.itemNumber,
+        name: item.name,
+        unitOfMeasure: item.unitOfMeasure,
+      },
+      location: { id: 4, code: location.code, name: location.name },
+      fromLocation: null,
+      toLocation: null,
+      createdBy: null,
+    };
+    adjustmentsRepository.approveAdjustment.mockResolvedValue({
+      status: 'APPROVED',
+      adjustment: {
+        ...adjustmentRecord,
+        status: StockAdjustmentStatus.APPROVED,
+      },
+      balance,
+      movement,
+    });
+
+    const result = await service.approveStockAdjustment(currentUser, 3, {
+      decisionNote: ' Approved. ',
+    });
+
+    expect(result.adjustment.status).toBe(StockAdjustmentStatus.APPROVED);
+    expect(result.balance.quantity).toBe('8.00');
+    expect(result.movement.type).toBe(StockMovementType.ADJUSTMENT_OUT);
+    expect(adjustmentsRepository.approveAdjustment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adjustmentId: 3,
+        approvedByUserId: currentUser.sub,
+        decisionNote: 'Approved.',
+      }),
+    );
+  });
+
+  it('rejects approval for non-pending adjustments', async () => {
+    adjustmentsRepository.findAdjustment.mockResolvedValue({
+      ...adjustmentRecord,
+      status: StockAdjustmentStatus.APPROVED,
+    });
+
+    await expect(
+      service.approveStockAdjustment(currentUser, 3, {}),
+    ).rejects.toThrow('Only pending stock adjustments can be decided.');
+  });
+
+  it('rejects and cancels pending stock adjustments without stock movement', async () => {
+    adjustmentsRepository.findAdjustment.mockResolvedValue(adjustmentRecord);
+    adjustmentsRepository.rejectAdjustment.mockResolvedValue({
+      ...adjustmentRecord,
+      status: StockAdjustmentStatus.REJECTED,
+      decisionNote: 'Rejected.',
+    });
+    adjustmentsRepository.cancelAdjustment.mockResolvedValue({
+      ...adjustmentRecord,
+      status: StockAdjustmentStatus.CANCELLED,
+      decisionNote: 'Cancelled.',
+    });
+
+    await expect(
+      service.rejectStockAdjustment(currentUser, 3, {
+        decisionNote: ' Rejected. ',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({ status: StockAdjustmentStatus.REJECTED }),
+    );
+    await expect(
+      service.cancelStockAdjustment(currentUser, 3, {
+        decisionNote: ' Cancelled. ',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({ status: StockAdjustmentStatus.CANCELLED }),
+    );
+    expect(adjustmentsRepository.rejectAdjustment).toHaveBeenCalledWith(
+      3,
+      expect.objectContaining({
+        status: StockAdjustmentStatus.REJECTED,
+        decisionNote: 'Rejected.',
+      }),
+    );
+    expect(adjustmentsRepository.cancelAdjustment).toHaveBeenCalledWith(
+      3,
+      expect.objectContaining({
+        status: StockAdjustmentStatus.CANCELLED,
+        decisionNote: 'Cancelled.',
+      }),
     );
   });
 
