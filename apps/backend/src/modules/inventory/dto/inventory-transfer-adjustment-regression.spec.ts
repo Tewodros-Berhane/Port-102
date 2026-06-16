@@ -512,3 +512,11 @@ describe('Zero adjustment rejection 6', () => {
     expect(errors.some((error) => error.property === 'quantity')).toBe(true);
   });
 });
+
+describe('Stock adjustment decision validation for approval', () => {
+  it('accepts omitted approval notes', async () => {
+    const dto = plainToInstance(ApproveStockAdjustmentDto, {});
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
+});
