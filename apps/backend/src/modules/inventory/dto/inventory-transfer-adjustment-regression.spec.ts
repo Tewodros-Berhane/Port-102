@@ -260,3 +260,17 @@ describe('Same-location transfer rejection 8', () => {
     expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
   });
 });
+
+describe('Negative adjustment request 1', () => {
+  it('accepts signed decrease adjustment quantity -1', async () => {
+    const dto = plainToInstance(CreateStockAdjustmentDto, {
+      itemId: 7,
+      locationId: 4,
+      quantity: -1,
+      reason: 'Physical count variance 1.',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.quantity).toBe(-1);
+  });
+});
