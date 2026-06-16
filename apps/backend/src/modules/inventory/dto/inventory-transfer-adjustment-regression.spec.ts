@@ -642,3 +642,17 @@ describe('Stock adjustment query pagination 2', () => {
     expect(dto).toMatchObject({ page: 2, limit: 20, itemId: 7, locationId: 4 });
   });
 });
+
+describe('Stock adjustment query pagination 3', () => {
+  it('transforms page and limit set 3', async () => {
+    const dto = plainToInstance(GetStockAdjustmentsQueryDto, {
+      page: '3',
+      limit: '30',
+      itemId: '7',
+      locationId: '4',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toMatchObject({ page: 3, limit: 30, itemId: 7, locationId: 4 });
+  });
+});
