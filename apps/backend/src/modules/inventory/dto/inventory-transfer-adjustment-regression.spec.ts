@@ -35,12 +35,12 @@ describe('Transfer quantity acceptance 1', () => {
       itemId: 7,
       fromLocationId: 4,
       toLocationId: 11,
-      quantity: 1.50,
+      quantity: 1.5,
       referenceType: 'STORE_REPLENISHMENT',
     });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
-    expect(dto.quantity).toBe(1.50);
+    expect(dto.quantity).toBe(1.5);
   });
 });
 
@@ -50,12 +50,12 @@ describe('Transfer quantity acceptance 2', () => {
       itemId: 7,
       fromLocationId: 4,
       toLocationId: 12,
-      quantity: 2.50,
+      quantity: 2.5,
       referenceType: 'STORE_REPLENISHMENT',
     });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
-    expect(dto.quantity).toBe(2.50);
+    expect(dto.quantity).toBe(2.5);
   });
 });
 
@@ -65,12 +65,12 @@ describe('Transfer quantity acceptance 3', () => {
       itemId: 7,
       fromLocationId: 4,
       toLocationId: 13,
-      quantity: 3.50,
+      quantity: 3.5,
       referenceType: 'STORE_REPLENISHMENT',
     });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
-    expect(dto.quantity).toBe(3.50);
+    expect(dto.quantity).toBe(3.5);
   });
 });
 
@@ -80,12 +80,12 @@ describe('Transfer quantity acceptance 4', () => {
       itemId: 7,
       fromLocationId: 4,
       toLocationId: 14,
-      quantity: 4.50,
+      quantity: 4.5,
       referenceType: 'STORE_REPLENISHMENT',
     });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
-    expect(dto.quantity).toBe(4.50);
+    expect(dto.quantity).toBe(4.5);
   });
 });
 
@@ -95,12 +95,12 @@ describe('Transfer quantity acceptance 5', () => {
       itemId: 7,
       fromLocationId: 4,
       toLocationId: 15,
-      quantity: 5.50,
+      quantity: 5.5,
       referenceType: 'STORE_REPLENISHMENT',
     });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
-    expect(dto.quantity).toBe(5.50);
+    expect(dto.quantity).toBe(5.5);
   });
 });
 
@@ -110,12 +110,12 @@ describe('Transfer quantity acceptance 6', () => {
       itemId: 7,
       fromLocationId: 4,
       toLocationId: 16,
-      quantity: 6.50,
+      quantity: 6.5,
       referenceType: 'STORE_REPLENISHMENT',
     });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
-    expect(dto.quantity).toBe(6.50);
+    expect(dto.quantity).toBe(6.5);
   });
 });
 
@@ -125,12 +125,12 @@ describe('Transfer quantity acceptance 7', () => {
       itemId: 7,
       fromLocationId: 4,
       toLocationId: 17,
-      quantity: 7.50,
+      quantity: 7.5,
       referenceType: 'STORE_REPLENISHMENT',
     });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
-    expect(dto.quantity).toBe(7.50);
+    expect(dto.quantity).toBe(7.5);
   });
 });
 
@@ -140,12 +140,12 @@ describe('Transfer quantity acceptance 8', () => {
       itemId: 7,
       fromLocationId: 4,
       toLocationId: 18,
-      quantity: 8.50,
+      quantity: 8.5,
       referenceType: 'STORE_REPLENISHMENT',
     });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
-    expect(dto.quantity).toBe(8.50);
+    expect(dto.quantity).toBe(8.5);
   });
 });
 
@@ -159,7 +159,9 @@ describe('Same-location transfer rejection 1', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
+    expect(errors.some((error) => error.property === 'toLocationId')).toBe(
+      true,
+    );
   });
 });
 
@@ -173,7 +175,9 @@ describe('Same-location transfer rejection 2', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
+    expect(errors.some((error) => error.property === 'toLocationId')).toBe(
+      true,
+    );
   });
 });
 
@@ -187,7 +191,9 @@ describe('Same-location transfer rejection 3', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
+    expect(errors.some((error) => error.property === 'toLocationId')).toBe(
+      true,
+    );
   });
 });
 
@@ -201,7 +207,9 @@ describe('Same-location transfer rejection 4', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
+    expect(errors.some((error) => error.property === 'toLocationId')).toBe(
+      true,
+    );
   });
 });
 
@@ -215,7 +223,9 @@ describe('Same-location transfer rejection 5', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
+    expect(errors.some((error) => error.property === 'toLocationId')).toBe(
+      true,
+    );
   });
 });
 
@@ -229,7 +239,9 @@ describe('Same-location transfer rejection 6', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
+    expect(errors.some((error) => error.property === 'toLocationId')).toBe(
+      true,
+    );
   });
 });
 
@@ -243,7 +255,9 @@ describe('Same-location transfer rejection 7', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
+    expect(errors.some((error) => error.property === 'toLocationId')).toBe(
+      true,
+    );
   });
 });
 
@@ -257,7 +271,9 @@ describe('Same-location transfer rejection 8', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
+    expect(errors.some((error) => error.property === 'toLocationId')).toBe(
+      true,
+    );
   });
 });
 
@@ -523,7 +539,9 @@ describe('Stock adjustment decision validation for approval', () => {
 
 describe('Stock adjustment decision validation for approval note', () => {
   it('accepts a non-empty optional approval note', async () => {
-    const dto = plainToInstance(ApproveStockAdjustmentDto, { decisionNote: 'Approved after recount.' });
+    const dto = plainToInstance(ApproveStockAdjustmentDto, {
+      decisionNote: 'Approved after recount.',
+    });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
@@ -534,13 +552,17 @@ describe('Stock adjustment decision validation for rejection', () => {
     const dto = plainToInstance(RejectStockAdjustmentDto, { decisionNote: '' });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'decisionNote')).toBe(true);
+    expect(errors.some((error) => error.property === 'decisionNote')).toBe(
+      true,
+    );
   });
 });
 
 describe('Stock adjustment decision validation for rejection note', () => {
   it('accepts a non-empty rejection note', async () => {
-    const dto = plainToInstance(RejectStockAdjustmentDto, { decisionNote: 'Reviewed by supervisor.' });
+    const dto = plainToInstance(RejectStockAdjustmentDto, {
+      decisionNote: 'Reviewed by supervisor.',
+    });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
@@ -551,13 +573,17 @@ describe('Stock adjustment decision validation for cancellation', () => {
     const dto = plainToInstance(CancelStockAdjustmentDto, { decisionNote: '' });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'decisionNote')).toBe(true);
+    expect(errors.some((error) => error.property === 'decisionNote')).toBe(
+      true,
+    );
   });
 });
 
 describe('Stock adjustment decision validation for cancellation note', () => {
   it('accepts a non-empty cancellation note', async () => {
-    const dto = plainToInstance(CancelStockAdjustmentDto, { decisionNote: 'Reviewed by supervisor.' });
+    const dto = plainToInstance(CancelStockAdjustmentDto, {
+      decisionNote: 'Reviewed by supervisor.',
+    });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
@@ -696,6 +722,25 @@ describe('Transfer metadata validation 1', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'referenceType')).toBe(true);
+    expect(errors.some((error) => error.property === 'referenceType')).toBe(
+      true,
+    );
+  });
+});
+
+describe('Transfer metadata validation 2', () => {
+  it('rejects oversized transfer metadata field 2', async () => {
+    const dto = plainToInstance(TransferStockDto, {
+      itemId: 7,
+      fromLocationId: 4,
+      toLocationId: 5,
+      quantity: 1,
+      referenceType: 'R'.repeat(81),
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'referenceType')).toBe(
+      true,
+    );
   });
 });
