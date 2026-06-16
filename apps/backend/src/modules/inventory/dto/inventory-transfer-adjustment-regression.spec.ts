@@ -575,3 +575,16 @@ describe('Stock adjustment query status PENDING', () => {
     expect(dto.status).toBe(StockAdjustmentStatus.PENDING);
   });
 });
+
+describe('Stock adjustment query status APPROVED', () => {
+  it('accepts APPROVED adjustment status filters', async () => {
+    const dto = plainToInstance(GetStockAdjustmentsQueryDto, {
+      status: StockAdjustmentStatus.APPROVED,
+      page: '1',
+      limit: '20',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.status).toBe(StockAdjustmentStatus.APPROVED);
+  });
+});
