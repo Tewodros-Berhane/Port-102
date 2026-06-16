@@ -537,3 +537,11 @@ describe('Stock adjustment decision validation for rejection', () => {
     expect(errors.some((error) => error.property === 'decisionNote')).toBe(true);
   });
 });
+
+describe('Stock adjustment decision validation for rejection note', () => {
+  it('accepts a non-empty rejection note', async () => {
+    const dto = plainToInstance(RejectStockAdjustmentDto, { decisionNote: 'Reviewed by supervisor.' });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
+});
