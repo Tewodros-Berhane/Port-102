@@ -372,3 +372,17 @@ describe('Positive adjustment request 2', () => {
     expect(dto.quantity).toBe(2);
   });
 });
+
+describe('Positive adjustment request 3', () => {
+  it('accepts signed increase adjustment quantity 3', async () => {
+    const dto = plainToInstance(CreateStockAdjustmentDto, {
+      itemId: 7,
+      locationId: 4,
+      quantity: 3,
+      reason: 'Found stock variance 3.',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.quantity).toBe(3);
+  });
+});
