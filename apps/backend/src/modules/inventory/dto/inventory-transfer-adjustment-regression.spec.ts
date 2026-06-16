@@ -614,3 +614,17 @@ describe('Stock adjustment query status CANCELLED', () => {
     expect(dto.status).toBe(StockAdjustmentStatus.CANCELLED);
   });
 });
+
+describe('Stock adjustment query pagination 1', () => {
+  it('transforms page and limit set 1', async () => {
+    const dto = plainToInstance(GetStockAdjustmentsQueryDto, {
+      page: '1',
+      limit: '10',
+      itemId: '7',
+      locationId: '4',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toMatchObject({ page: 1, limit: 10, itemId: 7, locationId: 4 });
+  });
+});
