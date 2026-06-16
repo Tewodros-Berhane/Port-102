@@ -274,3 +274,17 @@ describe('Negative adjustment request 1', () => {
     expect(dto.quantity).toBe(-1);
   });
 });
+
+describe('Negative adjustment request 2', () => {
+  it('accepts signed decrease adjustment quantity -2', async () => {
+    const dto = plainToInstance(CreateStockAdjustmentDto, {
+      itemId: 7,
+      locationId: 4,
+      quantity: -2,
+      reason: 'Physical count variance 2.',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.quantity).toBe(-2);
+  });
+});
