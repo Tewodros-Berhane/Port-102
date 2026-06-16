@@ -684,3 +684,18 @@ describe('Stock adjustment query pagination 5', () => {
     expect(dto).toMatchObject({ page: 5, limit: 50, itemId: 7, locationId: 4 });
   });
 });
+
+describe('Transfer metadata validation 1', () => {
+  it('rejects oversized transfer metadata field 1', async () => {
+    const dto = plainToInstance(TransferStockDto, {
+      itemId: 7,
+      fromLocationId: 4,
+      toLocationId: 5,
+      quantity: 1,
+      referenceType: 'R'.repeat(81),
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'referenceType')).toBe(true);
+  });
+});
