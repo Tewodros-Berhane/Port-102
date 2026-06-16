@@ -470,3 +470,17 @@ describe('Zero adjustment rejection 3', () => {
     expect(errors.some((error) => error.property === 'quantity')).toBe(true);
   });
 });
+
+describe('Zero adjustment rejection 4', () => {
+  it('rejects a zero stock adjustment for item 4', async () => {
+    const dto = plainToInstance(CreateStockAdjustmentDto, {
+      itemId: 4,
+      locationId: 4,
+      quantity: 0,
+      reason: 'No variance.',
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'quantity')).toBe(true);
+  });
+});
