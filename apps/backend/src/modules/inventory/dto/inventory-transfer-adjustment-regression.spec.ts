@@ -520,3 +520,11 @@ describe('Stock adjustment decision validation for approval', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
 });
+
+describe('Stock adjustment decision validation for approval note', () => {
+  it('accepts a non-empty optional approval note', async () => {
+    const dto = plainToInstance(ApproveStockAdjustmentDto, { decisionNote: 'Approved after recount.' });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
+});
