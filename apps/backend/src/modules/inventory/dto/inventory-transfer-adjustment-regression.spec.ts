@@ -28,3 +28,18 @@ describe('Inventory transfer and adjustment regression coverage', () => {
     });
   });
 });
+
+describe('Transfer quantity acceptance 1', () => {
+  it('accepts transfer quantity 1.50 for active-location movement', async () => {
+    const dto = plainToInstance(TransferStockDto, {
+      itemId: 7,
+      fromLocationId: 4,
+      toLocationId: 11,
+      quantity: 1.50,
+      referenceType: 'STORE_REPLENISHMENT',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.quantity).toBe(1.50);
+  });
+});
