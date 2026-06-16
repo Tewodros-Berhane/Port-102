@@ -162,3 +162,17 @@ describe('Same-location transfer rejection 1', () => {
     expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
   });
 });
+
+describe('Same-location transfer rejection 2', () => {
+  it('rejects transfer where both locations are 22', async () => {
+    const dto = plainToInstance(TransferStockDto, {
+      itemId: 7,
+      fromLocationId: 22,
+      toLocationId: 22,
+      quantity: 1,
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'toLocationId')).toBe(true);
+  });
+});
