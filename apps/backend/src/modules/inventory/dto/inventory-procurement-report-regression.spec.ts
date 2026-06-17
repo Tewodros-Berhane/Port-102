@@ -105,3 +105,11 @@ describe('Inventory reports and supplier regression coverage', () => {
 
     expect(errors.some((error) => error.property === 'recentMovementsLimit')).toBe(true);
   });
+  it('rejects dashboard recent movement limit 29', async () => {
+    const dto = plainToInstance(InventoryDashboardQueryDto, {
+      recentMovementsLimit: '29',
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'recentMovementsLimit')).toBe(true);
+  });
