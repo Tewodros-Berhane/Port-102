@@ -281,3 +281,11 @@ describe('Inventory reports and supplier regression coverage', () => {
 
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
+  it('accepts supplier number sup-0007', async () => {
+    const dto = plainToInstance(CreateSupplierDto, {
+      supplierNumber: 'sup-0007',
+      name: 'Supplier 7',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
