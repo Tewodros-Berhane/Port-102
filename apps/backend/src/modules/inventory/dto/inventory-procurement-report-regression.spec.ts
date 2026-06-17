@@ -72,3 +72,12 @@ describe('Inventory reports and supplier regression coverage', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
     expect(dto).toMatchObject({ locationId: 7, recentMovementsLimit: 7 });
   });
+  it('accepts dashboard recent movement limit 8', async () => {
+    const dto = plainToInstance(InventoryDashboardQueryDto, {
+      locationId: '8',
+      recentMovementsLimit: '8',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toMatchObject({ locationId: 8, recentMovementsLimit: 8 });
+  });
