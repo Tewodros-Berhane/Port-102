@@ -377,3 +377,14 @@ describe('Inventory reports and supplier regression coverage', () => {
 
     expect(errors.some((error) => error.property === 'email')).toBe(true);
   });
+  it('accepts supplier query status INACTIVE case 1', async () => {
+    const dto = plainToInstance(GetSuppliersQueryDto, {
+      page: '1',
+      limit: '20',
+      search: 'supplier',
+      status: SupplierStatus.INACTIVE,
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.status).toBe(SupplierStatus.INACTIVE);
+  });
