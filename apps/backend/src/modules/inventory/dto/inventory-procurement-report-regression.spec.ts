@@ -297,3 +297,13 @@ describe('Inventory reports and supplier regression coverage', () => {
 
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
+  it('rejects invalid supplier email 1', async () => {
+    const dto = plainToInstance(CreateSupplierDto, {
+      supplierNumber: 'SUP-BAD-1',
+      name: 'Supplier 1',
+      email: 'bad-email-1',
+    });
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'email')).toBe(true);
+  });
