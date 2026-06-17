@@ -19,9 +19,11 @@ import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { CreateInventoryLocationDto } from './dto/create-inventory-location.dto';
 import { GetInventoryItemsQueryDto } from './dto/get-inventory-items-query.dto';
 import { GetInventoryLocationsQueryDto } from './dto/get-inventory-locations-query.dto';
+import { GetReorderAlertsQueryDto } from './dto/get-reorder-alerts-query.dto';
 import { GetStockAdjustmentsQueryDto } from './dto/get-stock-adjustments-query.dto';
 import { GetStockBalancesQueryDto } from './dto/get-stock-balances-query.dto';
 import { GetStockMovementsQueryDto } from './dto/get-stock-movements-query.dto';
+import { InventoryDashboardQueryDto } from './dto/inventory-dashboard-query.dto';
 import { IssueStockDto } from './dto/issue-stock.dto';
 import { ReceiveStockDto } from './dto/receive-stock.dto';
 import { RejectStockAdjustmentDto } from './dto/reject-stock-adjustment.dto';
@@ -36,6 +38,11 @@ import {
   InventoryLocationRecord,
   InventoryLocationsRepository,
 } from './repositories/inventory-locations.repository';
+import {
+  DashboardMovementRecord,
+  InventoryReportsRepository,
+  ReorderAlertItemRecord,
+} from './repositories/inventory-reports.repository';
 import {
   StockAdjustmentRecord,
   StockAdjustmentsRepository,
@@ -57,6 +64,7 @@ export class InventoryService {
   constructor(
     private readonly inventoryLocationsRepository: InventoryLocationsRepository,
     private readonly inventoryItemsRepository: InventoryItemsRepository,
+    private readonly inventoryReportsRepository: InventoryReportsRepository,
     private readonly stockAdjustmentsRepository: StockAdjustmentsRepository,
     private readonly stockBalancesRepository: StockBalancesRepository,
     private readonly stockMovementsRepository: StockMovementsRepository,
@@ -139,6 +147,102 @@ export class InventoryService {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  async listReorderAlerts(
+    _currentUser: CurrentUserPayload,
+    query: GetReorderAlertsQueryDto,
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const search = this.normalizeOptionalString(query.search) ?? undefined;
+    const candidates =
+      await this.inventoryReportsRepository.listReorderAlertCandidates({
+        skip: (page - 1) * limit,
+        take: limit,
+        search,
+        locationId: query.locationId,
+      });
+    const totalCandidates =
+      await this.inventoryReportsRepository.countReorderAlertCandidates({
+        search,
+      });
+    const alerts = candidates
+      .map((item) => this.toReorderAlert(item, query.locationId))
+      .filter((alert) => alert !== null);
+
+    return {
+      items: alerts,
+      pagination: {
+        page,
+        limit,
+        total: totalCandidates,
+        totalPages: Math.ceil(totalCandidates / limit),
+      },
+    };
+  }
+
+  async getInventoryDashboard(
+    _currentUser: CurrentUserPayload,
+    query: InventoryDashboardQueryDto,
+  ) {
+    const recentMovementsLimit = query.recentMovementsLimit ?? 10;
+    const [
+      totalActiveItems,
+      lowStockCandidates,
+      totalStockValue,
+      recentMovements,
+      stockByItemTypeRows,
+    ] = await Promise.all([
+      this.inventoryReportsRepository.countActiveItems(),
+      this.inventoryReportsRepository.countLowStockCandidates(query.locationId),
+      this.inventoryReportsRepository.calculateStockValue(query.locationId),
+      this.inventoryReportsRepository.recentMovements(
+        recentMovementsLimit,
+        query.locationId,
+      ),
+      this.inventoryReportsRepository.stockByItemType(query.locationId),
+    ]);
+    const lowStockItems = lowStockCandidates.filter((item) => {
+      const totalQuantity = item.balances.reduce(
+        (total, balance) => total.add(balance.quantity),
+        new Prisma.Decimal(0),
+      );
+
+      return item.reorderLevel
+        ? totalQuantity.lessThanOrEqualTo(item.reorderLevel)
+        : false;
+    }).length;
+    const stockByItemType = stockByItemTypeRows.reduce<
+      Record<string, { itemCount: number; quantity: string }>
+    >((summary, item) => {
+      const quantity = item.balances.reduce(
+        (total, balance) => total.add(balance.quantity),
+        new Prisma.Decimal(0),
+      );
+      const current = summary[item.type] ?? {
+        itemCount: 0,
+        quantity: '0.00',
+      };
+      const nextQuantity = new Prisma.Decimal(current.quantity).add(quantity);
+
+      summary[item.type] = {
+        itemCount: current.itemCount + 1,
+        quantity: nextQuantity.toFixed(2),
+      };
+
+      return summary;
+    }, {});
+
+    return {
+      totalActiveItems,
+      lowStockItems,
+      totalStockValue: totalStockValue.toFixed(2),
+      recentMovements: recentMovements.map((movement) =>
+        this.serializeDashboardMovement(movement),
+      ),
+      stockByItemType,
     };
   }
 
@@ -1026,6 +1130,46 @@ export class InventoryService {
       quantity: movement.quantity.toFixed(2),
       unitCost: movement.unitCost?.toFixed(2) ?? null,
       totalCost: movement.totalCost?.toFixed(2) ?? null,
+    };
+  }
+
+  private serializeDashboardMovement(movement: DashboardMovementRecord) {
+    return {
+      ...movement,
+      quantity: movement.quantity.toFixed(2),
+      unitCost: movement.unitCost?.toFixed(2) ?? null,
+      totalCost: movement.totalCost?.toFixed(2) ?? null,
+    };
+  }
+
+  private toReorderAlert(item: ReorderAlertItemRecord, locationId?: number) {
+    const totalQuantity = item.balances.reduce(
+      (total, balance) => total.add(balance.quantity),
+      new Prisma.Decimal(0),
+    );
+
+    if (!item.reorderLevel || totalQuantity.greaterThan(item.reorderLevel)) {
+      return null;
+    }
+
+    return {
+      item: {
+        id: item.id,
+        itemNumber: item.itemNumber,
+        name: item.name,
+        type: item.type,
+        category: item.category,
+        unitOfMeasure: item.unitOfMeasure,
+        averageCost: item.averageCost?.toFixed(2) ?? null,
+      },
+      locationId: locationId ?? null,
+      currentQuantity: totalQuantity.toFixed(2),
+      reorderLevel: item.reorderLevel.toFixed(2),
+      reorderQuantity: item.reorderQuantity?.toFixed(2) ?? null,
+      locations: item.balances.map((balance) => ({
+        ...balance.location,
+        quantity: balance.quantity.toFixed(2),
+      })),
     };
   }
 

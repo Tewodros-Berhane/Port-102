@@ -22,6 +22,8 @@ describe('InventoryController', () => {
     getLocationById: jest.Mock;
     updateLocation: jest.Mock;
     deactivateLocation: jest.Mock;
+    getInventoryDashboard: jest.Mock;
+    listReorderAlerts: jest.Mock;
     listStockBalances: jest.Mock;
     getStockBalancesByItem: jest.Mock;
     listStockMovements: jest.Mock;
@@ -57,6 +59,8 @@ describe('InventoryController', () => {
       getLocationById: jest.fn(),
       updateLocation: jest.fn(),
       deactivateLocation: jest.fn(),
+      getInventoryDashboard: jest.fn(),
+      listReorderAlerts: jest.fn(),
       listStockBalances: jest.fn(),
       getStockBalancesByItem: jest.fn(),
       listStockMovements: jest.fn(),
@@ -165,6 +169,21 @@ describe('InventoryController', () => {
     ).toEqual(['inventory.items.delete']);
   });
 
+  it('declares inventory report permissions', () => {
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.getInventoryDashboard,
+      ),
+    ).toEqual(['reports.inventory.read']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        InventoryController.prototype.listReorderAlerts,
+      ),
+    ).toEqual(['inventory.reorder_alerts.read']);
+  });
+
   it('declares stock operation permissions', () => {
     expect(
       Reflect.getMetadata(
@@ -251,6 +270,27 @@ describe('InventoryController', () => {
     expect(inventoryService.listStockMovements).toHaveBeenCalledWith(
       currentUser,
       movementQuery,
+    );
+  });
+
+  it('delegates inventory dashboard and reorder alert queries', async () => {
+    const dashboardQuery = { locationId: 4, recentMovementsLimit: 5 };
+    const alertQuery = { page: 1, limit: 20, search: 'rice' };
+    inventoryService.getInventoryDashboard.mockResolvedValue({
+      totalActiveItems: 1,
+    });
+    inventoryService.listReorderAlerts.mockResolvedValue({ items: [] });
+
+    await controller.getInventoryDashboard(currentUser, dashboardQuery);
+    await controller.listReorderAlerts(currentUser, alertQuery);
+
+    expect(inventoryService.getInventoryDashboard).toHaveBeenCalledWith(
+      currentUser,
+      dashboardQuery,
+    );
+    expect(inventoryService.listReorderAlerts).toHaveBeenCalledWith(
+      currentUser,
+      alertQuery,
     );
   });
 

@@ -37,9 +37,11 @@ import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { CreateInventoryLocationDto } from './dto/create-inventory-location.dto';
 import { GetInventoryItemsQueryDto } from './dto/get-inventory-items-query.dto';
 import { GetInventoryLocationsQueryDto } from './dto/get-inventory-locations-query.dto';
+import { GetReorderAlertsQueryDto } from './dto/get-reorder-alerts-query.dto';
 import { GetStockAdjustmentsQueryDto } from './dto/get-stock-adjustments-query.dto';
 import { GetStockBalancesQueryDto } from './dto/get-stock-balances-query.dto';
 import { GetStockMovementsQueryDto } from './dto/get-stock-movements-query.dto';
+import { InventoryDashboardQueryDto } from './dto/inventory-dashboard-query.dto';
 import { IssueStockDto } from './dto/issue-stock.dto';
 import { ReceiveStockDto } from './dto/receive-stock.dto';
 import { RejectStockAdjustmentDto } from './dto/reject-stock-adjustment.dto';
@@ -54,6 +56,36 @@ import { InventoryService } from './inventory.service';
 @Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
+
+  @Get('dashboard')
+  @Permissions('reports.inventory.read')
+  @ApiOperation({
+    summary: 'Get inventory dashboard totals and recent activity',
+  })
+  @ApiOkResponse({ description: 'Inventory dashboard returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  getInventoryDashboard(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: InventoryDashboardQueryDto,
+  ) {
+    return this.inventoryService.getInventoryDashboard(currentUser, query);
+  }
+
+  @Get('reorder-alerts')
+  @Permissions('inventory.reorder_alerts.read')
+  @ApiOperation({
+    summary: 'List active inventory items at or below reorder level',
+  })
+  @ApiOkResponse({ description: 'Reorder alerts returned successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listReorderAlerts(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: GetReorderAlertsQueryDto,
+  ) {
+    return this.inventoryService.listReorderAlerts(currentUser, query);
+  }
 
   @Get('balances')
   @Permissions('inventory.items.read')

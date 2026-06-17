@@ -16,6 +16,7 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { InventoryService } from './inventory.service';
 import { InventoryItemsRepository } from './repositories/inventory-items.repository';
 import { InventoryLocationsRepository } from './repositories/inventory-locations.repository';
+import { InventoryReportsRepository } from './repositories/inventory-reports.repository';
 import { StockAdjustmentsRepository } from './repositories/stock-adjustments.repository';
 import { StockBalancesRepository } from './repositories/stock-balances.repository';
 import { StockIssuesRepository } from './repositories/stock-issues.repository';
@@ -41,6 +42,15 @@ describe('InventoryService', () => {
   };
   let balancesRepository: {
     listBalances: jest.Mock;
+  };
+  let reportsRepository: {
+    countActiveItems: jest.Mock;
+    listReorderAlertCandidates: jest.Mock;
+    countReorderAlertCandidates: jest.Mock;
+    calculateStockValue: jest.Mock;
+    countLowStockCandidates: jest.Mock;
+    recentMovements: jest.Mock;
+    stockByItemType: jest.Mock;
   };
   let movementsRepository: {
     listMovements: jest.Mock;
@@ -156,6 +166,15 @@ describe('InventoryService', () => {
     balancesRepository = {
       listBalances: jest.fn(),
     };
+    reportsRepository = {
+      countActiveItems: jest.fn(),
+      listReorderAlertCandidates: jest.fn(),
+      countReorderAlertCandidates: jest.fn(),
+      calculateStockValue: jest.fn(),
+      countLowStockCandidates: jest.fn(),
+      recentMovements: jest.fn(),
+      stockByItemType: jest.fn(),
+    };
     movementsRepository = {
       listMovements: jest.fn(),
       findByMovementNumber: jest.fn(),
@@ -192,6 +211,10 @@ describe('InventoryService', () => {
         {
           provide: InventoryItemsRepository,
           useValue: itemsRepository,
+        },
+        {
+          provide: InventoryReportsRepository,
+          useValue: reportsRepository,
         },
         {
           provide: StockAdjustmentsRepository,
@@ -374,6 +397,177 @@ describe('InventoryService', () => {
     ).rejects.toThrow(
       'Movement createdFrom must be before or equal to createdTo.',
     );
+  });
+
+  it('returns low-stock reorder alerts', async () => {
+    reportsRepository.listReorderAlertCandidates.mockResolvedValue([
+      {
+        id: 7,
+        itemNumber: 'INV-FOOD-0001',
+        name: 'Basmati Rice',
+        type: InventoryItemType.FOOD,
+        category: 'Dry Goods',
+        unitOfMeasure: 'KG',
+        reorderLevel: new Prisma.Decimal(25),
+        reorderQuantity: new Prisma.Decimal(100),
+        averageCost: new Prisma.Decimal(145.5),
+        balances: [
+          {
+            locationId: 4,
+            quantity: new Prisma.Decimal(20),
+            location: {
+              id: 4,
+              code: 'MAIN-STORE',
+              name: 'Main Store',
+              isActive: true,
+            },
+          },
+        ],
+      },
+    ]);
+    reportsRepository.countReorderAlertCandidates.mockResolvedValue(1);
+
+    await expect(
+      service.listReorderAlerts(currentUser, {
+        page: 1,
+        limit: 20,
+        search: ' rice ',
+        locationId: 4,
+      }),
+    ).resolves.toEqual({
+      items: [
+        expect.objectContaining({
+          currentQuantity: '20.00',
+          reorderLevel: '25.00',
+          reorderQuantity: '100.00',
+          locationId: 4,
+        }),
+      ],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+    expect(reportsRepository.listReorderAlertCandidates).toHaveBeenCalledWith({
+      skip: 0,
+      take: 20,
+      search: 'rice',
+      locationId: 4,
+    });
+  });
+
+  it('filters reorder candidates that are above reorder level', async () => {
+    reportsRepository.listReorderAlertCandidates.mockResolvedValue([
+      {
+        id: 7,
+        itemNumber: 'INV-FOOD-0001',
+        name: 'Basmati Rice',
+        type: InventoryItemType.FOOD,
+        category: 'Dry Goods',
+        unitOfMeasure: 'KG',
+        reorderLevel: new Prisma.Decimal(25),
+        reorderQuantity: new Prisma.Decimal(100),
+        averageCost: null,
+        balances: [
+          {
+            locationId: 4,
+            quantity: new Prisma.Decimal(30),
+            location: {
+              id: 4,
+              code: 'MAIN-STORE',
+              name: 'Main Store',
+              isActive: true,
+            },
+          },
+        ],
+      },
+    ]);
+    reportsRepository.countReorderAlertCandidates.mockResolvedValue(1);
+
+    await expect(
+      service.listReorderAlerts(currentUser, { page: 1, limit: 20 }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        items: [],
+      }),
+    );
+  });
+
+  it('returns inventory dashboard counts and recent movement summaries', async () => {
+    reportsRepository.countActiveItems.mockResolvedValue(12);
+    reportsRepository.countLowStockCandidates.mockResolvedValue([
+      {
+        reorderLevel: new Prisma.Decimal(10),
+        balances: [{ quantity: new Prisma.Decimal(8) }],
+      },
+      {
+        reorderLevel: new Prisma.Decimal(10),
+        balances: [{ quantity: new Prisma.Decimal(12) }],
+      },
+    ]);
+    reportsRepository.calculateStockValue.mockResolvedValue(
+      new Prisma.Decimal(1200),
+    );
+    reportsRepository.recentMovements.mockResolvedValue([
+      {
+        id: 9,
+        movementNumber: 'MOV-20260617-000001',
+        itemId: 7,
+        locationId: 4,
+        fromLocationId: null,
+        toLocationId: null,
+        type: StockMovementType.RECEIPT,
+        quantity: new Prisma.Decimal(5),
+        unitCost: new Prisma.Decimal(10),
+        totalCost: new Prisma.Decimal(50),
+        createdAt: new Date('2026-06-17T06:00:00.000Z'),
+        item: {
+          id: 7,
+          itemNumber: 'INV-FOOD-0001',
+          name: 'Basmati Rice',
+          unitOfMeasure: 'KG',
+        },
+        location: { id: 4, code: 'MAIN-STORE', name: 'Main Store' },
+        fromLocation: null,
+        toLocation: null,
+      },
+    ]);
+    reportsRepository.stockByItemType.mockResolvedValue([
+      {
+        type: InventoryItemType.FOOD,
+        balances: [{ quantity: new Prisma.Decimal(5) }],
+      },
+      {
+        type: InventoryItemType.FOOD,
+        balances: [{ quantity: new Prisma.Decimal(7) }],
+      },
+    ]);
+
+    await expect(
+      service.getInventoryDashboard(currentUser, {
+        locationId: 4,
+        recentMovementsLimit: 5,
+      }),
+    ).resolves.toEqual({
+      totalActiveItems: 12,
+      lowStockItems: 1,
+      totalStockValue: '1200.00',
+      recentMovements: [
+        expect.objectContaining({
+          quantity: '5.00',
+          unitCost: '10.00',
+          totalCost: '50.00',
+        }),
+      ],
+      stockByItemType: {
+        FOOD: {
+          itemCount: 2,
+          quantity: '12.00',
+        },
+      },
+    });
   });
 
   it('receives stock, returns updated values, and records an audit log', async () => {

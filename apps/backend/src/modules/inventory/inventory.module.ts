@@ -7,6 +7,7 @@ import { InventoryController } from './inventory.controller';
 import { InventoryService } from './inventory.service';
 import { InventoryItemsRepository } from './repositories/inventory-items.repository';
 import { InventoryLocationsRepository } from './repositories/inventory-locations.repository';
+import { InventoryReportsRepository } from './repositories/inventory-reports.repository';
 import { StockAdjustmentsRepository } from './repositories/stock-adjustments.repository';
 import { StockBalancesRepository } from './repositories/stock-balances.repository';
 import { StockIssuesRepository } from './repositories/stock-issues.repository';
@@ -21,6 +22,7 @@ import { StockTransfersRepository } from './repositories/stock-transfers.reposit
     InventoryService,
     InventoryLocationsRepository,
     InventoryItemsRepository,
+    InventoryReportsRepository,
     StockAdjustmentsRepository,
     StockBalancesRepository,
     StockIssuesRepository,
@@ -33,6 +35,7 @@ import { StockTransfersRepository } from './repositories/stock-transfers.reposit
     InventoryService,
     InventoryLocationsRepository,
     InventoryItemsRepository,
+    InventoryReportsRepository,
     StockAdjustmentsRepository,
     StockBalancesRepository,
     StockIssuesRepository,
