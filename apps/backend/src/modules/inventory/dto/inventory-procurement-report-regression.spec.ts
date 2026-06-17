@@ -4,7 +4,6 @@ import { validate } from 'class-validator';
 import { SupplierStatus } from '../../../generated/prisma/client';
 import { CreateSupplierDto } from '../../procurement/dto/create-supplier.dto';
 import { GetSuppliersQueryDto } from '../../procurement/dto/get-suppliers-query.dto';
-import { UpdateSupplierDto } from '../../procurement/dto/update-supplier.dto';
 import { GetReorderAlertsQueryDto } from './get-reorder-alerts-query.dto';
 import { InventoryDashboardQueryDto } from './inventory-dashboard-query.dto';
 
@@ -87,7 +86,9 @@ describe('Inventory reports and supplier regression coverage', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'recentMovementsLimit')).toBe(true);
+    expect(
+      errors.some((error) => error.property === 'recentMovementsLimit'),
+    ).toBe(true);
   });
   it('rejects dashboard recent movement limit 27', async () => {
     const dto = plainToInstance(InventoryDashboardQueryDto, {
@@ -95,7 +96,9 @@ describe('Inventory reports and supplier regression coverage', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'recentMovementsLimit')).toBe(true);
+    expect(
+      errors.some((error) => error.property === 'recentMovementsLimit'),
+    ).toBe(true);
   });
   it('rejects dashboard recent movement limit 28', async () => {
     const dto = plainToInstance(InventoryDashboardQueryDto, {
@@ -103,7 +106,9 @@ describe('Inventory reports and supplier regression coverage', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'recentMovementsLimit')).toBe(true);
+    expect(
+      errors.some((error) => error.property === 'recentMovementsLimit'),
+    ).toBe(true);
   });
   it('rejects dashboard recent movement limit 29', async () => {
     const dto = plainToInstance(InventoryDashboardQueryDto, {
@@ -111,7 +116,9 @@ describe('Inventory reports and supplier regression coverage', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'recentMovementsLimit')).toBe(true);
+    expect(
+      errors.some((error) => error.property === 'recentMovementsLimit'),
+    ).toBe(true);
   });
   it('rejects dashboard recent movement limit 30', async () => {
     const dto = plainToInstance(InventoryDashboardQueryDto, {
@@ -119,7 +126,9 @@ describe('Inventory reports and supplier regression coverage', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'recentMovementsLimit')).toBe(true);
+    expect(
+      errors.some((error) => error.property === 'recentMovementsLimit'),
+    ).toBe(true);
   });
   it('rejects dashboard recent movement limit 31', async () => {
     const dto = plainToInstance(InventoryDashboardQueryDto, {
@@ -127,7 +136,9 @@ describe('Inventory reports and supplier regression coverage', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'recentMovementsLimit')).toBe(true);
+    expect(
+      errors.some((error) => error.property === 'recentMovementsLimit'),
+    ).toBe(true);
   });
   it('rejects dashboard recent movement limit 32', async () => {
     const dto = plainToInstance(InventoryDashboardQueryDto, {
@@ -135,7 +146,9 @@ describe('Inventory reports and supplier regression coverage', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'recentMovementsLimit')).toBe(true);
+    expect(
+      errors.some((error) => error.property === 'recentMovementsLimit'),
+    ).toBe(true);
   });
   it('rejects dashboard recent movement limit 33', async () => {
     const dto = plainToInstance(InventoryDashboardQueryDto, {
@@ -143,7 +156,9 @@ describe('Inventory reports and supplier regression coverage', () => {
     });
     const errors = await validate(dto);
 
-    expect(errors.some((error) => error.property === 'recentMovementsLimit')).toBe(true);
+    expect(
+      errors.some((error) => error.property === 'recentMovementsLimit'),
+    ).toBe(true);
   });
   it('transforms reorder alert query set 1', async () => {
     const dto = plainToInstance(GetReorderAlertsQueryDto, {
@@ -454,3 +469,15 @@ describe('Inventory reports and supplier regression coverage', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
     expect(dto.status).toBe(SupplierStatus.INACTIVE);
   });
+  it('accepts supplier query status ACTIVE case 8', async () => {
+    const dto = plainToInstance(GetSuppliersQueryDto, {
+      page: '8',
+      limit: '20',
+      search: 'supplier',
+      status: SupplierStatus.ACTIVE,
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.status).toBe(SupplierStatus.ACTIVE);
+  });
+});
