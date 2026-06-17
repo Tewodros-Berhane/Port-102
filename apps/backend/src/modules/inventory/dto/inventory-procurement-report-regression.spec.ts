@@ -156,3 +156,14 @@ describe('Inventory reports and supplier regression coverage', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
     expect(dto).toMatchObject({ page: 1, limit: 10, locationId: 1 });
   });
+  it('transforms reorder alert query set 2', async () => {
+    const dto = plainToInstance(GetReorderAlertsQueryDto, {
+      page: '2',
+      limit: '20',
+      search: 'rice',
+      locationId: '2',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toMatchObject({ page: 2, limit: 20, locationId: 2 });
+  });
