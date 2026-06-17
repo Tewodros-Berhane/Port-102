@@ -410,3 +410,14 @@ describe('Inventory reports and supplier regression coverage', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
     expect(dto.status).toBe(SupplierStatus.INACTIVE);
   });
+  it('accepts supplier query status ACTIVE case 4', async () => {
+    const dto = plainToInstance(GetSuppliersQueryDto, {
+      page: '4',
+      limit: '20',
+      search: 'supplier',
+      status: SupplierStatus.ACTIVE,
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.status).toBe(SupplierStatus.ACTIVE);
+  });
