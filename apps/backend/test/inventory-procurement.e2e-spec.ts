@@ -546,4 +546,31 @@ describe('Inventory and Procurement API (e2e)', () => {
       payload,
     );
   });
+
+  it('transfers stock between locations', async () => {
+    const payload = {
+      itemId: item.id,
+      fromLocationId: location.id,
+      toLocationId: 5,
+      quantity: 2,
+      reason: 'Move to outlet store',
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/api/inventory/transfer')
+      .set('Authorization', 'Bearer store-token')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      data: {
+        transferOutMovement: { type: StockMovementType.TRANSFER_OUT },
+        transferInMovement: { type: StockMovementType.TRANSFER_IN },
+      },
+    });
+    expect(inventoryService.transferStock).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      payload,
+    );
+  });
 });
