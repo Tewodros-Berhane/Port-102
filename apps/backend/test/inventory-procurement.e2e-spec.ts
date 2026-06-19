@@ -476,4 +476,27 @@ describe('Inventory and Procurement API (e2e)', () => {
       { code: 'MAIN', name: 'Main Store' },
     );
   });
+
+  it('creates an inventory item master record', async () => {
+    const payload = {
+      itemNumber: item.itemNumber,
+      name: item.name,
+      type: item.type,
+      unitOfMeasure: item.unitOfMeasure,
+      reorderLevel: 5,
+      reorderQuantity: 20,
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/api/inventory/items')
+      .set('Authorization', 'Bearer store-token')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body).toMatchObject({ data: { id: item.id } });
+    expect(inventoryService.createItem).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      payload,
+    );
+  });
 });
