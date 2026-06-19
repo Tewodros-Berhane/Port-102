@@ -499,4 +499,27 @@ describe('Inventory and Procurement API (e2e)', () => {
       payload,
     );
   });
+
+  it('receives stock into an active location', async () => {
+    const payload = {
+      itemId: item.id,
+      locationId: location.id,
+      quantity: 4,
+      unitCost: 12.5,
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/api/inventory/receive')
+      .set('Authorization', 'Bearer store-token')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      data: { movement: { type: StockMovementType.RECEIPT } },
+    });
+    expect(inventoryService.receiveStock).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      payload,
+    );
+  });
 });
