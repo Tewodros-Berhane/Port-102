@@ -707,4 +707,26 @@ describe('Inventory and Procurement API (e2e)', () => {
       expect.objectContaining({ status: SupplierStatus.ACTIVE }),
     );
   });
+
+  it('creates a purchase request with items', async () => {
+    const payload = {
+      departmentId: 8,
+      reason: 'Weekly cafe stock',
+      items: [{ itemId: item.id, quantity: 4, estimatedUnitCost: 12.5 }],
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/api/procurement/purchase-requests')
+      .set('Authorization', 'Bearer store-token')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      data: { requestNumber: purchaseRequest.requestNumber },
+    });
+    expect(procurementService.createPurchaseRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      payload,
+    );
+  });
 });
