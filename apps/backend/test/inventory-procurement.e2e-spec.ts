@@ -814,4 +814,27 @@ describe('Inventory and Procurement API (e2e)', () => {
       { notes: 'Supplier confirmed' },
     );
   });
+
+  it('creates a goods received note', async () => {
+    const payload = {
+      purchaseOrderId: purchaseOrder.id,
+      supplierId: supplier.id,
+      locationId: location.id,
+      items: [{ itemId: item.id, quantity: 4, unitCost: 12.5 }],
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/api/procurement/goods-received')
+      .set('Authorization', 'Bearer store-token')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      data: { grnNumber: goodsReceived.grnNumber },
+    });
+    expect(procurementService.createGoodsReceived).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      payload,
+    );
+  });
 });
