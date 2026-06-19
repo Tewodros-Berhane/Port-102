@@ -522,4 +522,28 @@ describe('Inventory and Procurement API (e2e)', () => {
       payload,
     );
   });
+
+  it('issues stock from an active location', async () => {
+    const payload = {
+      itemId: item.id,
+      locationId: location.id,
+      quantity: 1,
+      departmentId: 8,
+      reason: 'Kitchen requisition',
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/api/inventory/issue')
+      .set('Authorization', 'Bearer store-token')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      data: { movement: { type: StockMovementType.ISSUE } },
+    });
+    expect(inventoryService.issueStock).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      payload,
+    );
+  });
 });
