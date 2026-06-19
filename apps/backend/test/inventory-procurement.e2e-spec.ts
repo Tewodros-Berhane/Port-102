@@ -588,4 +588,19 @@ describe('Inventory and Procurement API (e2e)', () => {
       expect.objectContaining({ page: 1, limit: 10, locationId: 4 }),
     );
   });
+
+  it('lists stock movement history', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/inventory/movements?type=RECEIPT&itemId=7')
+      .set('Authorization', 'Bearer store-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      data: { items: [{ type: StockMovementType.RECEIPT }] },
+    });
+    expect(inventoryService.listStockMovements).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      expect.objectContaining({ type: StockMovementType.RECEIPT, itemId: 7 }),
+    );
+  });
 });
