@@ -763,4 +763,21 @@ describe('Inventory and Procurement API (e2e)', () => {
       { decisionNote: 'Approved within budget' },
     );
   });
+
+  it('creates a purchase order from an approved request', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/procurement/purchase-orders/from-request/8')
+      .set('Authorization', 'Bearer store-token')
+      .send({ supplierId: supplier.id })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      data: { orderNumber: purchaseOrder.orderNumber },
+    });
+    expect(procurementService.createPurchaseOrderFromRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      8,
+      { supplierId: supplier.id },
+    );
+  });
 });
