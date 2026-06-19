@@ -673,4 +673,23 @@ describe('Inventory and Procurement API (e2e)', () => {
       { decisionNote: 'Verified count sheet' },
     );
   });
+
+  it('creates a supplier', async () => {
+    const payload = {
+      supplierNumber: supplier.supplierNumber,
+      name: supplier.name,
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/api/procurement/suppliers')
+      .set('Authorization', 'Bearer store-token')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body).toMatchObject({ data: { id: supplier.id } });
+    expect(procurementService.createSupplier).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      payload,
+    );
+  });
 });
