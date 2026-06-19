@@ -462,4 +462,18 @@ describe('Inventory and Procurement API (e2e)', () => {
       .send({ itemId: item.id, locationId: location.id, quantity: 1 })
       .expect(403);
   });
+
+  it('creates an inventory location', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/inventory/locations')
+      .set('Authorization', 'Bearer store-token')
+      .send({ code: 'MAIN', name: 'Main Store' })
+      .expect(201);
+
+    expect(response.body).toMatchObject({ data: { id: location.id } });
+    expect(inventoryService.createLocation).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      { code: 'MAIN', name: 'Main Store' },
+    );
+  });
 });
