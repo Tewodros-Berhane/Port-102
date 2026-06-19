@@ -729,4 +729,21 @@ describe('Inventory and Procurement API (e2e)', () => {
       payload,
     );
   });
+
+  it('submits a draft purchase request', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/procurement/purchase-requests/8/submit')
+      .set('Authorization', 'Bearer store-token')
+      .send({ notes: 'Ready for approval' })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      data: { status: PurchaseRequestStatus.SUBMITTED },
+    });
+    expect(procurementService.submitPurchaseRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      8,
+      { notes: 'Ready for approval' },
+    );
+  });
 });
