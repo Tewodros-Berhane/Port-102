@@ -692,4 +692,19 @@ describe('Inventory and Procurement API (e2e)', () => {
       payload,
     );
   });
+
+  it('lists suppliers for procurement', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/procurement/suppliers?status=ACTIVE')
+      .set('Authorization', 'Bearer store-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      data: { items: [{ supplierNumber: supplier.supplierNumber }] },
+    });
+    expect(procurementService.listSuppliers).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      expect.objectContaining({ status: SupplierStatus.ACTIVE }),
+    );
+  });
 });
