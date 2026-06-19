@@ -603,4 +603,19 @@ describe('Inventory and Procurement API (e2e)', () => {
       expect.objectContaining({ type: StockMovementType.RECEIPT, itemId: 7 }),
     );
   });
+
+  it('returns low-stock reorder alerts', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/inventory/reorder-alerts?locationId=4')
+      .set('Authorization', 'Bearer store-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      data: { items: [{ currentQuantity: '4.00', reorderLevel: '5.00' }] },
+    });
+    expect(inventoryService.listReorderAlerts).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      expect.objectContaining({ locationId: 4 }),
+    );
+  });
 });
