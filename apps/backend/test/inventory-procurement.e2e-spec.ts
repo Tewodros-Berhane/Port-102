@@ -746,4 +746,21 @@ describe('Inventory and Procurement API (e2e)', () => {
       { notes: 'Ready for approval' },
     );
   });
+
+  it('approves a submitted purchase request', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/procurement/purchase-requests/8/approve')
+      .set('Authorization', 'Bearer store-token')
+      .send({ decisionNote: 'Approved within budget' })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      data: { status: PurchaseRequestStatus.APPROVED },
+    });
+    expect(procurementService.approvePurchaseRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      8,
+      { decisionNote: 'Approved within budget' },
+    );
+  });
 });
