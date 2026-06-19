@@ -633,4 +633,27 @@ describe('Inventory and Procurement API (e2e)', () => {
       expect.objectContaining({ recentMovementsLimit: 5 }),
     );
   });
+
+  it('requests a stock adjustment', async () => {
+    const payload = {
+      itemId: item.id,
+      locationId: location.id,
+      quantity: -1,
+      reason: 'Cycle count variance',
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/api/inventory/adjustments')
+      .set('Authorization', 'Bearer store-token')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      data: { status: StockAdjustmentStatus.PENDING },
+    });
+    expect(inventoryService.createStockAdjustment).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      payload,
+    );
+  });
 });
