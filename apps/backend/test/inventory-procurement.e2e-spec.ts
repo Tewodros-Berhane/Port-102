@@ -618,4 +618,19 @@ describe('Inventory and Procurement API (e2e)', () => {
       expect.objectContaining({ locationId: 4 }),
     );
   });
+
+  it('returns the inventory dashboard', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/inventory/dashboard?recentMovementsLimit=5')
+      .set('Authorization', 'Bearer store-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      data: { totalActiveItems: 1, lowStockItems: 1 },
+    });
+    expect(inventoryService.getInventoryDashboard).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      expect.objectContaining({ recentMovementsLimit: 5 }),
+    );
+  });
 });
