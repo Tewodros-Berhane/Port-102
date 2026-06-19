@@ -573,4 +573,19 @@ describe('Inventory and Procurement API (e2e)', () => {
       payload,
     );
   });
+
+  it('lists stock balances with pagination filters', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/inventory/balances?page=1&limit=10&locationId=4')
+      .set('Authorization', 'Bearer store-token')
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      data: { items: [{ quantity: '4.00' }] },
+    });
+    expect(inventoryService.listStockBalances).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      expect.objectContaining({ page: 1, limit: 10, locationId: 4 }),
+    );
+  });
 });
