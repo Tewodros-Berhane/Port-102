@@ -454,4 +454,12 @@ describe('Inventory and Procurement API (e2e)', () => {
   it('rejects unauthenticated inventory requests', async () => {
     await request(app.getHttpServer()).get('/api/inventory/items').expect(401);
   });
+
+  it('rejects inventory users without stock receive permission', async () => {
+    await request(app.getHttpServer())
+      .post('/api/inventory/receive')
+      .set('Authorization', 'Bearer limited-token')
+      .send({ itemId: item.id, locationId: location.id, quantity: 1 })
+      .expect(403);
+  });
 });
