@@ -780,4 +780,21 @@ describe('Inventory and Procurement API (e2e)', () => {
       { supplierId: supplier.id },
     );
   });
+
+  it('approves a purchase order', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/procurement/purchase-orders/9/approve')
+      .set('Authorization', 'Bearer store-token')
+      .send({ notes: 'Approved for ordering' })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      data: { status: PurchaseOrderStatus.APPROVED },
+    });
+    expect(procurementService.approvePurchaseOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      9,
+      { notes: 'Approved for ordering' },
+    );
+  });
 });
