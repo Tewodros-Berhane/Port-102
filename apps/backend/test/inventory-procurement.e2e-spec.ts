@@ -656,4 +656,21 @@ describe('Inventory and Procurement API (e2e)', () => {
       payload,
     );
   });
+
+  it('approves a pending stock adjustment', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/inventory/adjustments/30/approve')
+      .set('Authorization', 'Bearer store-token')
+      .send({ decisionNote: 'Verified count sheet' })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      data: { adjustment: { status: StockAdjustmentStatus.APPROVED } },
+    });
+    expect(inventoryService.approveStockAdjustment).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      30,
+      { decisionNote: 'Verified count sheet' },
+    );
+  });
 });
