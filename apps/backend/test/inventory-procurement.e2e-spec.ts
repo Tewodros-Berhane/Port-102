@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import {
   ExecutionContext,
   ForbiddenException,
@@ -528,7 +529,8 @@ describe('Inventory and Procurement API (e2e)', () => {
       itemId: item.id,
       locationId: location.id,
       quantity: 1,
-      departmentId: 8,
+      referenceType: 'DEPARTMENT',
+      referenceId: 8,
       reason: 'Kitchen requisition',
     };
 
@@ -774,7 +776,9 @@ describe('Inventory and Procurement API (e2e)', () => {
     expect(response.body).toMatchObject({
       data: { orderNumber: purchaseOrder.orderNumber },
     });
-    expect(procurementService.createPurchaseOrderFromRequest).toHaveBeenCalledWith(
+    expect(
+      procurementService.createPurchaseOrderFromRequest,
+    ).toHaveBeenCalledWith(
       expect.objectContaining({ sub: storeManagerUser.sub }),
       8,
       { supplierId: supplier.id },
@@ -836,5 +840,31 @@ describe('Inventory and Procurement API (e2e)', () => {
       expect.objectContaining({ sub: storeManagerUser.sub }),
       payload,
     );
+  });
+
+  it('posts goods received and returns procurement dashboard counts', async () => {
+    const postedResponse = await request(app.getHttpServer())
+      .patch('/api/procurement/goods-received/10/post')
+      .set('Authorization', 'Bearer store-token')
+      .send({ notes: 'Verified against delivery note' })
+      .expect(200);
+
+    expect(postedResponse.body).toMatchObject({
+      data: { status: GoodsReceivedStatus.POSTED },
+    });
+    expect(procurementService.postGoodsReceived).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: storeManagerUser.sub }),
+      10,
+      { notes: 'Verified against delivery note' },
+    );
+
+    const dashboardResponse = await request(app.getHttpServer())
+      .get('/api/procurement/dashboard')
+      .set('Authorization', 'Bearer store-token')
+      .expect(200);
+
+    expect(dashboardResponse.body).toMatchObject({
+      data: { pendingPurchaseRequests: 1, activeSuppliers: 1 },
+    });
   });
 });
