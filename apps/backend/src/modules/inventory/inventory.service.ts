@@ -3,14 +3,17 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 
 import {
   InventoryItemStatus,
+  NotificationType,
   Prisma,
   StockAdjustmentStatus,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { ApproveStockAdjustmentDto } from './dto/approve-stock-adjustment.dto';
 import { CancelStockAdjustmentDto } from './dto/cancel-stock-adjustment.dto';
@@ -72,6 +75,7 @@ export class InventoryService {
     private readonly stockIssuesRepository: StockIssuesRepository,
     private readonly stockTransfersRepository: StockTransfersRepository,
     private readonly auditLogsService: AuditLogsService,
+    @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
   async listStockBalances(
@@ -311,6 +315,35 @@ export class InventoryService {
       },
     });
 
+    if (
+      item.reorderLevel &&
+      receipt.balance.quantity.lessThanOrEqualTo(item.reorderLevel)
+    ) {
+      await this.notificationsService?.safelyCreate(() =>
+        this.notificationsService!.createDeduplicatedForRole('STOREKEEPER', {
+          type: NotificationType.OPERATIONAL_ALERT,
+          title: 'Low stock alert',
+          message: `${item.name} is at or below its reorder level in ${location.name}.`,
+          entityType: 'InventoryItemLocation',
+          entityId: `${item.id}:${location.id}`,
+          actionUrl: `/inventory/items/${item.id}`,
+        }),
+      );
+      await this.notificationsService?.safelyCreate(() =>
+        this.notificationsService!.createDeduplicatedForRole(
+          'PROCUREMENT_OFFICER',
+          {
+            type: NotificationType.OPERATIONAL_ALERT,
+            title: 'Low stock alert',
+            message: `${item.name} is at or below its reorder level in ${location.name}.`,
+            entityType: 'InventoryItemLocation',
+            entityId: `${item.id}:${location.id}`,
+            actionUrl: `/inventory/items/${item.id}`,
+          },
+        ),
+      );
+    }
+
     return {
       movement: this.serializeMovement(receipt.movement),
       balance: this.serializeBalance(receipt.balance),
@@ -382,6 +415,32 @@ export class InventoryService {
         referenceId: issue.movement.referenceId,
       },
     });
+
+    if (
+      item.reorderLevel &&
+      issue.balance.quantity.lessThanOrEqualTo(item.reorderLevel)
+    ) {
+      const alert = {
+        type: NotificationType.OPERATIONAL_ALERT,
+        title: 'Low stock alert',
+        message: `${item.name} is at or below its reorder level in ${location.name}.`,
+        entityType: 'InventoryItemLocation',
+        entityId: `${item.id}:${location.id}`,
+        actionUrl: `/inventory/items/${item.id}`,
+      } as const;
+      await this.notificationsService?.safelyCreate(() =>
+        this.notificationsService!.createDeduplicatedForRole(
+          'STOREKEEPER',
+          alert,
+        ),
+      );
+      await this.notificationsService?.safelyCreate(() =>
+        this.notificationsService!.createDeduplicatedForRole(
+          'PROCUREMENT_OFFICER',
+          alert,
+        ),
+      );
+    }
 
     return {
       movement: this.serializeMovement(issue.movement),
@@ -589,6 +648,12 @@ export class InventoryService {
     if (result.status === 'INSUFFICIENT') {
       throw new ConflictException(
         `Insufficient stock. Available quantity is ${result.availableQuantity.toFixed(2)}.`,
+      );
+    }
+
+    if (result.status === 'ALREADY_APPLIED') {
+      throw new ConflictException(
+        'Stock adjustment has already been decided or applied.',
       );
     }
 
