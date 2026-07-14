@@ -1,0 +1,1 @@
+export function formatPropertyDate(value: string | Date, settings: { locale: string; timezone: string }, options: Intl.DateTimeFormatOptions = {}) { return new Intl.DateTimeFormat(settings.locale, { dateStyle: "medium", timeZone: settings.timezone, ...options }).format(new Date(value)); }

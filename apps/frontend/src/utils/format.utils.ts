@@ -1,0 +1,1 @@
+export function formatCurrency(value: number, settings: { locale: string; defaultCurrency: string }) { return new Intl.NumberFormat(settings.locale, { style: "currency", currency: settings.defaultCurrency }).format(value); }
