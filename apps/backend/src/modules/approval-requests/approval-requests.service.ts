@@ -3,14 +3,17 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 
 import {
   ApprovalRequestType,
   ApprovalStatus,
   Prisma,
+  NotificationType,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { CreateApprovalRequestDto } from './dto/create-approval-request.dto';
 import { DecideApprovalRequestDto } from './dto/decide-approval-request.dto';
@@ -54,6 +57,7 @@ export class ApprovalRequestsService {
   constructor(
     private readonly approvalRequestsRepository: ApprovalRequestsRepository,
     private readonly auditLogsService: AuditLogsService,
+    @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
   async create(
@@ -86,6 +90,17 @@ export class ApprovalRequestsService {
         status: approvalRequest.status,
       },
     });
+
+    await this.notificationsService?.safelyCreate(() =>
+      this.notificationsService!.createForRole('GENERAL_MANAGER', {
+        type: NotificationType.APPROVAL,
+        title: 'Approval request submitted',
+        message: approvalRequest.title,
+        entityType: 'ApprovalRequest',
+        entityId: String(approvalRequest.id),
+        actionUrl: `/approvals/${approvalRequest.id}`,
+      }),
+    );
 
     return this.serializeApprovalRequest(approvalRequest);
   }
@@ -199,6 +214,21 @@ export class ApprovalRequestsService {
         status,
       },
     });
+
+    await this.notificationsService?.safelyCreate(() =>
+      this.notificationsService!.createForUser({
+        userId: approvalRequest.requestedByUser.id,
+        type:
+          status === ApprovalStatus.APPROVED
+            ? NotificationType.SUCCESS
+            : NotificationType.WARNING,
+        title: `Approval request ${status.toLowerCase()}`,
+        message: approvalRequest.title,
+        entityType: 'ApprovalRequest',
+        entityId: String(approvalRequestId),
+        actionUrl: `/approvals/${approvalRequestId}`,
+      }),
+    );
 
     return this.serializeApprovalRequest(decidedApprovalRequest);
   }

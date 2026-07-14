@@ -162,3 +162,28 @@ Controller -> Service / Use Case -> Repository -> PrismaService -> PostgreSQL
 ```
 
 Controllers should only handle HTTP concerns, validation, and response mapping. Prisma queries belong behind repository or persistence boundaries, not in controllers.
+
+## Backend Module Documentation
+
+Implemented backend module notes:
+
+- [Rooms, floors, and room types](docs/rooms-module.md)
+- [Reservations and availability](docs/reservations-module.md)
+- [Stays and front desk](docs/front-desk-stays-module.md)
+- [Billing, folios, payments, invoices, and receipts](docs/billing-folios-payments-module.md)
+- [Housekeeping](docs/housekeeping-module.md)
+- [Maintenance](docs/maintenance-module.md)
+- [Restaurant and POS](docs/restaurant-pos-module.md)
+- [Inventory](docs/inventory-module.md)
+- [Procurement](docs/procurement-module.md)
+- [Consolidated reports and management dashboards](docs/reports-module.md)
+- [Property settings](docs/property-settings-module.md)
+- [Internal notifications](docs/notifications-module.md)
+
+Database integration tests require `DATABASE_URL_TEST` to identify a dedicated
+PostgreSQL database whose name contains `test`. The runner applies migrations
+before executing the serial database-backed suites:
+
+```bash
+npm run test:integration -w @port-102/backend -- --runInBand
+```

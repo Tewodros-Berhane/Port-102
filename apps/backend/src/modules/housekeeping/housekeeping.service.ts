@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 
 import {
@@ -16,6 +17,8 @@ import {
   RoomMaintenanceStatus,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../generated/prisma/client';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import {
   RoomRecord,
@@ -57,6 +60,7 @@ export class HousekeepingService {
     private readonly housekeepingIssuesRepository: HousekeepingIssuesRepository,
     private readonly roomsRepository: RoomsRepository,
     private readonly auditLogsService: AuditLogsService,
+    @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
   async create(
@@ -1068,6 +1072,19 @@ export class HousekeepingService {
       },
     );
 
+    if (rejectedTask.assignedToUserId)
+      await this.notificationsService?.safelyCreate(() =>
+        this.notificationsService!.createForUser({
+          userId: rejectedTask.assignedToUserId!,
+          type: NotificationType.TASK,
+          title: 'Housekeeping task rejected',
+          message: `Task ${rejectedTask.taskNumber} requires attention.`,
+          entityType: 'HousekeepingTask',
+          entityId: String(rejectedTask.id),
+          actionUrl: `/housekeeping/tasks/${rejectedTask.id}`,
+        }),
+      );
+
     return this.serializeTask(rejectedTask);
   }
 
@@ -1113,6 +1130,18 @@ export class HousekeepingService {
       status: updatedTask.status,
       notes: notes === undefined ? null : this.normalizeOptionalString(notes),
     });
+
+    await this.notificationsService?.safelyCreate(() =>
+      this.notificationsService!.createForUser({
+        userId: assignedUser.id,
+        type: NotificationType.TASK,
+        title: 'Housekeeping task assigned',
+        message: `Task ${updatedTask.taskNumber} was assigned to you.`,
+        entityType: 'HousekeepingTask',
+        entityId: String(updatedTask.id),
+        actionUrl: `/housekeeping/tasks/${updatedTask.id}`,
+      }),
+    );
 
     return this.serializeTask(updatedTask);
   }

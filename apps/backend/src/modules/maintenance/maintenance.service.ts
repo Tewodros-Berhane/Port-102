@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 
 import {
@@ -15,9 +16,11 @@ import {
   MaintenanceTicketStatus,
   PreventiveMaintenanceStatus,
   Prisma,
+  NotificationType,
   RoomMaintenanceStatus,
 } from '../../generated/prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { CurrentUserPayload } from '../auth/types/current-user-payload.type';
 import { HousekeepingIssuesRepository } from '../housekeeping/repositories/housekeeping-issues.repository';
 import type { RoomRecord } from '../rooms/repositories/rooms.repository';
@@ -76,6 +79,7 @@ export class MaintenanceService {
     private readonly housekeepingIssuesRepository: HousekeepingIssuesRepository,
     private readonly roomsRepository: RoomsRepository,
     private readonly auditLogsService: AuditLogsService,
+    @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
   async createTicket(
@@ -147,6 +151,30 @@ export class MaintenanceService {
         assignedToUserId: ticket.assignedToUserId,
       },
     );
+
+    if (ticket.assignedToUserId)
+      await this.notificationsService?.safelyCreate(() =>
+        this.notificationsService!.createForUser({
+          userId: ticket.assignedToUserId!,
+          type: NotificationType.TASK,
+          title: 'Maintenance ticket assigned',
+          message: `Ticket ${ticket.ticketNumber} was assigned to you.`,
+          entityType: 'MaintenanceTicket',
+          entityId: String(ticket.id),
+          actionUrl: `/maintenance/tickets/${ticket.id}`,
+        }),
+      );
+    if (ticket.priority === MaintenancePriority.URGENT)
+      await this.notificationsService?.safelyCreate(() =>
+        this.notificationsService!.createForRole('MAINTENANCE_SUPERVISOR', {
+          type: NotificationType.OPERATIONAL_ALERT,
+          title: 'Urgent maintenance ticket',
+          message: `${ticket.ticketNumber}: ${ticket.title}`,
+          entityType: 'MaintenanceTicket',
+          entityId: String(ticket.id),
+          actionUrl: `/maintenance/tickets/${ticket.id}`,
+        }),
+      );
 
     return this.serializeTicket(ticket);
   }
@@ -337,6 +365,18 @@ export class MaintenanceService {
         status: updatedTicket.status,
         notes: this.normalizeOptionalString(assignMaintenanceTicketDto.notes),
       },
+    );
+
+    await this.notificationsService?.safelyCreate(() =>
+      this.notificationsService!.createForUser({
+        userId: assignedUser.id,
+        type: NotificationType.TASK,
+        title: 'Maintenance ticket assigned',
+        message: `Ticket ${updatedTicket.ticketNumber} was assigned to you.`,
+        entityType: 'MaintenanceTicket',
+        entityId: String(updatedTicket.id),
+        actionUrl: `/maintenance/tickets/${updatedTicket.id}`,
+      }),
     );
 
     return this.serializeTicket(updatedTicket);
