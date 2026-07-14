@@ -388,6 +388,12 @@ export class ProcurementService {
       })),
     });
 
+    if (!order) {
+      throw new ConflictException(
+        'Purchase request has already been converted or is no longer approved.',
+      );
+    }
+
     await this.recordAudit(
       currentUser,
       'procurement.purchase_orders.created_from_request',
