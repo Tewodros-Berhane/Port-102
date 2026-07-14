@@ -12,6 +12,7 @@ pnpm-debug.log*
 *.tsbuildinfo
 .DS_Store
 .turbo/
+.next/
 AGENTS.md
 Agents.md
 tree.md
