@@ -229,6 +229,28 @@ export class GoodsReceivedRepository {
           return { status: 'INACTIVE_ITEM' as const, grn };
         }
 
+        const claimed = await tx.goodsReceived.updateMany({
+          where: {
+            id: grn.id,
+            status: GoodsReceivedStatus.DRAFT,
+          },
+          data: {
+            status: GoodsReceivedStatus.POSTED,
+            postedAt: input.postedAt,
+            notes: input.notes ?? grn.notes,
+          },
+        });
+
+        if (claimed.count !== 1) {
+          const current = await tx.goodsReceived.findUniqueOrThrow({
+            where: { id: grn.id },
+            select: goodsReceivedSelect,
+          });
+          return current.status === GoodsReceivedStatus.CANCELLED
+            ? { status: 'CANCELLED' as const, grn: current }
+            : { status: 'ALREADY_POSTED' as const, grn: current };
+        }
+
         const movements = [];
 
         for (const [index, item] of grn.items.entries()) {
@@ -338,13 +360,8 @@ export class GoodsReceivedRepository {
           });
         }
 
-        const posted = await tx.goodsReceived.update({
+        const posted = await tx.goodsReceived.findUniqueOrThrow({
           where: { id: grn.id },
-          data: {
-            status: GoodsReceivedStatus.POSTED,
-            postedAt: input.postedAt,
-            notes: input.notes ?? grn.notes,
-          },
           select: goodsReceivedSelect,
         });
 
