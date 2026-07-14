@@ -208,13 +208,14 @@ async function seedHotelProfile(prisma: PrismaClient) {
   const hotelCode = optionalEnv('INITIAL_HOTEL_CODE', 'DEMO');
 
   return prisma.hotel.upsert({
-    where: { code: hotelCode },
+    where: { id: 1 },
     update: {
       name: hotelName,
       timezone: optionalEnv('INITIAL_HOTEL_TIMEZONE', 'Africa/Nairobi'),
       defaultCurrency: optionalEnv('INITIAL_HOTEL_CURRENCY', 'ETB'),
     },
     create: {
+      id: 1,
       name: hotelName,
       code: hotelCode,
       timezone: optionalEnv('INITIAL_HOTEL_TIMEZONE', 'Africa/Nairobi'),

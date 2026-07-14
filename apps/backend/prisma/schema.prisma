@@ -361,6 +361,22 @@ enum SupplierStatus {
   INACTIVE
 }
 
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  TASK
+  APPROVAL
+  OPERATIONAL_ALERT
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
 model User {
   id                          Int                         @id @default(autoincrement())
   email                       String                      @unique
@@ -428,6 +444,7 @@ model User {
   approvedPurchaseOrders      PurchaseOrder[]             @relation("PurchaseOrderApprovedBy")
   createdPurchaseOrders       PurchaseOrder[]             @relation("PurchaseOrderCreatedBy")
   receivedGoods               GoodsReceived[]             @relation("GoodsReceivedBy")
+  notifications               Notification[]
 
   @@index([roleId])
   @@index([departmentId])
@@ -436,19 +453,59 @@ model User {
 
 /// Singleton hotel profile/settings record. This is not used for tenancy or access control.
 model Hotel {
-  id              Int      @id @default(autoincrement())
-  name            String
-  code            String   @unique
-  timezone        String   @default("Africa/Nairobi")
-  defaultCurrency String   @default("ETB")
-  address         String?
-  phone           String?
-  email           String?
-  logoUrl         String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                       Int      @id @default(1)
+  name                     String
+  code                     String?  @unique
+  legalName                String?
+  taxIdentification        String?
+  registrationNumber       String?
+  email                    String?
+  phone                    String?
+  alternatePhone           String?
+  website                  String?
+  address                  String?
+  addressLine1             String?
+  addressLine2             String?
+  city                     String?
+  region                   String?
+  country                  String   @default("Ethiopia")
+  timezone                 String   @default("Africa/Addis_Ababa")
+  defaultCurrency          String   @default("ETB")
+  locale                   String   @default("en-ET")
+  checkInTime              String?
+  checkOutTime             String?
+  logoUrl                  String?
+  receiptFooter            String?
+  invoiceFooter            String?
+  defaultTaxRate           Decimal? @db.Decimal(5, 2)
+  defaultServiceChargeRate Decimal? @db.Decimal(5, 2)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   @@map("hotels")
+}
+
+model Notification {
+  id         Int                @id @default(autoincrement())
+  userId     Int
+  type       NotificationType   @default(INFO)
+  status     NotificationStatus @default(UNREAD)
+  title      String
+  message    String
+  entityType String?
+  entityId   String?
+  actionUrl  String?
+  metadata   Json?
+  readAt     DateTime?
+  archivedAt DateTime?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@map("notifications")
 }
 
 model Role {
@@ -668,6 +725,7 @@ model Reservation {
   @@index([status])
   @@index([checkInDate, checkOutDate])
   @@index([source])
+  @@index([createdAt])
   @@map("reservations")
 }
 
@@ -845,9 +903,11 @@ model FolioLineItem {
   folio          Folio             @relation(fields: [folioId], references: [id], onDelete: Cascade)
   postedBy       User?             @relation("FolioLineItemPostedBy", fields: [postedByUserId], references: [id], onDelete: SetNull)
 
+  @@unique([sourceType, sourceId])
   @@index([folioId])
   @@index([type])
   @@index([postedByUserId])
+  @@index([postedAt])
   @@map("folio_line_items")
 }
 
@@ -965,6 +1025,7 @@ model HousekeepingTask {
   cancelledBy        User?                  @relation("HousekeepingTaskCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
   issues             HousekeepingIssue[]
 
+  @@unique([roomId, sourceType, sourceId])
   @@index([roomId])
   @@index([status])
   @@index([priority])
@@ -1427,6 +1488,7 @@ model PurchaseRequest {
   @@index([status])
   @@index([departmentId])
   @@index([requestedByUserId])
+  @@index([createdAt])
   @@map("purchase_requests")
 }
 
@@ -1449,7 +1511,7 @@ model PurchaseOrder {
   id                Int                 @id @default(autoincrement())
   orderNumber       String              @unique
   supplierId        Int?
-  purchaseRequestId Int?
+  purchaseRequestId Int?                @unique
   status            PurchaseOrderStatus @default(DRAFT)
   orderedAt         DateTime?
   expectedAt        DateTime?
@@ -1468,6 +1530,7 @@ model PurchaseOrder {
   @@index([supplierId])
   @@index([purchaseRequestId])
   @@index([status])
+  @@index([createdAt])
   @@map("purchase_orders")
 }
 
@@ -1509,6 +1572,7 @@ model GoodsReceived {
   @@index([supplierId])
   @@index([locationId])
   @@index([status])
+  @@index([createdAt])
   @@map("goods_received")
 }
 
