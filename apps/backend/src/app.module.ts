@@ -27,6 +27,9 @@ import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { RestaurantModule } from './modules/restaurant/restaurant.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ProcurementModule } from './modules/procurement/procurement.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { PropertySettingsModule } from './modules/property-settings/property-settings.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -64,6 +67,9 @@ import { ProcurementModule } from './modules/procurement/procurement.module';
     RestaurantModule,
     InventoryModule,
     ProcurementModule,
+    ReportsModule,
+    PropertySettingsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
