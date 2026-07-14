@@ -194,6 +194,18 @@ export class PurchaseOrdersRepository {
     items: Prisma.PurchaseOrderItemUncheckedCreateWithoutPurchaseOrderInput[];
   }) {
     return this.prisma.$transaction(async (tx) => {
+      const converted = await tx.purchaseRequest.updateMany({
+        where: {
+          id: data.requestId,
+          status: 'APPROVED',
+        },
+        data: { status: 'CONVERTED_TO_PO' },
+      });
+
+      if (converted.count !== 1) {
+        return null;
+      }
+
       const order = await tx.purchaseOrder.create({
         data: {
           orderNumber: data.orderNumber,
@@ -205,11 +217,6 @@ export class PurchaseOrdersRepository {
           items: { create: data.items },
         },
         select: purchaseOrderSelect,
-      });
-
-      await tx.purchaseRequest.update({
-        where: { id: data.requestId },
-        data: { status: 'CONVERTED_TO_PO' },
       });
 
       return order;
