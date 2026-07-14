@@ -61,6 +61,7 @@ export type StockAdjustmentRecord = Prisma.StockAdjustmentGetPayload<{
 export type StockAdjustmentApprovalResult =
   | { status: 'INACTIVE' }
   | { status: 'INSUFFICIENT'; availableQuantity: Prisma.Decimal }
+  | { status: 'ALREADY_APPLIED' }
   | {
       status: 'APPROVED';
       adjustment: StockAdjustmentRecord;
@@ -168,6 +169,10 @@ export class StockAdjustmentsRepository {
           return { status: 'INACTIVE' };
         }
 
+        if (adjustment.status !== StockAdjustmentStatus.PENDING) {
+          return { status: 'ALREADY_APPLIED' };
+        }
+
         const [item, location, existingBalance] = await Promise.all([
           tx.inventoryItem.findFirst({
             where: {
@@ -198,6 +203,30 @@ export class StockAdjustmentsRepository {
         const isIncrease = adjustment.quantity.greaterThan(0);
         const availableQuantity =
           existingBalance?.quantity ?? new Prisma.Decimal(0);
+        if (!isIncrease && availableQuantity.lessThan(absoluteQuantity)) {
+          return {
+            status: 'INSUFFICIENT',
+            availableQuantity,
+          };
+        }
+
+        const claimed = await tx.stockAdjustment.updateMany({
+          where: {
+            id: adjustment.id,
+            status: StockAdjustmentStatus.PENDING,
+          },
+          data: {
+            status: StockAdjustmentStatus.APPROVED,
+            approvedByUserId: input.approvedByUserId,
+            decidedAt: new Date(),
+            decisionNote: input.decisionNote,
+          },
+        });
+
+        if (claimed.count !== 1) {
+          return { status: 'ALREADY_APPLIED' };
+        }
+
         const balance = isIncrease
           ? await this.stockBalancesRepository.increaseBalance(
               adjustment.itemId,
@@ -213,10 +242,9 @@ export class StockAdjustmentsRepository {
             );
 
         if (!balance) {
-          return {
-            status: 'INSUFFICIENT',
-            availableQuantity,
-          };
+          throw new Error(
+            'Stock balance changed while an adjustment was being approved.',
+          );
         }
 
         const movement = await this.stockMovementsRepository.createMovement(
@@ -244,9 +272,6 @@ export class StockAdjustmentsRepository {
           where: { id: adjustment.id },
           data: {
             status: StockAdjustmentStatus.APPROVED,
-            approvedByUserId: input.approvedByUserId,
-            decidedAt: new Date(),
-            decisionNote: input.decisionNote,
           },
           select: stockAdjustmentSelect,
         });

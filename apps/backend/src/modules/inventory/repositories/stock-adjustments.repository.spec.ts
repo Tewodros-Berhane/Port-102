@@ -32,6 +32,7 @@ describe('StockAdjustmentsRepository', () => {
   let tx: {
     stockAdjustment: {
       findUnique: jest.Mock;
+      updateMany: jest.Mock;
       update: jest.Mock;
     };
     inventoryItem: { findFirst: jest.Mock };
@@ -54,6 +55,7 @@ describe('StockAdjustmentsRepository', () => {
     tx = {
       stockAdjustment: {
         findUnique: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         update: jest.fn(),
       },
       inventoryItem: { findFirst: jest.fn() },
