@@ -10,7 +10,7 @@ async function bootstrap() {
 
   configureApplication(app);
 
-  const port = configService.get<number>('port', 3000);
+  const port = configService.get<number>('port', 8080);
   await app.listen(port);
 }
 

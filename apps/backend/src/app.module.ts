@@ -30,17 +30,13 @@ import { ProcurementModule } from './modules/procurement/procurement.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { PropertySettingsModule } from './modules/property-settings/property-settings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { DepartmentsModule } from './modules/departments/departments.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [
-        join(process.cwd(), '.env'),
-        join(process.cwd(), '../../.env'),
-        join(process.cwd(), '.env.example'),
-        join(process.cwd(), '../../.env.example'),
-      ],
+      envFilePath: join(process.cwd(), '.env'),
       load: [configuration],
     }),
     PrismaModule,
@@ -70,6 +66,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     ReportsModule,
     PropertySettingsModule,
     NotificationsModule,
+    DepartmentsModule,
   ],
 })
 export class AppModule {}
