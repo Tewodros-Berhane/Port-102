@@ -1,1 +1,2 @@
-export function PermissionDeniedState() { return <div className="state"><h2>Permission required</h2><p>You do not have access to this area.</p></div>; }
+import { ShieldX } from "lucide-react";
+export function PermissionDeniedState() { return <div className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-border bg-surface px-6 py-10 text-center"><div className="mb-3 grid size-10 place-items-center rounded-md bg-warning-subtle text-warning-foreground"><ShieldX className="size-5"/></div><h2 className="text-base font-semibold">Permission required</h2><p className="mt-1 text-sm text-foreground-muted">You do not have access to this area.</p></div>; }

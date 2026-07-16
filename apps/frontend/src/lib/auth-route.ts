@@ -5,6 +5,7 @@ import { accessCookie, authCookieOptions, durationToSeconds, refreshCookie } fro
 import { backendFetch, unwrap } from "./backend";
 import type { ApiSuccess } from "@/types/api.types";
 import type { BackendLogin } from "@/types/auth.types";
+import type { ApiFailure } from "@/types/api.types";
 
 type Tokens = BackendLogin["tokens"];
 export function setTokenCookies(response: NextResponse, tokens: Tokens) {
@@ -15,12 +16,11 @@ export function clearTokenCookies(response: NextResponse) {
   response.cookies.set(accessCookie, "", { ...authCookieOptions, maxAge: 0 });
   response.cookies.set(refreshCookie, "", { ...authCookieOptions, maxAge: 0 });
 }
-export function forward(body: unknown, status: number) { return NextResponse.json(body, { status }); }
 export async function refreshFromCookie() {
   const token = (await cookies()).get(refreshCookie)?.value;
-  if (!token) return null;
+  if (!token) return { ok: false as const, status: 401, body: null as ApiFailure | null };
   const result = await backendFetch<Tokens>("auth/refresh", { method: "POST", body: JSON.stringify({ refreshToken: token }) });
-  return result.response.ok ? { tokens: unwrap<Tokens>(result.body), body: result.body } : null;
+  return result.response.ok ? { ok: true as const, tokens: unwrap<Tokens>(result.body), body: result.body } : { ok: false as const, status: result.response.status, body: result.body as ApiFailure };
 }
 export function safeSessionFromLogin(login: BackendLogin) {
   return { id: login.user.id, fullName: login.user.fullName, email: login.user.email, status: login.user.status, role: login.role, department: login.department, permissions: login.permissions };

@@ -5,5 +5,5 @@ export type ApiSuccess<T> = {
 
 export type ApiFailure = {
   success: false; statusCode: number; error: string;
-  message: string | string[]; timestamp?: string; path?: string;
+  message: string | string[]; timestamp: string; path: string;
 };
