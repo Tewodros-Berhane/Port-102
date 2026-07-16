@@ -171,6 +171,7 @@ export const DEFAULT_PERMISSION_CATEGORIES = [
       'housekeeping.tasks.read',
       'housekeeping.tasks.read.assigned',
       'housekeeping.tasks.assign',
+      'housekeeping.assignees.read',
       'housekeeping.tasks.reassign',
       'housekeeping.tasks.start',
       'housekeeping.tasks.start.assigned',

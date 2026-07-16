@@ -39,6 +39,7 @@ import { CompleteHousekeepingTaskDto } from './dto/complete-housekeeping-task.dt
 import { CreateHousekeepingIssueDto } from './dto/create-housekeeping-issue.dto';
 import { CreateHousekeepingTaskDto } from './dto/create-housekeeping-task.dto';
 import { GetHousekeepingIssuesQueryDto } from './dto/get-housekeeping-issues-query.dto';
+import { GetHousekeepingAssigneesQueryDto } from './dto/get-housekeeping-assignees-query.dto';
 import { GetHousekeepingTasksQueryDto } from './dto/get-housekeeping-tasks-query.dto';
 import { HousekeepingDashboardQueryDto } from './dto/housekeeping-dashboard-query.dto';
 import { HousekeepingProductivityQueryDto } from './dto/housekeeping-productivity-query.dto';
@@ -57,6 +58,21 @@ import { HousekeepingService } from './housekeeping.service';
 @Controller('housekeeping')
 export class HousekeepingController {
   constructor(private readonly housekeepingService: HousekeepingService) {}
+
+  @Get('assignees')
+  @Permissions('housekeeping.assignees.read')
+  @ApiOperation({
+    summary:
+      'Search active housekeeping attendants eligible for task assignment',
+  })
+  @ApiOkResponse({
+    description: 'Assignable housekeeping attendants returned.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required.' })
+  @ApiForbiddenResponse({ description: 'Missing required permission.' })
+  listAssignees(@Query() query: GetHousekeepingAssigneesQueryDto) {
+    return this.housekeepingService.listAssignees(query);
+  }
 
   @Get('dashboard')
   @Permissions('housekeeping.dashboard.read')

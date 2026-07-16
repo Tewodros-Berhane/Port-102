@@ -49,6 +49,7 @@ const supervisorUser: TestUser = {
     'housekeeping.tasks.create',
     'housekeeping.tasks.read',
     'housekeeping.tasks.assign',
+    'housekeeping.assignees.read',
     'housekeeping.tasks.reassign',
     'housekeeping.tasks.inspect',
     'housekeeping.tasks.approve',
@@ -147,6 +148,7 @@ describe('Housekeeping API (e2e)', () => {
     create: jest.fn(),
     list: jest.fn(),
     listAssignedToMe: jest.fn(),
+    listAssignees: jest.fn(),
     getById: jest.fn(),
     update: jest.fn(),
     assign: jest.fn(),
@@ -277,6 +279,18 @@ describe('Housekeeping API (e2e)', () => {
         totalPages: 1,
       },
     });
+    housekeepingService.listAssignees.mockResolvedValue({
+      data: [
+        {
+          id: 7,
+          fullName: 'Housekeeping Attendant',
+          email: 'attendant@demo-hotel.com',
+          employeeId: 17,
+          employeeNumber: 'HK-ATT-001',
+        },
+      ],
+      meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+    });
     housekeepingService.start.mockResolvedValue({
       ...task,
       status: HousekeepingTaskStatus.IN_PROGRESS,
@@ -348,6 +362,27 @@ describe('Housekeeping API (e2e)', () => {
       message: 'Missing required permission.',
     });
     expect(housekeepingService.list).not.toHaveBeenCalled();
+  });
+
+  it('allows supervisors and denies attendants when searching assignees', async () => {
+    await request(app.getHttpServer())
+      .get('/api/housekeeping/assignees?search=att&page=1&limit=20')
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/api/housekeeping/assignees')
+      .set('Authorization', 'Bearer attendant-token')
+      .expect(403);
+    const response = await request(app.getHttpServer())
+      .get('/api/housekeeping/assignees?search=att&page=1&limit=20')
+      .set('Authorization', 'Bearer supervisor-token')
+      .expect(200);
+    expect(response.body).toMatchObject({
+      data: [{ id: 7, employeeNumber: 'HK-ATT-001' }],
+      meta: { total: 1, page: 1, limit: 20 },
+    });
+    expect(housekeepingService.listAssignees).toHaveBeenCalledWith(
+      expect.objectContaining({ search: 'att', page: 1, limit: 20 }),
+    );
   });
 
   it('allows a supervisor to create and list housekeeping tasks', async () => {

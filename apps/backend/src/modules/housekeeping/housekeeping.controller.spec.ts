@@ -23,6 +23,7 @@ describe('HousekeepingController', () => {
     create: jest.Mock;
     list: jest.Mock;
     listAssignedToMe: jest.Mock;
+    listAssignees: jest.Mock;
     getDashboard: jest.Mock;
     getProductivity: jest.Mock;
     reportIssue: jest.Mock;
@@ -57,6 +58,7 @@ describe('HousekeepingController', () => {
       create: jest.fn(),
       list: jest.fn(),
       listAssignedToMe: jest.fn(),
+      listAssignees: jest.fn(),
       getDashboard: jest.fn(),
       getProductivity: jest.fn(),
       reportIssue: jest.fn(),

@@ -86,4 +86,40 @@ describe('default role permissions', () => {
       );
     }
   });
+
+  it('aligns management roles with deliberate Phase One read access', () => {
+    expect(getRolePermissions('HOTEL_OWNER')).toEqual(
+      expect.arrayContaining([
+        'employees.read',
+        'departments.read',
+        'notifications.read',
+        'reports.inventory.read',
+        'reports.procurement.read',
+      ]),
+    );
+    expect(getRolePermissions('HOTEL_ADMIN')).toEqual(
+      expect.arrayContaining([
+        'reports.dashboard.read',
+        'reports.daily_summary.read',
+        'employees.read',
+        'departments.read',
+        'notifications.read',
+      ]),
+    );
+    expect(getRolePermissions('GENERAL_MANAGER')).toEqual(
+      expect.arrayContaining([
+        'employees.read',
+        'departments.read',
+        'hotel.profile.read',
+        'hotel.settings.read',
+      ]),
+    );
+    expect(getRolePermissions('GENERAL_MANAGER')).not.toEqual(
+      expect.arrayContaining([
+        'users.create',
+        'roles.create',
+        'hotel.settings.update',
+      ]),
+    );
+  });
 });

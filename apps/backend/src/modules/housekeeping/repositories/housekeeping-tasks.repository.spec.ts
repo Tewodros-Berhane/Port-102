@@ -23,6 +23,8 @@ describe('HousekeepingTasksRepository', () => {
     };
     user: {
       findFirst: jest.Mock;
+      count: jest.Mock;
+      findMany: jest.Mock;
     };
   };
 
@@ -39,6 +41,8 @@ describe('HousekeepingTasksRepository', () => {
       },
       user: {
         findFirst: jest.fn(),
+        count: jest.fn(),
+        findMany: jest.fn(),
       },
     };
 
@@ -54,6 +58,26 @@ describe('HousekeepingTasksRepository', () => {
 
     repository = module.get<HousekeepingTasksRepository>(
       HousekeepingTasksRepository,
+    );
+  });
+
+  it('lists only active attendant-role assignees with search and pagination', async () => {
+    await repository.listAssignableAttendants({
+      skip: 20,
+      take: 10,
+      search: 'att',
+    });
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 20,
+        take: 10,
+        where: expect.objectContaining({
+          status: UserStatus.ACTIVE,
+          role: { isActive: true, systemKey: 'HOUSEKEEPING_ATTENDANT' },
+          OR: expect.any(Array),
+        }),
+        select: expect.not.objectContaining({ passwordHash: true }),
+      }),
     );
   });
 
@@ -277,6 +301,7 @@ describe('HousekeepingTasksRepository', () => {
           status: UserStatus.ACTIVE,
           role: {
             isActive: true,
+            systemKey: 'HOUSEKEEPING_ATTENDANT',
           },
         },
       }),

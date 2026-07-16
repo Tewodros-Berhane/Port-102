@@ -178,6 +178,7 @@ describe('HousekeepingService', () => {
     listTasksForProductivity: jest.Mock;
     updateTask: jest.Mock;
     findActiveUser: jest.Mock;
+    listAssignableAttendants: jest.Mock;
   };
   let housekeepingIssuesRepository: {
     createIssue: jest.Mock;
@@ -210,6 +211,7 @@ describe('HousekeepingService', () => {
       listTasksForProductivity: jest.fn(),
       updateTask: jest.fn(),
       findActiveUser: jest.fn(),
+      listAssignableAttendants: jest.fn(),
     };
     housekeepingIssuesRepository = {
       createIssue: jest.fn(),
@@ -252,6 +254,35 @@ describe('HousekeepingService', () => {
     }).compile();
 
     service = module.get<HousekeepingService>(HousekeepingService);
+  });
+
+  it('returns paginated safe assignable attendant projections', async () => {
+    housekeepingTasksRepository.listAssignableAttendants.mockResolvedValue([
+      1,
+      [
+        {
+          ...createUser(),
+          employees: [{ id: 22, employeeNumber: 'HK-ATT-001' }],
+        },
+      ],
+    ]);
+    await expect(
+      service.listAssignees({ page: 1, limit: 20, search: 'att' }),
+    ).resolves.toEqual({
+      data: [
+        {
+          id: 7,
+          fullName: 'Housekeeping Attendant',
+          email: 'attendant@demo-hotel.com',
+          employeeId: 22,
+          employeeNumber: 'HK-ATT-001',
+        },
+      ],
+      meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+    });
+    expect(
+      housekeepingTasksRepository.listAssignableAttendants,
+    ).toHaveBeenCalledWith({ skip: 0, take: 20, search: 'att' });
   });
 
   it('creates a pending task for an active room', async () => {

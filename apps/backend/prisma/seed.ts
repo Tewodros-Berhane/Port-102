@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -63,18 +62,7 @@ const DEFAULT_DEPARTMENTS = [
 ] as const;
 
 function loadEnvironment() {
-  const envFilePaths = [
-    join(process.cwd(), '.env'),
-    join(process.cwd(), '../../.env'),
-    join(process.cwd(), '.env.example'),
-    join(process.cwd(), '../../.env.example'),
-  ];
-
-  for (const path of envFilePaths) {
-    if (existsSync(path)) {
-      loadEnv({ path, override: false });
-    }
-  }
+  loadEnv({ path: join(process.cwd(), '.env'), override: false });
 }
 
 function requiredEnv(name: string) {
@@ -298,6 +286,95 @@ async function seedInitialAdmin(prisma: PrismaClient) {
   });
 }
 
+async function seedHousekeepingQaAccounts(prisma: PrismaClient) {
+  const department = await prisma.department.findUnique({
+    where: { key: 'HOUSEKEEPING' },
+  });
+  if (!department) throw new Error('HOUSEKEEPING department was not seeded.');
+  const saltRounds = integerEnv('BCRYPT_SALT_ROUNDS', 12);
+  const accounts = [
+    {
+      roleKey: RoleKey.HOUSEKEEPING_SUPERVISOR,
+      email: normalizeEmail(
+        optionalEnv(
+          'HOUSEKEEPING_SUPERVISOR_EMAIL',
+          'housekeeping.supervisor@demo-hotel.com',
+        ),
+      ),
+      password: optionalEnv('HOUSEKEEPING_SUPERVISOR_PASSWORD', 'ChangeMe123!'),
+      fullName: optionalEnv(
+        'HOUSEKEEPING_SUPERVISOR_NAME',
+        'Housekeeping Supervisor',
+      ),
+      employeeNumber: 'HK-SUP-001',
+      jobTitle: 'Housekeeping Supervisor',
+    },
+    {
+      roleKey: RoleKey.HOUSEKEEPING_ATTENDANT,
+      email: normalizeEmail(
+        optionalEnv(
+          'HOUSEKEEPING_ATTENDANT_EMAIL',
+          'housekeeping.attendant@demo-hotel.com',
+        ),
+      ),
+      password: optionalEnv('HOUSEKEEPING_ATTENDANT_PASSWORD', 'ChangeMe123!'),
+      fullName: optionalEnv(
+        'HOUSEKEEPING_ATTENDANT_NAME',
+        'Housekeeping Attendant',
+      ),
+      employeeNumber: 'HK-ATT-001',
+      jobTitle: 'Housekeeping Attendant',
+    },
+  ] as const;
+
+  for (const account of accounts) {
+    const role = await prisma.role.findUnique({
+      where: { systemKey: account.roleKey },
+    });
+    if (!role) throw new Error(`${account.roleKey} role was not seeded.`);
+    const passwordHash = await hash(account.password, saltRounds);
+    const user = await prisma.user.upsert({
+      where: { email: account.email },
+      update: {
+        fullName: account.fullName,
+        passwordHash,
+        status: 'ACTIVE',
+        roleId: role.id,
+        departmentId: department.id,
+      },
+      create: {
+        email: account.email,
+        fullName: account.fullName,
+        passwordHash,
+        roleId: role.id,
+        departmentId: department.id,
+      },
+    });
+    const [firstName, ...lastNameParts] = account.fullName.split(/\s+/);
+    await prisma.employee.upsert({
+      where: { employeeNumber: account.employeeNumber },
+      update: {
+        userId: user.id,
+        departmentId: department.id,
+        firstName,
+        lastName: lastNameParts.join(' ') || account.jobTitle,
+        email: account.email,
+        jobTitle: account.jobTitle,
+        status: 'ACTIVE',
+      },
+      create: {
+        userId: user.id,
+        departmentId: department.id,
+        employeeNumber: account.employeeNumber,
+        firstName,
+        lastName: lastNameParts.join(' ') || account.jobTitle,
+        email: account.email,
+        jobTitle: account.jobTitle,
+      },
+    });
+  }
+}
+
 async function main() {
   loadEnvironment();
 
@@ -313,6 +390,7 @@ async function main() {
     await seedHotelProfile(prisma);
     await seedDefaultDepartments(prisma);
     await seedInitialAdmin(prisma);
+    await seedHousekeepingQaAccounts(prisma);
 
     const [permissionCount, roleCount, departmentCount] = await Promise.all([
       prisma.permission.count(),

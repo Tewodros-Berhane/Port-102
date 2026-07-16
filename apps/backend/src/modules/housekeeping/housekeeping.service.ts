@@ -32,6 +32,7 @@ import { CompleteHousekeepingTaskDto } from './dto/complete-housekeeping-task.dt
 import { CreateHousekeepingTaskDto } from './dto/create-housekeeping-task.dto';
 import { CreateHousekeepingIssueDto } from './dto/create-housekeeping-issue.dto';
 import { GetHousekeepingIssuesQueryDto } from './dto/get-housekeeping-issues-query.dto';
+import { GetHousekeepingAssigneesQueryDto } from './dto/get-housekeeping-assignees-query.dto';
 import { GetHousekeepingTasksQueryDto } from './dto/get-housekeeping-tasks-query.dto';
 import { HousekeepingDashboardQueryDto } from './dto/housekeeping-dashboard-query.dto';
 import { HousekeepingProductivityQueryDto } from './dto/housekeeping-productivity-query.dto';
@@ -186,6 +187,28 @@ export class HousekeepingService {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  async listAssignees(query: GetHousekeepingAssigneesQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const search = this.normalizeOptionalString(query.search);
+    const [total, users] =
+      await this.housekeepingTasksRepository.listAssignableAttendants({
+        skip: (page - 1) * limit,
+        take: limit,
+        search: search ?? undefined,
+      });
+    return {
+      data: users.map((user) => ({
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        employeeId: user.employees[0]?.id ?? null,
+        employeeNumber: user.employees[0]?.employeeNumber ?? null,
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
@@ -1301,7 +1324,9 @@ export class HousekeepingService {
     const user = await this.housekeepingTasksRepository.findActiveUser(userId);
 
     if (!user) {
-      throw new NotFoundException('Assigned user was not found or inactive.');
+      throw new NotFoundException(
+        'Assigned housekeeping attendant was not found or inactive.',
+      );
     }
 
     return user;

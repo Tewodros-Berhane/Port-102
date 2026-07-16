@@ -95,6 +95,13 @@ const activeUserSelect = {
       isActive: true,
     },
   },
+  employees: {
+    select: {
+      id: true,
+      employeeNumber: true,
+    },
+    take: 1,
+  },
 } as const;
 
 const productivityTaskSelect = {
@@ -333,10 +340,51 @@ export class HousekeepingTasksRepository {
         status: UserStatus.ACTIVE,
         role: {
           isActive: true,
+          systemKey: 'HOUSEKEEPING_ATTENDANT',
         },
       },
       select: activeUserSelect,
     });
+  }
+
+  listAssignableAttendants({
+    skip,
+    take,
+    search,
+  }: {
+    skip: number;
+    take: number;
+    search?: string;
+  }) {
+    const where: Prisma.UserWhereInput = {
+      status: UserStatus.ACTIVE,
+      role: { isActive: true, systemKey: 'HOUSEKEEPING_ATTENDANT' },
+      ...(search
+        ? {
+            OR: [
+              { fullName: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+              {
+                employees: {
+                  some: {
+                    employeeNumber: { contains: search, mode: 'insensitive' },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    return Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take,
+        select: activeUserSelect,
+        orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
   }
 
   private searchWhere(search?: string): Prisma.HousekeepingTaskWhereInput {
