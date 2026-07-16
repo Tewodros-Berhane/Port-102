@@ -8,7 +8,6 @@ This file tracks the project structure for Port-102. Generated output, dependenc
 
 ```text
 Port-102/
-|-- .env.example
 |-- .gitignore
 |-- README.md
 |-- docker-compose.yml
@@ -210,7 +209,6 @@ Notes:
 
 ```text
 Port-102/
-|-- .env.example
 |-- .gitignore
 |-- README.md
 |-- docker-compose.yml
@@ -219,6 +217,7 @@ Port-102/
 |-- tree.md
 |-- apps/
 |   |-- backend/
+|   |   |-- .env.example
 |   |   |-- .prettierignore
 |   |   |-- .prettierrc
 |   |   |-- eslint.config.mjs
@@ -283,6 +282,19 @@ Port-102/
 |   |   |   |   |   `-- .gitkeep
 |   |   |   |   |-- employees/
 |   |   |   |   |   `-- .gitkeep
+|   |   |   |   |-- departments/
+|   |   |   |   |   |-- departments.controller.spec.ts
+|   |   |   |   |   |-- departments.controller.ts
+|   |   |   |   |   |-- departments.module.ts
+|   |   |   |   |   |-- departments.service.spec.ts
+|   |   |   |   |   |-- departments.service.ts
+|   |   |   |   |   |-- dto/
+|   |   |   |   |   |   |-- create-department.dto.ts
+|   |   |   |   |   |   |-- get-departments-query.dto.ts
+|   |   |   |   |   |   `-- update-department.dto.ts
+|   |   |   |   |   `-- repositories/
+|   |   |   |   |       |-- departments.repository.spec.ts
+|   |   |   |   |       `-- departments.repository.ts
 |   |   |   |   |-- floors/
 |   |   |   |   |   |-- .gitkeep
 |   |   |   |   |   |-- floors.controller.spec.ts
@@ -670,6 +682,7 @@ docker-compose.yml
 package-lock.json
 package.json
 tree.md
+apps/backend/.env.example
 apps/backend/.prettierignore
 apps/backend/.prettierrc
 apps/backend/eslint.config.mjs
@@ -711,6 +724,16 @@ apps/backend/src/main.ts
 apps/backend/src/modules/audit-logs/.gitkeep
 apps/backend/src/modules/auth/.gitkeep
 apps/backend/src/modules/billing/.gitkeep
+apps/backend/src/modules/departments/departments.controller.spec.ts
+apps/backend/src/modules/departments/departments.controller.ts
+apps/backend/src/modules/departments/departments.module.ts
+apps/backend/src/modules/departments/departments.service.spec.ts
+apps/backend/src/modules/departments/departments.service.ts
+apps/backend/src/modules/departments/dto/create-department.dto.ts
+apps/backend/src/modules/departments/dto/get-departments-query.dto.ts
+apps/backend/src/modules/departments/dto/update-department.dto.ts
+apps/backend/src/modules/departments/repositories/departments.repository.spec.ts
+apps/backend/src/modules/departments/repositories/departments.repository.ts
 apps/backend/src/modules/employees/.gitkeep
 apps/backend/src/modules/floors/.gitkeep
 apps/backend/src/modules/floors/dto/create-floor.dto.ts
@@ -1064,6 +1087,7 @@ apps/backend/test/integration/property-notifications-postgres.integration-spec.t
 apps/backend/test/integration/run-integration-tests.ts
 apps/backend/test/jest-e2e.json
 apps/backend/test/jest-integration.json
+apps/backend/test/departments.e2e-spec.ts
 apps/backend/test/maintenance.e2e-spec.ts
 apps/backend/test/payments.e2e-spec.ts
 apps/backend/test/receipts.e2e-spec.ts
@@ -1079,6 +1103,7 @@ apps/frontend/.gitkeep
 apps/mobile/.gitkeep
 docs/.gitkeep
 docs/billing-folios-payments-module.md
+docs/departments-module.md
 docs/front-desk-stays-module.md
 docs/housekeeping-module.md
 docs/inventory-module.md

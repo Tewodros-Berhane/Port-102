@@ -31,25 +31,25 @@ Start the backend in development mode:
 npm run backend:dev
 ```
 
-The API starts on `http://localhost:3000` by default.
+The API starts on `http://localhost:8080` by default.
 
 ### Environment Setup
 
 Create a local environment file:
 
 ```bash
-cp .env.example .env
+cp apps/backend/.env.example apps/backend/.env
 ```
 
 Required backend environment values:
 
 ```text
 NODE_ENV=development
-PORT=3000
+PORT=8080
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/port_102?schema=public"
 ```
 
-The backend uses `ConfigModule` globally and reads these values from the root `.env` file.
+The backend uses `ConfigModule` globally and reads these values from `apps/backend/.env`.
 
 ### Database Setup
 
@@ -59,7 +59,7 @@ Start PostgreSQL with Docker Compose:
 docker compose up -d postgres
 ```
 
-The default database settings in `.env.example` match the `postgres` service in `docker-compose.yml`.
+The default database settings in `apps/backend/.env.example` match the `postgres` service in `docker-compose.yml`.
 
 ### Prisma Commands
 
@@ -104,7 +104,7 @@ GET /api/health
 Swagger documentation is available at:
 
 ```text
-http://localhost:3000/api/docs
+http://localhost:8080/api/docs
 ```
 
 Successful API responses are wrapped globally:
